@@ -1,0 +1,39 @@
+Security hardening + production readiness fixes
+
+CRITICAL FIXES:
+- Wall post authentication: UserSession required, prevent impersonation
+- Admin endpoint protection: role-based access control for /admin/heatmap
+- Rate limiting: login (5/min), anonymous feedback (10/min) per IP
+- Secure cookies: auto-enable for HTTPS in production
+- Wall API decryption: server-side decrypt instead of returning ciphertext
+- Legacy data migration: answers (0-3) → checkin_answers (1-10) adapter
+- Row Level Security: policies + middleware for database-level isolation
+- Deterministic builds: SQLX_OFFLINE + Cargo.lock generation script
+
+SECURITY IMPACT:
+- ✅ Prevents wall post impersonation (was CRITICAL)
+- ✅ Protects admin data exposure (was CRITICAL)
+- ✅ Blocks brute force attacks (was HIGH)
+- ✅ Prevents anonymous spam (was HIGH)
+- ✅ Secures session cookies on HTTPS (was HIGH)
+
+FILES CHANGED:
+- src/web/feedback.rs: auth + rate limiting + decryption
+- src/web/auth.rs: rate limiting + secure cookies
+- src/web/admin.rs: authentication + authorization
+- src/db/mod.rs: legacy data adapter (0-3 to 1-10 scale)
+- src/middleware/rate_limit.rs: NEW - IP-based throttling
+- src/middleware/rls.rs: NEW - RLS context middleware
+- migrations/06_row_level_security.sql: NEW - RLS policies
+- Dockerfile: SQLX_OFFLINE=true for database-less builds
+- GENERATE_LOCKFILE.sh: automated build artifacts generation
+
+DEPLOYMENT NOTES:
+1. Run ./GENERATE_LOCKFILE.sh locally to generate Cargo.lock + sqlx-data.json
+2. Set environment variables on Railway (see PRODUCTION_DEPLOY.md)
+3. Push to main → Railway auto-deploys
+4. Optional: enable RLS middleware (instructions in PRODUCTION_DEPLOY.md)
+
+See SECURITY_FIXES_SUMMARY.md for complete details.
+
+Co-Authored-By: Claude <noreply@anthropic.com>

@@ -1,0 +1,2 @@
+-- Seed data is performed at runtime to ensure Argon2 hashing with fresh salts.
+-- Run the application once (or call seed::seed_all) to populate users and questions.

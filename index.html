@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpsLab Mindguard · TeamPulse Import</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div>
+          <h1>OpsLab Mindguard</h1>
+          <div class="meta">
+            <span class="pill">Дані: TeamPulse MindGuard AI</span>
+            <span class="pill">Період: Серпень — Грудень 2025</span>
+            <span class="pill">Оновлено: 2025-12-31</span>
+          </div>
+        </div>
+        <div class="tag">Neobrutal Secure Ops</div>
+      </header>
+
+      <section class="section">
+        <div class="section-title">Командний стан (поточні метрики)</div>
+        <div id="summary-cards" class="grid cards"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Тренди команди · Серпень—Грудень 2025</div>
+        <div id="trend-metrics" class="grid trend-grid"></div>
+      </section>
+
+      <section class="section two-col">
+        <div>
+          <div class="section-title">Індикатори ризику</div>
+          <div id="alerts-list" class="stack"></div>
+        </div>
+        <div>
+          <div class="section-title">Рекомендації</div>
+          <div id="rec-list" class="stack"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Team Heatmap (Live) · WOW Feature #8</div>
+        <div id="team-heatmap" class="grid employee-grid"></div>
+        <button id="refresh-heatmap" class="btn">🔄 Оновити Heatmap</button>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Індивідуальні карти співробітників</div>
+        <div id="employees" class="grid employee-grid"></div>
+      </section>
+
+      <section class="section two-col">
+        <div>
+          <div class="section-title">Бенчмарки індустрії (Tech)</div>
+          <div id="benchmarks" class="card bench"></div>
+        </div>
+        <div>
+          <div class="section-title">Playbooks 1:1</div>
+          <div id="playbooks" class="stack"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Додаткові аналітики</div>
+        <div class="grid analytics-grid">
+          <div class="card" id="risk-matrix">
+            <h3>Risk Matrix (Stress vs Burnout)</h3>
+            <div class="matrix" id="matrix-grid"></div>
+          </div>
+          <div class="card" id="correlation">
+            <h3>Кореляції</h3>
+            <div id="correlation-heatmap" class="heatmap"></div>
+          </div>
+          <div class="card" id="distribution">
+            <h3>Розподіл метрик</h3>
+            <div id="distributions" class="stack"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">
+        <div>Логін для імпорту: work.olegkmainskyi@gmail.com · Код 0000</div>
+        <div>Zero Trust · AES-256-GCM · Teloxide + Axum + SQLx · OpsLab Orange</div>
+      </div>
+    </div>
+
+    <script>
+      const data = {
+        extraction_metadata: {
+          platform_name: "TeamPulse MindGuard AI",
+          platform_url: "https://teampulse-mindguard-production.up.railway.app",
+          extraction_date: "2026-01-04",
+          company: "OpsLab",
+          authentication: "NONE - Public access (no authentication required)",
+          data_period: "August-December 2025",
+          last_updated: "2025-12-31",
+        },
+        team_summary: {
+          total_employees: 8,
+          active_employees: 8,
+          participation_rate: "100%",
+          update_frequency: "monthly",
+          next_assessment: "2025-12-30",
+        },
+        team_averages_by_month: {
+          current: {
+            who5: 65.5,
+            phq9: 8.25,
+            gad7: 7.38,
+            mbi: 44.81,
+            sleepDuration: 6.33,
+            sleepQuality: 4.25,
+            workLifeBalance: 4.88,
+            stressLevel: 23.88,
+          },
+          august: {
+            who5: 68.1,
+            phq9: 2.8,
+            gad7: 0,
+            mbi: 46.1,
+            sleepDuration: 6.85,
+            sleepQuality: 6.7,
+            workLifeBalance: 6.6,
+            stressLevel: 20.6,
+          },
+          september: {
+            who5: 57.82,
+            phq9: 6.73,
+            gad7: 8,
+            mbi: 33.56,
+            sleepDuration: 6.86,
+            sleepQuality: 6.45,
+            workLifeBalance: 5.55,
+            stressLevel: 17.73,
+          },
+          october: {
+            who5: 57.5,
+            phq9: 7.38,
+            gad7: 7.12,
+            mbi: 29.17,
+            sleepDuration: 6.66,
+            sleepQuality: 6.5,
+            workLifeBalance: 6.375,
+            stressLevel: 9.625,
+          },
+          november: {
+            who5: 66.75,
+            phq9: 8.25,
+            gad7: 7.125,
+            mbi: 29.19,
+            sleepDuration: 7.06,
+            sleepQuality: 6.625,
+            workLifeBalance: 6.5,
+            stressLevel: 10.25,
+          },
+          december: {
+            who5: 65.5,
+            phq9: 8.25,
+            gad7: 7.38,
+            mbi: 44.81,
+            sleepDuration: 6.33,
+            sleepQuality: 4.25,
+            workLifeBalance: 4.88,
+            stressLevel: 23.88,
+          },
+        },
+        current_team_metrics: {
+          wellbeingIndex: 65.5,
+          depressionLevel: 8.25,
+          anxietyLevel: 7.38,
+          burnoutIndex: 44.81,
+          sleepDuration: 6.33,
+          sleepQuality: 4.25,
+          workLifeBalance: 4.88,
+          stressLevel: 23.88,
+          atRiskCount: 4,
+          criticalCount: 1,
+        },
+        industry_benchmarks: {
+          tech_sector: {
+            who5: 58,
+            phq9: 8,
+            gad7: 7,
+            mbi: 30,
+            sleepDuration: 6.5,
+            workLifeBalance: 5.5,
+            stressLevel: 7,
+          },
+        },
+        alerts: [
+          {
+            severity: "critical",
+            employee: "Катерина Петухова",
+            message:
+              "КРИТИЧНИЙ СТАН! WHO-5: 40, PHQ-9: 16 (помірно-тяжка депресія), MBI: 81.5%. Негайна психологічна допомога!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+          {
+            severity: "critical",
+            employee: "Іванна Сакало",
+            message:
+              "КРИТИЧНЕ ПОГІРШЕННЯ! WHO-5 впав з 72 (листопад) до 32 (грудень). PHQ-9: 11. Негайна інтервенція!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+          {
+            severity: "critical",
+            employee: "Михайло Іващук",
+            message: "Критичний рівень вигорання 70%, PHQ-9: 15 (помірно-тяжка депресія). Негайна підтримка!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+          {
+            severity: "positive",
+            employee: "Оксана Клінчаян",
+            message: "Відмінне покращення в грудні! WHO-5: 76 (+16 від листопада), PHQ-9: 7 (з 11). Позитивна динаміка!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+          {
+            severity: "positive",
+            employee: "Ірина М'ячкова",
+            message: "Дуже сильне покращення! WHO-5: 84 (+24 від листопада). Відмінна динаміка відновлення!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+          {
+            severity: "positive",
+            employee: "Вероніка Кухарчук",
+            message: "Стабільно відмінні показники! WHO-5: 88, MBI знизився до 16.5%. Зразковий стан!",
+            timestamp: "2025-12-31T10:00:00Z",
+          },
+        ],
+        recommendations: [
+          {
+            category: "emergency",
+            title: "ТЕРМІНОВА психологічна інтервенція",
+            description:
+              "3 співробітників в критичному стані (Катерина, Іванна, Михайло) потребують НЕГАЙНОЇ професійної психологічної допомоги",
+            affectedEmployees: ["Катерина Петухова", "Іванна Сакало", "Михайло Іващук"],
+            priority: "critical",
+          },
+          {
+            category: "urgent",
+            title: "Зменшення робочого навантаження",
+            description: "Для співробітників в критичному стані необхідно негайно перерозподілити задачі та надати відпустку",
+            affectedEmployees: ["Катерина Петухова", "Іванна Сакало", "Михайло Іващук"],
+            priority: "critical",
+          },
+          {
+            category: "positive",
+            title: "Аналіз успішних практик відновлення",
+            description: "Вивчити фактори успіху Оксани, Ірини та Вероніки для застосування в команді",
+            affectedEmployees: ["Оксана Клінчаян", "Ірина М'ячкова", "Вероніка Кухарчук"],
+            priority: "high",
+          },
+          {
+            category: "general",
+            title: "Організаційні зміни",
+            description: "Критично високий рівень вигорання команди (44.81%) вимагає системних змін в організації роботи",
+            affectedEmployees: ["all"],
+            priority: "critical",
+          },
+        ],
+        employees: [
+          {
+            id: 1,
+            code: "1122",
+            name: "Катерина Петухова",
+            email: "kateryna.petukhova@opslab.uk",
+            current_metrics: {
+              who5: 40,
+              phq9: 16,
+              gad7: 13,
+              mbi: 81.5,
+              sleepDuration: 5.3,
+              sleepQuality: 1,
+              workLifeBalance: 2,
+              stressLevel: 39,
+            },
+            riskLevel: "critical",
+            notes:
+              "КРИТИЧНИЙ СТАН! WHO-5: 40, PHQ-9: 16, GAD-7: 13, MBI: 81.5%. Термінова психологічна допомога необхідна!",
+            monthly_history: {
+              august: {
+                who5: 72,
+                phq9: 1,
+                gad7: 0,
+                mbi: 40,
+                sleepDuration: 7.2,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 12,
+              },
+              september: {
+                who5: 40,
+                phq9: 14,
+                gad7: 15,
+                mbi: 33.33,
+                sleepDuration: 6.5,
+                sleepQuality: 6,
+                workLifeBalance: 5,
+                stressLevel: 18,
+              },
+              october: {
+                who5: 48,
+                phq9: 14,
+                gad7: 0,
+                mbi: 44.44,
+                sleepDuration: 6.3,
+                sleepQuality: 5,
+                workLifeBalance: 5,
+                stressLevel: 15,
+              },
+              november: {
+                who5: 48,
+                phq9: 13,
+                gad7: 11,
+                mbi: 44.44,
+                sleepDuration: 6.2,
+                sleepQuality: 5,
+                workLifeBalance: 5,
+                stressLevel: 16,
+              },
+              december: {
+                who5: 40,
+                phq9: 16,
+                gad7: 13,
+                mbi: 81.5,
+                sleepDuration: 5.3,
+                sleepQuality: 1,
+                workLifeBalance: 2,
+                stressLevel: 39,
+              },
+            },
+          },
+          {
+            id: 2,
+            code: "6738",
+            name: "Іванна Сакало",
+            email: "ivanna.sakalo@opslab.uk",
+            current_metrics: {
+              who5: 32,
+              phq9: 11,
+              gad7: 8,
+              mbi: 68,
+              sleepDuration: 5.7,
+              sleepQuality: 3,
+              workLifeBalance: 3,
+              stressLevel: 30,
+            },
+            riskLevel: "high",
+            notes: "КРИТИЧНЕ ПОГІРШЕННЯ в грудні! WHO-5 впав з 72 до 32. PHQ-9: 11. Негайна інтервенція потрібна.",
+            monthly_history: {
+              august: {
+                who5: 60,
+                phq9: 2,
+                gad7: 0,
+                mbi: 45,
+                sleepDuration: 6.8,
+                sleepQuality: 6,
+                workLifeBalance: 6,
+                stressLevel: 14,
+              },
+              september: {
+                who5: 44,
+                phq9: 7,
+                gad7: 10,
+                mbi: 16.67,
+                sleepDuration: 6.5,
+                sleepQuality: 6,
+                workLifeBalance: 5,
+                stressLevel: 16,
+              },
+              october: {
+                who5: 36,
+                phq9: 11,
+                gad7: 14,
+                mbi: 22.22,
+                sleepDuration: 6,
+                sleepQuality: 5,
+                workLifeBalance: 5,
+                stressLevel: 18,
+              },
+              november: {
+                who5: 72,
+                phq9: 8,
+                gad7: 5,
+                mbi: 22.22,
+                sleepDuration: 7.2,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 10,
+              },
+              december: {
+                who5: 32,
+                phq9: 11,
+                gad7: 8,
+                mbi: 68,
+                sleepDuration: 5.7,
+                sleepQuality: 3,
+                workLifeBalance: 3,
+                stressLevel: 30,
+              },
+            },
+          },
+          {
+            id: 3,
+            code: "9267",
+            name: "Михайло Іващук",
+            email: "mykhailo.ivashchuk@opslab.uk",
+            current_metrics: {
+              who5: 56,
+              phq9: 15,
+              gad7: 12,
+              mbi: 70,
+              sleepDuration: 5.6,
+              sleepQuality: 1,
+              workLifeBalance: 3,
+              stressLevel: 36,
+            },
+            riskLevel: "high",
+            notes:
+              "Критичний рівень вигорання 70%, PHQ-9: 15 (помірно-тяжка депресія), GAD-7: 12. Необхідна термінова підтримка.",
+            monthly_history: {
+              august: {
+                who5: 52,
+                phq9: 6,
+                gad7: 0,
+                mbi: 62,
+                sleepDuration: 6.2,
+                sleepQuality: 6,
+                workLifeBalance: 5,
+                stressLevel: 18,
+              },
+              september: {
+                who5: 44,
+                phq9: 17,
+                gad7: 15,
+                mbi: 50,
+                sleepDuration: 5.8,
+                sleepQuality: 5,
+                workLifeBalance: 4,
+                stressLevel: 20,
+              },
+              october: {
+                who5: 36,
+                phq9: 9,
+                gad7: 14,
+                mbi: 44.44,
+                sleepDuration: 5.5,
+                sleepQuality: 4,
+                workLifeBalance: 4,
+                stressLevel: 19,
+              },
+              november: {
+                who5: 56,
+                phq9: 13,
+                gad7: 10,
+                mbi: 44.44,
+                sleepDuration: 6,
+                sleepQuality: 5,
+                workLifeBalance: 5,
+                stressLevel: 15,
+              },
+              december: {
+                who5: 56,
+                phq9: 15,
+                gad7: 12,
+                mbi: 70,
+                sleepDuration: 5.6,
+                sleepQuality: 1,
+                workLifeBalance: 3,
+                stressLevel: 36,
+              },
+            },
+          },
+          {
+            id: 4,
+            code: "4747",
+            name: "Джейн Давидюк",
+            email: "jane.davydyuk@opslab.uk",
+            current_metrics: {
+              who5: 90,
+              phq9: 3,
+              gad7: 8,
+              mbi: 11.11,
+              sleepDuration: 7.8,
+              sleepQuality: 8,
+              workLifeBalance: 8,
+              stressLevel: 5,
+            },
+            riskLevel: "low",
+            notes: "Відмінні показники психічного здоров'я. Еталонний work-life баланс. Новий співробітник з вересня.",
+            monthly_history: {
+              august: { who5: 0, phq9: 0, gad7: 0, mbi: 0, sleepDuration: 0, sleepQuality: 0, workLifeBalance: 0, stressLevel: 0 },
+              september: {
+                who5: 88,
+                phq9: 2,
+                gad7: 4,
+                mbi: 5.56,
+                sleepDuration: 7.8,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 4,
+              },
+              october: {
+                who5: 88,
+                phq9: 3,
+                gad7: 9,
+                mbi: 11.11,
+                sleepDuration: 7.7,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 5,
+              },
+              november: {
+                who5: 90,
+                phq9: 3,
+                gad7: 8,
+                mbi: 11.11,
+                sleepDuration: 7.8,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 5,
+              },
+            },
+          },
+          {
+            id: 5,
+            code: "8463",
+            name: "Оксана Клінчаян",
+            email: "oksana.klinchaian@opslab.uk",
+            current_metrics: {
+              who5: 76,
+              phq9: 7,
+              gad7: 7,
+              mbi: 36.5,
+              sleepDuration: 6.6,
+              sleepQuality: 5,
+              workLifeBalance: 6,
+              stressLevel: 21,
+            },
+            riskLevel: "high",
+            notes: "Відмінне покращення в грудні! WHO-5: 76 (з 60), PHQ-9: 7 (з 11). Позитивна динаміка!",
+            monthly_history: {
+              august: {
+                who5: 72,
+                phq9: 2,
+                gad7: 0,
+                mbi: 40,
+                sleepDuration: 7.2,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 10,
+              },
+              september: {
+                who5: 64,
+                phq9: 3,
+                gad7: 4,
+                mbi: 33.33,
+                sleepDuration: 7,
+                sleepQuality: 6,
+                workLifeBalance: 6,
+                stressLevel: 11,
+              },
+              october: {
+                who5: 72,
+                phq9: 5,
+                gad7: 4,
+                mbi: 27.78,
+                sleepDuration: 7.2,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 8,
+              },
+              november: {
+                who5: 60,
+                phq9: 11,
+                gad7: 8,
+                mbi: 27.78,
+                sleepDuration: 6.8,
+                sleepQuality: 6,
+                workLifeBalance: 6,
+                stressLevel: 12,
+              },
+              december: {
+                who5: 76,
+                phq9: 7,
+                gad7: 7,
+                mbi: 36.5,
+                sleepDuration: 6.6,
+                sleepQuality: 5,
+                workLifeBalance: 6,
+                stressLevel: 21,
+              },
+            },
+          },
+          {
+            id: 6,
+            code: "3814",
+            name: "Ірина М'ячкова",
+            email: "iryna.miachkova@opslab.uk",
+            current_metrics: {
+              who5: 84,
+              phq9: 6,
+              gad7: 7,
+              mbi: 30.5,
+              sleepDuration: 6.7,
+              sleepQuality: 5,
+              workLifeBalance: 6,
+              stressLevel: 20,
+            },
+            riskLevel: "low",
+            notes: "Дуже сильне покращення! WHO-5: 84 (з 60). Стабільні показники, відмінна динаміка.",
+            monthly_history: {
+              august: {
+                who5: 72,
+                phq9: 1,
+                gad7: 0,
+                mbi: 40,
+                sleepDuration: 7.5,
+                sleepQuality: 8,
+                workLifeBalance: 7,
+                stressLevel: 8,
+              },
+              september: {
+                who5: 68,
+                phq9: 4,
+                gad7: 5,
+                mbi: 11.11,
+                sleepDuration: 7.3,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 8,
+              },
+              october: {
+                who5: 80,
+                phq9: 7,
+                gad7: 8,
+                mbi: 16.67,
+                sleepDuration: 7.5,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 9,
+              },
+              november: {
+                who5: 60,
+                phq9: 7,
+                gad7: 7,
+                mbi: 16.67,
+                sleepDuration: 7,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 9,
+              },
+              december: {
+                who5: 84,
+                phq9: 6,
+                gad7: 7,
+                mbi: 30.5,
+                sleepDuration: 6.7,
+                sleepQuality: 5,
+                workLifeBalance: 6,
+                stressLevel: 20,
+              },
+            },
+          },
+          {
+            id: 7,
+            code: "4582",
+            name: "Вероніка Кухарчук",
+            email: "veronika.kukharchuk@opslab.uk",
+            current_metrics: {
+              who5: 88,
+              phq9: 3,
+              gad7: 3,
+              mbi: 16.5,
+              sleepDuration: 7.1,
+              sleepQuality: 7,
+              workLifeBalance: 7,
+              stressLevel: 12,
+            },
+            riskLevel: "low",
+            notes: "Стабільно відмінні показники! WHO-5: 88, PHQ-9: 3. Зниження MBI до 16.5%. Чудовий стан!",
+            monthly_history: {
+              august: {
+                who5: 92,
+                phq9: 1,
+                gad7: 0,
+                mbi: 30,
+                sleepDuration: 7.8,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 6,
+              },
+              september: {
+                who5: 60,
+                phq9: 4,
+                gad7: 8,
+                mbi: 38.89,
+                sleepDuration: 7,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 9,
+              },
+              october: {
+                who5: 48,
+                phq9: 7,
+                gad7: 5,
+                mbi: 38.89,
+                sleepDuration: 6.8,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 8,
+              },
+              november: {
+                who5: 88,
+                phq9: 6,
+                gad7: 3,
+                mbi: 38.89,
+                sleepDuration: 7.5,
+                sleepQuality: 8,
+                workLifeBalance: 8,
+                stressLevel: 7,
+              },
+              december: {
+                who5: 88,
+                phq9: 3,
+                gad7: 3,
+                mbi: 16.5,
+                sleepDuration: 7.1,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 12,
+              },
+            },
+          },
+          {
+            id: 8,
+            code: "1425",
+            name: "Марія Василик",
+            email: "mariya.vasylyk@opslab.uk",
+            current_metrics: {
+              who5: 64,
+              phq9: 3,
+              gad7: 3,
+              mbi: 28.5,
+              sleepDuration: 6.8,
+              sleepQuality: 7,
+              workLifeBalance: 6,
+              stressLevel: 15,
+            },
+            riskLevel: "low",
+            notes: "Стабільні показники, WHO-5: 64. Невелике покращення порівняно з листопадом.",
+            monthly_history: {
+              august: {
+                who5: 60,
+                phq9: 1,
+                gad7: 0,
+                mbi: 45,
+                sleepDuration: 7,
+                sleepQuality: 7,
+                workLifeBalance: 7,
+                stressLevel: 10,
+              },
+              september: {
+                who5: 64,
+                phq9: 4,
+                gad7: 2,
+                mbi: 33.33,
+                sleepDuration: 6.8,
+                sleepQuality: 7,
+                workLifeBalance: 6,
+                stressLevel: 9,
+              },
+              october: {
+                who5: 52,
+                phq9: 3,
+                gad7: 3,
+                mbi: 27.78,
+                sleepDuration: 6.8,
+                sleepQuality: 7,
+                workLifeBalance: 6,
+                stressLevel: 7,
+              },
+              november: {
+                who5: 60,
+                phq9: 5,
+                gad7: 5,
+                mbi: 27.78,
+                sleepDuration: 7,
+                sleepQuality: 7,
+                workLifeBalance: 6,
+                stressLevel: 8,
+              },
+              december: {
+                who5: 64,
+                phq9: 3,
+                gad7: 3,
+                mbi: 28.5,
+                sleepDuration: 6.8,
+                sleepQuality: 7,
+                workLifeBalance: 6,
+                stressLevel: 15,
+              },
+            },
+          },
+        ],
+        one_on_one_playbooks: [
+          {
+            employee: "Катерина Петухова",
+            riskLevel: "high",
+            alert: "PHQ-9: 13/27, Стрес: високий",
+            conversation_script: {
+              opening:
+                "Катю, дякую, що знайшла час. Хочу поговорити про твоє самопочуття - це важливо для мене. Я помітив деякі сигнали в метриках і хочу переконатися, що ти отримуєш потрібну підтримку.",
+              questions: [
+                "Як ти себе почуваєш останнім часом? Що найбільше турбує?",
+                "Які завдання/проєкти зараз забирають найбільше енергії?",
+                "Як твій сон? Чи вистачає часу на відновлення?",
+                "Що б допомогло тобі почуватися краще на роботі?",
+              ],
+              active_listening_tips: "Не перебивати, робити паузи 3-5 секунд після відповідей, підтверджувати почуте",
+              closing: "Дякую за відкритість. Давай разом складемо конкретний план на тиждень і зустрінемось знову через 7 днів.",
+            },
+            "7_day_action_plan": {
+              day_1_2:
+                "Делегувати 1 не-критичну задачу колезі. Призначити консультацію з психологом/коучем (конкретна дата і час). Надіслати запрошення в календар.",
+              day_3_4:
+                "Скасувати або скоротити 2 найменш продуктивних мітинги. Додати в календар 2 блоки по 2 години 'Deep Work' без пінгів і повідомлень.",
+              day_5_7:
+                "Короткий check-in (5 хв): 'Як відчуваєш зміни? Що працює, що треба скоригувати?' Заборона робочих чатів після 19:00 (домовленість з командою).",
+            },
+            follow_up_questions: [
+              "Наскільки змінилося твоє самопочуття за шкалі 1-10?",
+              "Які з запропонованих змін найбільше допомогли?",
+              "Що ще потрібно скоригувати на наступний тиждень?",
+              "Чи вистачає тобі енергії наприкінці дня? Як змінився сон?",
+            ],
+          },
+          {
+            employee: "Михайло Іващук",
+            riskLevel: "high",
+            alert: "PHQ-9: 13/27, GAD-7: 10/21",
+            conversation_script: {
+              opening:
+                "Михайле, дякую, що знайшов час. Помітив, що рівень тривожності підвищився - хочу зрозуміти, як тобі допомогти.",
+              questions: [
+                "Що найбільше викликає занепокоєння останнім часом?",
+                "Чи є конкретні робочі ситуації, які підвищують стрес?",
+                "Як ти зараз справляєшся з тривожністю? Що допомагає?",
+                "Що б зменшило невизначеність або тиск на роботі?",
+              ],
+              active_listening_tips:
+                "Валідувати емоції ('Це абсолютно нормально відчувати...'), не давати порад одразу, дозволити висловитися повністю",
+              closing: "Ми разом з цим впораємось. Давай впровадимо кілька технік і зустрінемось через тиждень.",
+            },
+            "7_day_action_plan": {
+              day_1_2:
+                "Навчити техніці 4-7-8 дихання (4 сек вдих, 7 сек затримка, 8 сек видих). Практикувати 3 рази на день по 2 хвилини. Створити приоритезований список задач на тиждень разом.",
+              day_3_4:
+                "Запровадити гнучкий графік: можливість починати роботу на 1-2 години пізніше, якщо потрібно. Призначити buddy з команди для щоденних 5-хв check-in'ів підтримки.",
+              day_5_7:
+                "Короткий check-in: 'Як працюють дихальні вправи? Чи зменшилась тривожність?' Обговорити можливість консультації з терапевтом (CBT для тривожності).",
+            },
+            follow_up_questions: [
+              "Як часто виникають моменти сильної тривожності?",
+              "Чи допомагає дихальна техніка? В яких ситуаціях використовуєш?",
+              "Чи є ясність по задачах і пріоритетах зараз?",
+              "Що ще викликає занепокоєння, про що ми не поговорили?",
+            ],
+          },
+          {
+            employee: "Оксана Клінчаян",
+            riskLevel: "medium",
+            alert: "PHQ-9: 11/27, негативна динаміка",
+            conversation_script: {
+              opening:
+                "Оксано, дякую за час. Помітив зміни в показниках благополуччя і хочу поговорити - що змінилось останнім часом?",
+              questions: [
+                "Що змінилось в останні тижні? Які події вплинули на самопочуття?",
+                "На якому рівні зараз енергія і мотивація?",
+                "Які конкретні робочі моменти зараз найбільше виснажують?",
+                "Яка підтримка була б найбільш корисною зараз?",
+              ],
+              active_listening_tips: "Не мінімізувати проблеми, запитувати уточнюючі питання, показати емпатію",
+              closing: "Важливо зупинити погіршення зараз. Давай впровадимо зміни і контролюватимемо стан щотижня.",
+            },
+            "7_day_action_plan": {
+              day_1_2:
+                "Провести аудит робочого навантаження: виписати всі поточні задачі, позначити пріоритети (Must/Should/Could). Заморозити 2 найменш пріоритетні задачі до наступного спринту.",
+              day_3_4:
+                "Запропонувати 1 ментальний день здоров'я (Mental Health Day) для відновлення. Підключити peer support - призначити ментора з команди з хорошим work-life balance для обміну практиками.",
+              day_5_7:
+                "Check-in: 'Як вплинув день відновлення? Чи відчуваєш різницю після перерозподілу задач?' Разом визначити 1-2 практики для підтримки енергії.",
+            },
+            follow_up_questions: [
+              "Як змінився рівень енергії на шкалі 1-10?",
+              "Чи допоміг mental health day? Що робила, що найбільше відновило?",
+              "Які практики від ментора хочеш спробувати?",
+              "Чи відчуваєш, що навантаження зараз керованіше?",
+            ],
+          },
+        ],
+      };
+
+      const metricTips = {
+        who5: "WHO-5 (0-100). Вищий = краще. <50 ризик, <28 критично.",
+        phq9: "PHQ-9 (0-27). >10 ризик депресії, >15 критично.",
+        gad7: "GAD-7 (0-21). >10 ризик тривожності, >15 критично.",
+        mbi: "MBI вигорання (%). >35% ризик, >40% високий.",
+        sleepDuration: "Сон (год). Оптимум 7-9 год, <6 недостатньо.",
+        sleepQuality: "Якість сну (0-10). >7 добре.",
+        workLifeBalance: "Баланс (0-10). >7 здоровий.",
+        stressLevel: "Stress PSS (0-40). >26 високий стрес.",
+        wellbeingIndex: "Командний WHO-5 агрегований за поточний місяць.",
+        burnoutIndex: "MBI вигорання команди (%).",
+      };
+
+      const monthOrder = ["august", "september", "october", "november", "december"];
+      const monthLabels = {
+        august: "Серпень",
+        september: "Вересень",
+        october: "Жовтень",
+        november: "Листопад",
+        december: "Грудень",
+      };
+
+      const metricMeta = {
+        wellbeingIndex: { label: "Team Health Score (WHO-5)", unit: "" },
+        depressionLevel: { label: "Depression (PHQ-9)", unit: "" },
+        anxietyLevel: { label: "Anxiety (GAD-7)", unit: "" },
+        burnoutIndex: { label: "Burnout (MBI %)", unit: "%" },
+        sleepDuration: { label: "Sleep Duration", unit: "h" },
+        sleepQuality: { label: "Sleep Quality", unit: "/10" },
+        workLifeBalance: { label: "Work-Life Balance", unit: "/10" },
+        stressLevel: { label: "Stress (PSS)", unit: "" },
+      };
+
+      function helpIcon(key) {
+        const tip = metricTips[key] || "";
+        return tip ? `<span class="help" data-tip="${tip}">?</span>` : "";
+      }
+
+      function renderSummary() {
+        const container = document.getElementById("summary-cards");
+        const m = data.current_team_metrics;
+        const entries = [
+          { key: "wellbeingIndex", title: "Team Health Score", val: m.wellbeingIndex, note: "Поточний WHO-5 середній" },
+          { key: "burnoutIndex", title: "Burnout Index", val: m.burnoutIndex, note: "MBI, вище = гірше" },
+          { key: "gad7", title: "Anxiety (GAD-7)", val: m.anxietyLevel, note: "Критичні якщо > 15" },
+          { key: "phq9", title: "Depression (PHQ-9)", val: m.depressionLevel, note: "Вище 10 = ризик" },
+          { key: "sleepDuration", title: "Sleep (h)", val: m.sleepDuration, note: "Оптимум 7-9 год" },
+          { key: "workLifeBalance", title: "Work-Life", val: m.workLifeBalance, note: "Середній бал" },
+          { key: "stressLevel", title: "Stress (PSS)", val: m.stressLevel, note: "Вище 26 = високий" },
+          { key: "risk", title: "At Risk / Critical", val: `${m.atRiskCount} / ${m.criticalCount}`, note: "Кількість людей" },
+        ];
+        entries.forEach(({ title, val, note, key }) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="card-top">
+              <h2>${title} ${helpIcon(key)}</h2>
+              <span class="badge">${val}</span>
+            </div>
+            <p class="muted">${note}</p>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.min(100, Number(val) || 60)}%"></div>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      function renderTrends() {
+        const container = document.getElementById("trend-metrics");
+        const metrics = [
+          { key: "who5", label: "WHO-5", goodHigh: true },
+          { key: "phq9", label: "PHQ-9", goodHigh: false },
+          { key: "gad7", label: "GAD-7", goodHigh: false },
+          { key: "mbi", label: "MBI Burnout %", goodHigh: false },
+          { key: "sleepDuration", label: "Sleep Duration (h)", goodHigh: true },
+          { key: "workLifeBalance", label: "Work-Life Balance", goodHigh: true },
+          { key: "stressLevel", label: "Stress Level (PSS)", goodHigh: false },
+        ];
+
+        metrics.forEach((metric) => {
+          const card = document.createElement("div");
+          card.className = "card trend-card";
+          const maxVal = Math.max(...monthOrder.map((m) => data.team_averages_by_month[m][metric.key] || 0)) || 1;
+          const bars = monthOrder
+            .map((m) => {
+              const value = data.team_averages_by_month[m][metric.key] || 0;
+              const width = (value / maxVal) * 100;
+              return `<div class="bar-row">
+                <span>${monthLabels[m]}</span>
+                <div class="bar-track thin">
+                  <div class="bar-fill ${metric.goodHigh ? "good" : "risk"}" style="width:${width}%"
+                    data-tip="${metric.label}: ${value.toFixed(2)} (${monthLabels[m]})"></div>
+                </div>
+                <span class="value">${value.toFixed(2)}</span>
+              </div>`;
+            })
+            .join("");
+          card.innerHTML = `
+            <div class="card-top">
+              <h3>${metric.label} ${helpIcon(metric.key)}</h3>
+              <span class="pill small">Тренд</span>
+            </div>
+            ${bars}
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      function renderAlerts() {
+        const container = document.getElementById("alerts-list");
+        data.alerts.forEach((alert) => {
+          const row = document.createElement("div");
+          row.className = `card alert ${alert.severity}`;
+          row.innerHTML = `
+            <div class="card-top">
+              <span class="badge ${alert.severity}">${alert.severity.toUpperCase()}</span>
+              <span class="muted">${new Date(alert.timestamp).toLocaleString("uk-UA")}</span>
+            </div>
+            <h3>${alert.employee}</h3>
+            <p>${alert.message}</p>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      function renderRecs() {
+        const container = document.getElementById("rec-list");
+        data.recommendations.forEach((rec) => {
+          const row = document.createElement("div");
+          row.className = "card";
+          row.innerHTML = `
+            <div class="card-top">
+              <h3>${rec.title}</h3>
+              <span class="badge ${rec.priority}">${rec.priority}</span>
+            </div>
+            <p>${rec.description}</p>
+            <div class="muted">Кого стосується: ${rec.affectedEmployees.join(", ")}</div>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      function riskBadge(level) {
+        const map = { critical: "critical", high: "risk", medium: "warn", low: "good" };
+        return map[level] || "warn";
+      }
+
+      function renderEmployees() {
+        const container = document.getElementById("employees");
+        data.employees.forEach((emp) => {
+          const card = document.createElement("div");
+          card.className = "card employee-card";
+          const cm = emp.current_metrics;
+          card.innerHTML = `
+            <div class="card-top">
+              <div>
+                <h3>${emp.name}</h3>
+                <div class="muted">${emp.email}</div>
+              </div>
+              <span class="badge ${riskBadge(emp.riskLevel)}">${emp.riskLevel.toUpperCase()}</span>
+            </div>
+            <p>${emp.notes}</p>
+            <div class="mini-grid">
+              <div class="chip">WHO-5: ${cm.who5}</div>
+              <div class="chip">PHQ-9: ${cm.phq9}</div>
+              <div class="chip">GAD-7: ${cm.gad7}</div>
+              <div class="chip">MBI: ${cm.mbi}%</div>
+              <div class="chip">Stress: ${cm.stressLevel}</div>
+              <div class="chip">Sleep: ${cm.sleepDuration}h · ${cm.sleepQuality}/10</div>
+            </div>
+            <div class="spark" aria-label="trajectory">
+              ${renderSpark(emp.monthly_history, "who5")}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+
+      function renderSpark(history, key) {
+        const values = monthOrder.map((m) => history[m]?.[key] || 0);
+        const max = Math.max(...values, 1);
+        return values
+          .map((v, idx) => {
+            const height = Math.max(8, (v / max) * 40);
+            return `<div class="spark-bar" style="height:${height}px" data-tip="${monthLabels[monthOrder[idx]]}: ${v}"></div>`;
+          })
+          .join("");
+      }
+
+      function renderBenchmarks() {
+        const block = document.getElementById("benchmarks");
+        const bench = data.industry_benchmarks.tech_sector;
+        const team = data.team_averages_by_month.current;
+        block.innerHTML = `
+          <div class="mini-grid">
+            <div class="chip">WHO-5: ${team.who5} vs ${bench.who5}</div>
+            <div class="chip">PHQ-9: ${team.phq9} vs ${bench.phq9}</div>
+            <div class="chip">GAD-7: ${team.gad7} vs ${bench.gad7}</div>
+            <div class="chip">MBI: ${team.mbi}% vs ${bench.mbi}%</div>
+            <div class="chip">Sleep: ${team.sleepDuration}h vs ${bench.sleepDuration}h</div>
+            <div class="chip">WLB: ${team.workLifeBalance} vs ${bench.workLifeBalance}</div>
+            <div class="chip">Stress: ${team.stressLevel} vs ${bench.stressLevel}</div>
+          </div>
+          <p class="muted">Порівняння з тех-сектором. Червоні карти = гірше за бенчмарк.</p>
+        `;
+      }
+
+      function renderPlaybooks() {
+        const container = document.getElementById("playbooks");
+        data.one_on_one_playbooks.forEach((pb) => {
+          const row = document.createElement("div");
+          row.className = "card";
+          row.innerHTML = `
+            <div class="card-top">
+              <h3>${pb.employee}</h3>
+              <span class="badge ${riskBadge(pb.riskLevel)}">${pb.riskLevel.toUpperCase()}</span>
+            </div>
+            <p>${pb.alert}</p>
+            <div class="muted">Відкриття: ${pb.conversation_script.opening}</div>
+            <div class="list">
+              ${pb.conversation_script.questions.map((q) => `<div>• ${q}</div>`).join("")}
+            </div>
+            <div class="muted">Активне слухання: ${pb.conversation_script.active_listening_tips}</div>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      function renderMatrix() {
+        const grid = document.getElementById("matrix-grid");
+        data.employees.forEach((emp) => {
+          const stress = emp.current_metrics.stressLevel;
+          const burnout = emp.current_metrics.mbi;
+          const left = Math.min(100, (stress / 40) * 100);
+          const top = 100 - Math.min(100, (burnout / 100) * 100);
+          const dot = document.createElement("div");
+          dot.className = `dot ${riskBadge(emp.riskLevel)}`;
+          dot.style.left = `${left}%`;
+          dot.style.top = `${top}%`;
+          dot.setAttribute("data-tip", `${emp.name} · Stress ${stress} / Burnout ${burnout}%`);
+          grid.appendChild(dot);
+        });
+      }
+
+      function renderCorrelation() {
+        const target = document.getElementById("correlation-heatmap");
+        const pairs = [
+          ["Stress", "MBI", 0.82],
+          ["Stress", "PHQ-9", 0.76],
+          ["Sleep", "WHO-5", -0.64],
+          ["Sleep", "PHQ-9", -0.52],
+          ["WHO-5", "PHQ-9", -0.70],
+        ];
+        pairs.forEach(([a, b, val]) => {
+          const row = document.createElement("div");
+          row.className = "heat-row";
+          const intensity = Math.min(1, Math.abs(val));
+          const color = val > 0 ? `rgba(255,69,0,${intensity})` : `rgba(0,0,0,${intensity})`;
+          row.innerHTML = `
+            <span>${a} ↔ ${b}</span>
+            <div class="heat-box" style="background:${color}">${val}</div>
+          `;
+          target.appendChild(row);
+        });
+      }
+
+      function renderDistributions() {
+        const target = document.getElementById("distributions");
+        const metrics = [
+          { key: "who5", label: "WHO-5" },
+          { key: "phq9", label: "PHQ-9" },
+          { key: "mbi", label: "MBI" },
+          { key: "stressLevel", label: "Stress" },
+        ];
+        metrics.forEach((m) => {
+          const values = data.employees.map((e) => e.current_metrics[m.key]);
+          const max = Math.max(...values, 1);
+          const bar = values
+            .map((v, idx) => {
+              const name = data.employees[idx].name;
+              return `<div class="spark-bar" style="height:${(v / max) * 50}px" data-tip="${name}: ${v}"></div>`;
+            })
+            .join("");
+          const row = document.createElement("div");
+          row.className = "card";
+          row.innerHTML = `<div class="card-top"><h3>${m.label}</h3><span class="muted">Розподіл</span></div><div class="spark">${bar}</div>`;
+          target.appendChild(row);
+        });
+      }
+
+      function initTooltips() {
+        const tip = document.createElement("div");
+        tip.className = "tooltip hidden";
+        document.body.appendChild(tip);
+        const attach = (el) => {
+          el.addEventListener("mouseenter", (e) => {
+            tip.textContent = el.getAttribute("data-tip") || "";
+            tip.classList.remove("hidden");
+            tip.style.left = `${e.clientX + 12}px`;
+            tip.style.top = `${e.clientY + 12}px`;
+          });
+          el.addEventListener("mousemove", (e) => {
+            tip.style.left = `${e.clientX + 12}px`;
+            tip.style.top = `${e.clientY + 12}px`;
+          });
+          el.addEventListener("mouseleave", () => tip.classList.add("hidden"));
+        };
+        document.querySelectorAll("[data-tip]").forEach(attach);
+      }
+
+      renderSummary();
+      renderTrends();
+      renderAlerts();
+      renderRecs();
+      renderEmployees();
+      renderBenchmarks();
+      renderPlaybooks();
+      renderMatrix();
+      renderCorrelation();
+      renderDistributions();
+      initTooltips();
+      loadTeamHeatmap();
+
+      // WOW Feature #8: Team Heatmap
+      async function loadTeamHeatmap() {
+        try {
+          const response = await fetch('/admin/heatmap');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const heatmapData = await response.json();
+          renderTeamHeatmap(heatmapData);
+        } catch (error) {
+          console.error('Failed to load team heatmap:', error);
+          document.getElementById('team-heatmap').innerHTML =
+            '<div class="card"><p class="muted">⚠️ Не вдалося завантажити heatmap. Перевірте з\'єднання з сервером.</p></div>';
+        }
+      }
+
+      function renderTeamHeatmap(data) {
+        const container = document.getElementById('team-heatmap');
+        container.innerHTML = '';
+
+        if (!data.users || data.users.length === 0) {
+          container.innerHTML = '<div class="card"><p class="muted">Немає даних для відображення</p></div>';
+          return;
+        }
+
+        data.users.forEach(user => {
+          const card = document.createElement('div');
+          card.className = 'card employee-card';
+
+          const statusEmoji = {
+            'EXCELLENT': '🟢',
+            'GOOD': '🟡',
+            'CONCERNING': '🟠',
+            'CRITICAL': '🔴',
+            'NO_DATA': '⚪'
+          }[user.status] || '⚪';
+
+          const statusLabel = {
+            'EXCELLENT': 'Відмінно',
+            'GOOD': 'Добре',
+            'CONCERNING': 'Увага',
+            'CRITICAL': 'Критично',
+            'NO_DATA': 'Немає даних'
+          }[user.status] || 'Невідомо';
+
+          const lastCheckin = user.last_checkin
+            ? new Date(user.last_checkin).toLocaleDateString('uk-UA')
+            : 'Ніколи';
+
+          card.innerHTML = `
+            <div class="card-top">
+              <div>
+                <h3>${statusEmoji} ${user.name}</h3>
+                <div class="muted">Останній чекін: ${lastCheckin}</div>
+              </div>
+              <span class="badge ${riskBadge(user.status.toLowerCase())}">${statusLabel}</span>
+            </div>
+            <div class="mini-grid">
+              <div class="chip">WHO-5: ${user.who5_score.toFixed(1)}</div>
+              <div class="chip">PHQ-9: ${user.phq9_score.toFixed(1)}</div>
+              <div class="chip">GAD-7: ${user.gad7_score.toFixed(1)}</div>
+              <div class="chip">Burnout: ${user.burnout_percentage.toFixed(0)}%</div>
+              <div class="chip">Streak: 🔥 ${user.streak} днів</div>
+            </div>
+            ${getHeatmapInsights(user)}
+          `;
+          container.appendChild(card);
+        });
+
+        // Update timestamp
+        const timestamp = document.createElement('p');
+        timestamp.className = 'muted';
+        timestamp.style.textAlign = 'center';
+        timestamp.style.marginTop = '1rem';
+        timestamp.textContent = `Оновлено: ${new Date(data.generated_at).toLocaleString('uk-UA')}`;
+        container.appendChild(timestamp);
+      }
+
+      function getHeatmapInsights(user) {
+        const insights = [];
+
+        if (user.who5_score < 35.0) {
+          insights.push('🚨 Критично низький well-being');
+        } else if (user.who5_score < 50.0) {
+          insights.push('⚠️ Знижений well-being');
+        } else if (user.who5_score >= 75.0) {
+          insights.push('✨ Відмінний well-being');
+        }
+
+        if (user.phq9_score >= 15.0) {
+          insights.push('🚨 Ознаки тяжкої депресії');
+        } else if (user.phq9_score >= 10.0) {
+          insights.push('⚠️ Ознаки депресії');
+        }
+
+        if (user.gad7_score >= 15.0) {
+          insights.push('🚨 Високий рівень тривожності');
+        } else if (user.gad7_score >= 10.0) {
+          insights.push('⚠️ Підвищена тривожність');
+        }
+
+        if (user.burnout_percentage > 75.0) {
+          insights.push('🔥 Критичний burnout');
+        } else if (user.burnout_percentage > 60.0) {
+          insights.push('⚠️ Високий ризик burnout');
+        }
+
+        if (user.streak >= 14) {
+          insights.push('🏆 Стабільна практика чекінів');
+        } else if (user.streak >= 7) {
+          insights.push('💪 Хороший streak');
+        }
+
+        if (insights.length === 0) {
+          if (user.status === 'NO_DATA') {
+            insights.push('ℹ️ Потрібні дані для аналізу');
+          } else {
+            insights.push('✅ Стабільний стан');
+          }
+        }
+
+        return `
+          <div class="stack" style="margin-top: 0.5rem;">
+            ${insights.map(insight => `<div class="muted" style="font-size: 0.9rem;">• ${insight}</div>`).join('')}
+          </div>
+        `;
+      }
+
+      // Refresh button handler
+      document.getElementById('refresh-heatmap').addEventListener('click', async () => {
+        const btn = document.getElementById('refresh-heatmap');
+        btn.disabled = true;
+        btn.textContent = '⏳ Оновлення...';
+        await loadTeamHeatmap();
+        btn.disabled = false;
+        btn.textContent = '🔄 Оновити Heatmap';
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+# Cargo.lock - KEEP FOR PRODUCTION (deterministic builds)
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# User credentials (IMPORTANT!)
+USER_CREDENTIALS.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+
+# Placeholders (remove after generation)
+*.PLACEHOLDER
+
+# Railway
+.railway/
