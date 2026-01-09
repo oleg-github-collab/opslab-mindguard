@@ -39,3 +39,4 @@ temp/
 
 # Railway
 .railway/
+RAILWAY_ENV_VARS_PRIVATE.txt
