@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS telegram_pins (
     used_at TIMESTAMPTZ
 );
 
--- Index for fast PIN lookup
+-- Index for fast PIN lookup (removed now() from predicate - not IMMUTABLE)
 CREATE INDEX IF NOT EXISTS idx_telegram_pins_code
     ON telegram_pins(pin_code)
-    WHERE used = false AND expires_at > now();
+    WHERE used = false;
 
 -- Index for user's active PINs
 CREATE INDEX IF NOT EXISTS idx_telegram_pins_user
