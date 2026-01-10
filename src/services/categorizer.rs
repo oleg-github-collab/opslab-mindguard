@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
-    CreateChatCompletionRequestArgs,
+    CreateChatCompletionRequestArgs, Role,
 };
 use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
@@ -84,10 +84,12 @@ impl WallPostCategorizer {
 
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                role: Role::System,
                 content: system_prompt.to_string(),
                 name: None,
             }),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                role: Role::User,
                 content: ChatCompletionRequestUserMessageContent::Text(content.to_string()),
                 name: None,
             }),

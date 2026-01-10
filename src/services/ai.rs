@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
-    CreateChatCompletionRequestArgs,
+    CreateChatCompletionRequestArgs, Role,
 };
 use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
@@ -56,10 +56,12 @@ If self-harm cues such as "suicide", "kill myself", "hopeless" appear, force ris
         loop {
             let messages = vec![
                 ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                    role: Role::System,
                     content: system_prompt.to_string(),
                     name: None,
                 }),
                 ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                    role: Role::User,
                     content: ChatCompletionRequestUserMessageContent::Text(format!(
                         "Context (last 3 days): {context}\nTranscription:\n{transcript}"
                     )),
@@ -141,10 +143,12 @@ If self-harm cues such as "suicide", "kill myself", "hopeless" appear, force ris
     pub async fn group_coach_response(&self, mention_text: &str) -> Result<String> {
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                role: Role::System,
                 content: "Return a short empathetic tip. Never mention personal metrics.".to_string(),
                 name: None,
             }),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                role: Role::User,
                 content: ChatCompletionRequestUserMessageContent::Text(format!(
                     "You are OpsLab Mindguard group assistant. Provide concise, non-clinical tips (breathing, productivity, focus) in Ukrainian.\nQuestion: {mention_text}"
                 )),

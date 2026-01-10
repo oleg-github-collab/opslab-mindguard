@@ -6,7 +6,7 @@ use anyhow::Result;
 use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
-    CreateChatCompletionRequestArgs,
+    CreateChatCompletionRequestArgs, Role,
 };
 use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
@@ -40,10 +40,12 @@ impl VoiceCoach {
 
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                role: Role::System,
                 content: system_prompt,
                 name: None,
             }),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                role: Role::User,
                 content: ChatCompletionRequestUserMessageContent::Text(transcription.to_string()),
                 name: None,
             }),
