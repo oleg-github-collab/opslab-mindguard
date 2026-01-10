@@ -19,10 +19,3 @@ pub struct AppState {
 }
 
 pub type SharedState = Arc<AppState>;
-
-// Implement FromRef for UserSession extractor
-impl FromRef<SharedState> for SharedState {
-    fn from_ref(state: &SharedState) -> Self {
-        state.clone()
-    }
-}

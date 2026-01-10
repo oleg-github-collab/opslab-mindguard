@@ -514,8 +514,9 @@ impl MetricsCalculator {
             who5_score: who5 as f64,
             phq9_score: phq9 as f64,
             gad7_score: gad7 as f64,
-            burnout_percentage: mbi,
-            sleep_quality,
+            mbi_score: mbi,
+            sleep_duration: sleep_quality,
+            work_life_balance,
             stress_level,
         })
     }
@@ -525,7 +526,7 @@ impl MetricsCalculator {
         metrics.who5_score < 50.0
             || metrics.phq9_score >= 15.0
             || metrics.gad7_score >= 15.0
-            || metrics.burnout_percentage >= 70.0
+            || metrics.mbi_score >= 70.0
     }
 
     /// Визначення рівня ризику
@@ -535,13 +536,13 @@ impl MetricsCalculator {
         } else if metrics.who5_score < 60.0
             || metrics.phq9_score >= 10.0
             || metrics.gad7_score >= 10.0
-            || metrics.burnout_percentage >= 50.0
+            || metrics.mbi_score >= 50.0
         {
             "high"
         } else if metrics.who5_score < 70.0
             || metrics.phq9_score >= 5.0
             || metrics.gad7_score >= 5.0
-            || metrics.burnout_percentage >= 35.0
+            || metrics.mbi_score >= 35.0
         {
             "medium"
         } else {

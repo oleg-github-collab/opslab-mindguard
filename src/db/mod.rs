@@ -522,9 +522,9 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
             GROUP BY user_id
         )
         SELECT
-            COALESCE(AVG(who5), 0.0) as "avg_who5!",
-            COALESCE(AVG(phq9), 0.0) as "avg_phq9!",
-            COALESCE(AVG(gad7), 0.0) as "avg_gad7!"
+            CAST(COALESCE(AVG(who5), 0.0) AS DOUBLE PRECISION) as "avg_who5: f64",
+            CAST(COALESCE(AVG(phq9), 0.0) AS DOUBLE PRECISION) as "avg_phq9: f64",
+            CAST(COALESCE(AVG(gad7), 0.0) AS DOUBLE PRECISION) as "avg_gad7: f64"
         FROM recent_metrics
         "#
     )
@@ -691,7 +691,7 @@ pub async fn get_user_recent_pattern(
 ) -> Result<Vec<(String, f64)>> {
     let patterns = sqlx::query!(
         r#"
-        SELECT question_type, AVG(value) as "avg_value"
+        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as "avg_value: f64"
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - INTERVAL '3 days'
@@ -704,7 +704,7 @@ pub async fn get_user_recent_pattern(
 
     Ok(patterns
         .into_iter()
-        .map(|p| (p.question_type, p.avg_value.unwrap_or(5.0)))
+        .map(|p| (p.question_type, p.avg_value))
         .collect())
 }
 
@@ -721,13 +721,13 @@ pub async fn calculate_user_metrics_for_period(
     let result = sqlx::query!(
         r#"
         SELECT
-            AVG(CASE WHEN question_type = 'mood' THEN value * 20.0 ELSE NULL END) as who5,
-            AVG(CASE WHEN question_type IN ('mood', 'sleep', 'focus') THEN value * 3.0 ELSE NULL END) as phq9,
-            AVG(CASE WHEN question_type = 'stress' THEN value * 3.0 ELSE NULL END) as gad7,
-            AVG(CASE WHEN question_type IN ('energy', 'stress', 'workload') THEN value * 10.0 ELSE NULL END) as mbi,
-            AVG(CASE WHEN question_type = 'sleep' THEN value ELSE NULL END) as sleep_duration,
-            AVG(CASE WHEN question_type = 'workload' THEN 10.0 - value ELSE NULL END) as work_life_balance,
-            AVG(CASE WHEN question_type = 'stress' THEN value * 4.0 ELSE NULL END) as stress_level
+            CAST(COALESCE(AVG(CASE WHEN question_type = 'mood' THEN value * 20.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "who5: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type IN ('mood', 'sleep', 'focus') THEN value * 3.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "phq9: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type = 'stress' THEN value * 3.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "gad7: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type IN ('energy', 'stress', 'workload') THEN value * 10.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "mbi: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type = 'sleep' THEN value ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "sleep_duration: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type = 'workload' THEN 10.0 - value ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "work_life_balance: f64",
+            CAST(COALESCE(AVG(CASE WHEN question_type = 'stress' THEN value * 4.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "stress_level: f64"
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= $2
@@ -740,17 +740,17 @@ pub async fn calculate_user_metrics_for_period(
     .fetch_one(pool)
     .await?;
 
-    if result.who5.is_none() {
+    if result.who5 == 0.0 {
         return Ok(None);
     }
 
     Ok(Some(Metrics {
-        who5_score: result.who5.unwrap_or(0.0),
-        phq9_score: result.phq9.unwrap_or(0.0),
-        gad7_score: result.gad7.unwrap_or(0.0),
-        mbi_score: result.mbi.unwrap_or(0.0),
-        sleep_duration: result.sleep_duration.unwrap_or(0.0),
-        work_life_balance: result.work_life_balance.unwrap_or(0.0),
-        stress_level: result.stress_level.unwrap_or(0.0),
+        who5_score: result.who5,
+        phq9_score: result.phq9,
+        gad7_score: result.gad7,
+        mbi_score: result.mbi,
+        sleep_duration: result.sleep_duration,
+        work_life_balance: result.work_life_balance,
+        stress_level: result.stress_level,
     }))
 }

@@ -23,7 +23,7 @@ async fn handle_update(
     Json(update): Json<Update>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let bot = bot();
-    if let Some(message) = update.message {
+    if let teloxide::types::UpdateKind::Message(message) = update.kind {
         match &message.chat.kind {
             ChatKind::Private(_) => {
                 handle_private(&bot, state, message)
@@ -35,7 +35,7 @@ async fn handle_update(
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
-            ChatKind::Unknown(_) => {}
+            _ => {}
         }
     }
 
@@ -56,8 +56,9 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         return Ok(());
     };
 
-    if let Some(voice) = msg.voice {
-        handle_voice(bot, state, msg, user.id, voice.file_id).await?;
+    if let Some(voice) = msg.voice() {
+        let file_id = voice.file.id.clone();
+        handle_voice(bot, state, msg, user.id, file_id).await?;
         return Ok(());
     }
 

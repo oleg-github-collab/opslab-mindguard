@@ -1,10 +1,11 @@
 use crate::crypto::Crypto;
 use anyhow::{anyhow, Result};
 use async_openai::types::{
-    ChatCompletionRequestMessageArgs, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-    CreateChatCompletionRequestArgs, Role,
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+    CreateChatCompletionRequestArgs,
 };
-use async_openai::Client;
+use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -19,14 +20,15 @@ pub struct AiOutcome {
 
 #[derive(Clone)]
 pub struct AiService {
-    client: Client,
+    client: Client<OpenAIConfig>,
     crypto: Arc<Crypto>,
     api_key: String,
 }
 
 impl AiService {
     pub fn new(api_key: String, crypto: Arc<Crypto>) -> Self {
-        let client = Client::new().with_api_key(api_key.clone());
+        let config = OpenAIConfig::new().with_api_key(api_key.clone());
+        let client = Client::with_config(config);
         Self {
             client,
             crypto,
@@ -52,21 +54,22 @@ If self-harm cues such as "suicide", "kill myself", "hopeless" appear, force ris
             .any(|k| lowered.contains(k));
 
         loop {
+            let messages = vec![
+                ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                    content: system_prompt.to_string(),
+                    name: None,
+                }),
+                ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                    content: ChatCompletionRequestUserMessageContent::Text(format!(
+                        "Context (last 3 days): {context}\nTranscription:\n{transcript}"
+                    )),
+                    name: None,
+                }),
+            ];
+
             let request = CreateChatCompletionRequestArgs::default()
                 .model("gpt-4o")
-                .messages([
-                    ChatCompletionRequestMessageArgs::default()
-                        .role(Role::System)
-                        .content(system_prompt)
-                        .build()?,
-                    ChatCompletionRequestMessageArgs::default()
-                        .role(Role::User)
-                        .content(format!(
-                            "Context (last 3 days): {context}\nTranscription:\n{transcript}"
-                        ))
-                        .build()?,
-                ])
-                .response_format(serde_json::json!({ "type": "json_object" }))
+                .messages(messages)
                 .build()?;
 
             match self.client.chat().create(request).await {
@@ -136,20 +139,22 @@ If self-harm cues such as "suicide", "kill myself", "hopeless" appear, force ris
     }
 
     pub async fn group_coach_response(&self, mention_text: &str) -> Result<String> {
+        let messages = vec![
+            ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                content: "Return a short empathetic tip. Never mention personal metrics.".to_string(),
+                name: None,
+            }),
+            ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                content: ChatCompletionRequestUserMessageContent::Text(format!(
+                    "You are OpsLab Mindguard group assistant. Provide concise, non-clinical tips (breathing, productivity, focus) in Ukrainian.\nQuestion: {mention_text}"
+                )),
+                name: None,
+            }),
+        ];
+
         let request = CreateChatCompletionRequestArgs::default()
             .model("gpt-4o-mini")
-            .messages([
-                ChatCompletionRequestSystemMessageArgs::default()
-                    .content("Return a short empathetic tip. Never mention personal metrics.")
-                    .build()?
-                    .into(),
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(format!(
-                        "You are OpsLab Mindguard group assistant. Provide concise, non-clinical tips (breathing, productivity, focus) in Ukrainian.\nQuestion: {mention_text}"
-                    ))
-                    .build()?
-                    .into(),
-            ])
+            .messages(messages)
             .build()?;
 
         let resp = self.client.chat().create(request).await?;

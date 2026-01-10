@@ -58,12 +58,12 @@ pub async fn set_rls_context(
     Ok(next.run(request).await)
 }
 
-/// Production-ready note:
-/// This middleware should be applied BEFORE route handlers
-/// Example in main.rs:
-/// ```
-/// let app = Router::new()
-///     .route("/api/...", ...)
-///     .layer(middleware::from_fn_with_state(state.clone(), rls::set_rls_context))
-///     .with_state(state);
-/// ```
+// Production-ready note:
+// This middleware should be applied BEFORE route handlers
+// Example in main.rs:
+// ```
+// let app = Router::new()
+//     .route("/api/...", ...)
+//     .layer(middleware::from_fn_with_state(state.clone(), rls::set_rls_context))
+//     .with_state(state);
+// ```

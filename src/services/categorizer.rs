@@ -3,10 +3,11 @@
 
 use anyhow::Result;
 use async_openai::types::{
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-    ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+    CreateChatCompletionRequestArgs,
 };
-use async_openai::Client;
+use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
@@ -52,12 +53,13 @@ impl PostCategory {
 }
 
 pub struct WallPostCategorizer {
-    client: Client,
+    client: Client<OpenAIConfig>,
 }
 
 impl WallPostCategorizer {
     pub fn new(api_key: String) -> Self {
-        let client = Client::new().with_api_key(api_key);
+        let config = OpenAIConfig::new().with_api_key(api_key);
+        let client = Client::with_config(config);
         Self { client }
     }
 
@@ -81,16 +83,14 @@ impl WallPostCategorizer {
             Без пояснень, без коментарів - тільки категорія.";
 
         let messages = vec![
-            ChatCompletionRequestMessage::System(
-                ChatCompletionRequestSystemMessageArgs::default()
-                    .content(system_prompt)
-                    .build()?,
-            ),
-            ChatCompletionRequestMessage::User(
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(content)
-                    .build()?,
-            ),
+            ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                content: system_prompt.to_string(),
+                name: None,
+            }),
+            ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                content: ChatCompletionRequestUserMessageContent::Text(content.to_string()),
+                name: None,
+            }),
         ];
 
         let request = CreateChatCompletionRequestArgs::default()

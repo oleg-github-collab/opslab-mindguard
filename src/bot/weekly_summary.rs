@@ -36,8 +36,9 @@ impl WeeklySummary {
                     who5_score: 0.0,
                     phq9_score: 0.0,
                     gad7_score: 0.0,
-                    burnout_percentage: 0.0,
-                    sleep_quality: 0.0,
+                    mbi_score: 0.0,
+                    sleep_duration: 0.0,
+                    work_life_balance: 0.0,
                     stress_level: 0.0,
                 }
             }

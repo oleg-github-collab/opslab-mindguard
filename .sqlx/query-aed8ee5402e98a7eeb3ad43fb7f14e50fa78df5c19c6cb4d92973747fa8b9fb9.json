@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT enc_transcript, created_at\n        FROM voice_logs\n        WHERE user_id = $1 AND created_at > now() - interval '3 days'\n        ORDER BY created_at DESC\n        LIMIT 3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "enc_transcript",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "aed8ee5402e98a7eeb3ad43fb7f14e50fa78df5c19c6cb4d92973747fa8b9fb9"
+}

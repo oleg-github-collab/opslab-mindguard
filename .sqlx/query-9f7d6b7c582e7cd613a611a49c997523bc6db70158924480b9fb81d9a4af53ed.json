@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO wall_posts (id, user_id, enc_content, category, ai_categorized)\n        VALUES ($1, $2, $3, $4, $5)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bytea",
+        {
+          "Custom": {
+            "name": "post_category",
+            "kind": {
+              "Enum": [
+                "COMPLAINT",
+                "SUGGESTION",
+                "CELEBRATION",
+                "QUESTION",
+                "SUPPORT_NEEDED"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9f7d6b7c582e7cd613a611a49c997523bc6db70158924480b9fb81d9a4af53ed"
+}

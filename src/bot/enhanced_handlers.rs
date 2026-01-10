@@ -87,7 +87,7 @@ async fn handle_action_callback(
     match action {
         "meditation" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "🎵 *Meditation 5 min*\n\n\
                 1. Знайди тихе місце\n\
                 2. Заплющ очі\n\
@@ -103,7 +103,7 @@ async fn handle_action_callback(
         }
         "walk" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "🚶 *10-хвилинна прогулянка*\n\n\
                 ✅ Покращує настрій на 20%\n\
                 ✅ Знижує stress\n\
@@ -115,7 +115,7 @@ async fn handle_action_callback(
         }
         "wall_post" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "📝 *Стіна плачу*\n\n\
                 Поділись своїми думками анонімно:\n\
                 https://mindguard.opslab.uk/wall\n\n\
@@ -126,7 +126,7 @@ async fn handle_action_callback(
         }
         "talk" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "💬 *Поговорити з кимось*\n\n\
                 Іноді розмова - найкраще рішення.\n\n\
                 Кому написати:\n\
@@ -140,7 +140,7 @@ async fn handle_action_callback(
         }
         "sleep_tips" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "😴 *Поради для якісного сну:*\n\n\
                 1. Лягай в один час (10-11 PM)\n\
                 2. Вимкни екрани за 1 годину\n\
@@ -155,7 +155,7 @@ async fn handle_action_callback(
         }
         "vacation" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "🌴 *Час відпочити!*\n\n\
                 Твої показники вказують на burnout.\n\n\
                 Рекомендації:\n\
@@ -169,7 +169,7 @@ async fn handle_action_callback(
         }
         "status" => {
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "Використай команду /status щоб побачити детальну статистику! 📊",
             )
             .await?;
@@ -267,27 +267,29 @@ async fn handle_update(
     Json(update): Json<Update>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let bot = bot();
-    if let Some(message) = update.message {
-        match &message.chat.kind {
-            ChatKind::Private(_) => {
-                handle_private(&bot, state, message)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            }
-            ChatKind::Public(_) => {
-                handle_group(&bot, state, message)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            }
-            ChatKind::Unknown(_) => {}
-        }
-    }
 
-    // Handle callback queries (inline buttons)
-    if let Some(callback) = update.callback_query {
-        handle_callback(&bot, state, callback)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    match update.kind {
+        teloxide::types::UpdateKind::Message(message) => {
+            match &message.chat.kind {
+                ChatKind::Private(_) => {
+                    handle_private(&bot, state, message)
+                        .await
+                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                }
+                ChatKind::Public(_) => {
+                    handle_group(&bot, state, message)
+                        .await
+                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                }
+                _ => {}
+            }
+        }
+        teloxide::types::UpdateKind::CallbackQuery(callback) => {
+            handle_callback(&bot, state, callback)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
+        _ => {}
     }
 
     Ok(Json(json!({"status": "ok"})))
@@ -329,8 +331,9 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
     };
 
     // Handle voice messages
-    if let Some(voice) = msg.voice {
-        handle_voice(bot, state, msg, user.id, voice.file_id).await?;
+    if let Some(voice) = msg.voice() {
+        let file_id = voice.file.id.clone();
+        handle_voice(bot, state, msg, user.id, file_id).await?;
         return Ok(());
     }
 
@@ -616,7 +619,7 @@ async fn handle_callback(
             let value: i16 = parts[2].parse().unwrap_or(0);
 
             if let Some(msg) = &callback.message {
-                let telegram_id = msg.chat.id().0;
+                let telegram_id = msg.chat.id.0;
 
                 // Отримати чекін з сесії
                 let checkin = {
@@ -651,7 +654,7 @@ async fn handle_callback(
                             .await?;
 
                         // Видалити попереднє повідомлення
-                        bot.delete_message(msg.chat.id(), msg.id).await.ok();
+                        bot.delete_message(msg.chat.id, msg.id).await.ok();
 
                         // Знайти індекс поточного питання
                         let current_index = checkin.questions.iter()
@@ -661,7 +664,7 @@ async fn handle_callback(
 
                         if next_index < checkin.questions.len() {
                             // Відправити наступне питання
-                            send_checkin_question(bot, msg.chat.id(), &checkin, next_index).await?;
+                            send_checkin_question(bot, msg.chat.id, &checkin, next_index).await?;
                         } else {
                             // Чекін завершено - видалити з сесії
                             {
@@ -670,7 +673,7 @@ async fn handle_callback(
                             }
 
                             bot.send_message(
-                                msg.chat.id(),
+                                msg.chat.id,
                                 "✅ *Чекін завершено! Дякую!* 🙏\n\n\
                                 Твої дані збережені та будуть використані для аналізу.\n\
                                 Продовжуй проходити щоденні чекіни для повної картини.\n\n\
@@ -680,7 +683,7 @@ async fn handle_callback(
                             .await?;
 
                             // #5 WOW Feature: Quick Actions after check-in
-                            send_quick_actions(bot, &state, msg.chat.id(), user.id).await.ok();
+                            send_quick_actions(bot, &state, msg.chat.id, user.id).await.ok();
 
                             // Перевірити чи потрібно надіслати критичний алерт
                             let count = db::get_checkin_answer_count(&state.pool, user.id, 10).await?;
@@ -691,7 +694,7 @@ async fn handle_callback(
 
                                         // Сповістити користувача
                                         bot.send_message(
-                                            msg.chat.id(),
+                                            msg.chat.id,
                                             "⚠️ *Важливе повідомлення*\n\n\
                                             Твої показники вказують на необхідність звернення до фахівця.\n\n\
                                             Рекомендуємо:\n\
@@ -716,9 +719,9 @@ async fn handle_callback(
             .await?;
 
         if let Some(msg) = callback.message {
-            bot.delete_message(msg.chat.id(), msg.id).await.ok();
+            bot.delete_message(msg.chat.id, msg.id).await.ok();
             bot.send_message(
-                msg.chat.id(),
+                msg.chat.id,
                 "⏭️ Чекін пропущено.\n\n\
                 Пам'ятай, що регулярні чекіни допомагають краще розуміти твій стан.\n\
                 Завтра спробуй пройти повністю! 💪",
@@ -802,7 +805,7 @@ async fn send_user_status(
             metrics.gad7_score,
             metrics.mbi_score,
             metrics.sleep_duration,
-            metrics.sleep_quality,
+            metrics.sleep_quality(),
             metrics.work_life_balance,
             metrics.stress_level,
             answer_count

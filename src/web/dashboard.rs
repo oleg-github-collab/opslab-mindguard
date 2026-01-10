@@ -113,7 +113,7 @@ async fn team_view(headers: HeaderMap, State(state): State<SharedState>) -> Resu
             role: user.role,
             rolling_score: rolling,
             last_voice_risk: last_voice.map(|v| v as i16),
-            outstanding_questions,
+            outstanding_questions: outstanding,
         });
     }
 

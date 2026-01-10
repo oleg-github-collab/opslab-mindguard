@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC')::INT as hour,\n            COUNT(*) as count\n        FROM checkin_answers\n        WHERE user_id = $1\n        GROUP BY hour\n        ORDER BY count DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "hour",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "18072d7ff49e7bda9c0b034b8e44cac0729554dc7d1bc7f4d922a1b1991ab00c"
+}

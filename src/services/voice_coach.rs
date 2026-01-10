@@ -4,10 +4,11 @@
 use crate::bot::daily_checkin::Metrics;
 use anyhow::Result;
 use async_openai::types::{
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-    ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+    CreateChatCompletionRequestArgs,
 };
-use async_openai::Client;
+use async_openai::{Client, config::OpenAIConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,12 +20,13 @@ pub struct VoiceCoachResponse {
 }
 
 pub struct VoiceCoach {
-    client: Client,
+    client: Client<OpenAIConfig>,
 }
 
 impl VoiceCoach {
     pub fn new(api_key: String) -> Self {
-        let client = Client::new().with_api_key(api_key);
+        let config = OpenAIConfig::new().with_api_key(api_key);
+        let client = Client::with_config(config);
         Self { client }
     }
 
@@ -37,16 +39,14 @@ impl VoiceCoach {
         let system_prompt = self.build_system_prompt(user_metrics);
 
         let messages = vec![
-            ChatCompletionRequestMessage::System(
-                ChatCompletionRequestSystemMessageArgs::default()
-                    .content(system_prompt)
-                    .build()?,
-            ),
-            ChatCompletionRequestMessage::User(
-                ChatCompletionRequestUserMessageArgs::default()
-                    .content(transcription)
-                    .build()?,
-            ),
+            ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                content: system_prompt,
+                name: None,
+            }),
+            ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                content: ChatCompletionRequestUserMessageContent::Text(transcription.to_string()),
+                name: None,
+            }),
         ];
 
         let request = CreateChatCompletionRequestArgs::default()
@@ -125,7 +125,7 @@ impl VoiceCoach {
                 );
             }
 
-            if m.burnout_percentage > 70.0 {
+            if m.mbi_score > 70.0 {
                 prompt.push_str(
                     "🔥 BURNOUT ALERT: Критичний рівень вигорання. Наполегливо рекомендуй відпочинок.\n\n",
                 );
