@@ -22,9 +22,9 @@ RUN apt-get update && apt-get install -y ca-certificates openssl && rm -rf /var/
 WORKDIR /app
 
 COPY --from=builder /app/target/release/opslab_mindguard /usr/local/bin/opslab-mindguard
-COPY static static
-COPY index.html index.html
-COPY migrations migrations
+COPY --from=builder /app/static static
+COPY --from=builder /app/index.html index.html
+COPY --from=builder /app/migrations migrations
 
 ENV RUST_LOG=info
 EXPOSE 3000
