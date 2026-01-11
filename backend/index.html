@@ -238,6 +238,102 @@
       font-weight: 700;
       color: #000;
     }
+
+    /* Card styles */
+    .card {
+      padding: 24px;
+      background: #fff;
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0 #000;
+    }
+
+    .card h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .section {
+      margin-top: 40px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .muted {
+      color: #999;
+      font-style: italic;
+    }
+
+    .grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    .employee-grid {
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+
+    .btn {
+      padding: 12px 24px;
+      background: #FF6B35;
+      border: 3px solid #000;
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 #000;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      margin-top: 20px;
+    }
+
+    .btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 #000;
+    }
+
+    .btn:active {
+      transform: translate(4px, 4px);
+      box-shadow: 0 0 0 #000;
+    }
+
+    /* Smooth scroll */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Better focus states */
+    input:focus,
+    button:focus {
+      outline: 3px solid #FF6B35;
+      outline-offset: 2px;
+    }
+
+    /* Accessibility improvements */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -447,11 +543,68 @@
 
     function renderPersonalMetrics(data) {
       const container = document.getElementById('personal-metrics');
-      // TODO: Render metrics based on data
+
+      const score = data.rolling_score?.total || 0;
+      const voiceRisk = data.last_voice_risk;
+      const outstandingCount = data.outstanding_questions?.length || 0;
+
+      // Determine overall status based on score
+      let status = 'Excellent';
+      let statusColor = '#00AA55';
+      let statusEmoji = '✅';
+
+      if (score < 40) {
+        status = 'Critical';
+        statusColor = '#CC0000';
+        statusEmoji = '⚠️';
+      } else if (score < 60) {
+        status = 'Concerning';
+        statusColor = '#FF6B35';
+        statusEmoji = '⚡';
+      } else if (score < 75) {
+        status = 'Good';
+        statusColor = '#FFA500';
+        statusEmoji = '👍';
+      }
+
       container.innerHTML = `
+        <div class="card metric-card" style="border-color: ${statusColor};">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Загальний стан</h3>
+            <span style="font-size: 32px;">${statusEmoji}</span>
+          </div>
+          <div class="metric-value" style="color: ${statusColor}; margin-bottom: 8px;">${status}</div>
+          <div style="font-size: 14px; color: #666;">
+            Rolling Score (14 днів): <strong>${score.toFixed(1)}</strong>
+          </div>
+        </div>
+
+        ${voiceRisk !== null && voiceRisk !== undefined ? `
+          <div class="card metric-card">
+            <h3>Voice Analysis Risk</h3>
+            <div class="metric-value">${voiceRisk}/100</div>
+            <div style="font-size: 14px; color: #666; margin-top: 8px;">
+              ${voiceRisk > 70 ? '⚠️ Високий ризик' : voiceRisk > 40 ? '⚡ Помірний ризик' : '✅ Низький ризик'}
+            </div>
+          </div>
+        ` : ''}
+
         <div class="card metric-card">
-          <h3>WHO-5 Score</h3>
-          <div class="metric-value">${data.rolling_score?.who5_score || 'N/A'}</div>
+          <h3>Outstanding Questions</h3>
+          <div class="metric-value">${outstandingCount}</div>
+          <div style="font-size: 14px; color: #666; margin-top: 8px;">
+            ${outstandingCount > 0 ? '📝 Питання очікують відповіді' : '✅ Все актуально'}
+          </div>
+        </div>
+
+        <div class="card metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-color: #667eea;">
+          <h3 style="color: white;">Щоденний Чекін</h3>
+          <div style="font-size: 14px; opacity: 0.9; margin-top: 8px;">
+            Відповідай щодня в Telegram боті для кращого трекінгу
+          </div>
+          <div style="margin-top: 16px; font-size: 13px; opacity: 0.8;">
+            🤖 @Opslab_Mindguard_bot
+          </div>
         </div>
       `;
     }
@@ -469,9 +622,27 @@
 
         container.innerHTML = '';
 
-        data.months.forEach(month => {
+        data.months.forEach((month, index) => {
           const card = document.createElement('div');
           card.className = 'month-card slide-in';
+          card.style.animationDelay = `${index * 0.1}s`;
+
+          // Calculate trends compared to previous month
+          const prevMonth = data.months[index + 1]; // sorted DESC, so next is previous
+          const getTrend = (current, previous) => {
+            if (!current || !previous) return '';
+            const diff = current - previous;
+            if (Math.abs(diff) < 1) return '→'; // no significant change
+            return diff > 0 ? '↑' : '↓';
+          };
+
+          const getTrendColor = (current, previous, higherIsBetter = true) => {
+            if (!current || !previous) return '#666';
+            const diff = current - previous;
+            if (Math.abs(diff) < 1) return '#666';
+            const isImproving = higherIsBetter ? diff > 0 : diff < 0;
+            return isImproving ? '#00AA55' : '#CC0000';
+          };
 
           card.innerHTML = `
             <div class="month-header">${month.month_name} ${month.year}</div>
@@ -482,31 +653,66 @@
               ${month.who5_score ? `
                 <div class="metric-item">
                   <div class="metric-label">WHO-5 Wellbeing</div>
-                  <div class="metric-value">${month.who5_score.toFixed(1)}</div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="metric-value">${month.who5_score.toFixed(1)}</div>
+                    ${prevMonth?.who5_score ? `
+                      <span style="color: ${getTrendColor(month.who5_score, prevMonth.who5_score, true)}; font-size: 20px; font-weight: 700;">
+                        ${getTrend(month.who5_score, prevMonth.who5_score)}
+                      </span>
+                    ` : ''}
+                  </div>
                 </div>
               ` : ''}
               ${month.phq9_score !== null && month.phq9_score !== undefined ? `
                 <div class="metric-item">
                   <div class="metric-label">PHQ-9 Depression</div>
-                  <div class="metric-value">${month.phq9_score.toFixed(1)}</div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="metric-value">${month.phq9_score.toFixed(1)}</div>
+                    ${prevMonth?.phq9_score !== null && prevMonth?.phq9_score !== undefined ? `
+                      <span style="color: ${getTrendColor(month.phq9_score, prevMonth.phq9_score, false)}; font-size: 20px; font-weight: 700;">
+                        ${getTrend(month.phq9_score, prevMonth.phq9_score)}
+                      </span>
+                    ` : ''}
+                  </div>
                 </div>
               ` : ''}
               ${month.gad7_score !== null && month.gad7_score !== undefined ? `
                 <div class="metric-item">
                   <div class="metric-label">GAD-7 Anxiety</div>
-                  <div class="metric-value">${month.gad7_score.toFixed(1)}</div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="metric-value">${month.gad7_score.toFixed(1)}</div>
+                    ${prevMonth?.gad7_score !== null && prevMonth?.gad7_score !== undefined ? `
+                      <span style="color: ${getTrendColor(month.gad7_score, prevMonth.gad7_score, false)}; font-size: 20px; font-weight: 700;">
+                        ${getTrend(month.gad7_score, prevMonth.gad7_score)}
+                      </span>
+                    ` : ''}
+                  </div>
                 </div>
               ` : ''}
               ${month.burnout_percentage ? `
                 <div class="metric-item">
                   <div class="metric-label">Burnout %</div>
-                  <div class="metric-value">${month.burnout_percentage.toFixed(1)}%</div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="metric-value">${month.burnout_percentage.toFixed(1)}%</div>
+                    ${prevMonth?.burnout_percentage ? `
+                      <span style="color: ${getTrendColor(month.burnout_percentage, prevMonth.burnout_percentage, false)}; font-size: 20px; font-weight: 700;">
+                        ${getTrend(month.burnout_percentage, prevMonth.burnout_percentage)}
+                      </span>
+                    ` : ''}
+                  </div>
                 </div>
               ` : ''}
               ${month.stress_level ? `
                 <div class="metric-item">
                   <div class="metric-label">Stress Level</div>
-                  <div class="metric-value">${month.stress_level.toFixed(1)}</div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="metric-value">${month.stress_level.toFixed(1)}</div>
+                    ${prevMonth?.stress_level ? `
+                      <span style="color: ${getTrendColor(month.stress_level, prevMonth.stress_level, false)}; font-size: 20px; font-weight: 700;">
+                        ${getTrend(month.stress_level, prevMonth.stress_level)}
+                      </span>
+                    ` : ''}
+                  </div>
                 </div>
               ` : ''}
             </div>
