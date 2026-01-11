@@ -534,9 +534,9 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
     .await?;
 
     Ok(TeamAverage {
-        who5: avg.avg_who5,
-        phq9: avg.avg_phq9,
-        gad7: avg.avg_gad7,
+        who5: avg.avg_who5.unwrap_or(0.0),
+        phq9: avg.avg_phq9.unwrap_or(0.0),
+        gad7: avg.avg_gad7.unwrap_or(0.0),
     })
 }
 
@@ -706,7 +706,7 @@ pub async fn get_user_recent_pattern(
 
     Ok(patterns
         .into_iter()
-        .map(|p| (p.question_type, p.avg_value))
+        .map(|p| (p.question_type, p.avg_value.unwrap_or(0.0)))
         .collect())
 }
 
@@ -742,17 +742,18 @@ pub async fn calculate_user_metrics_for_period(
     .fetch_one(pool)
     .await?;
 
-    if result.who5 == 0.0 {
+    let who5 = result.who5.unwrap_or(0.0);
+    if who5 == 0.0 {
         return Ok(None);
     }
 
     Ok(Some(Metrics {
-        who5_score: result.who5,
-        phq9_score: result.phq9,
-        gad7_score: result.gad7,
-        mbi_score: result.mbi,
-        sleep_duration: result.sleep_duration,
-        work_life_balance: result.work_life_balance,
-        stress_level: result.stress_level,
+        who5_score: who5,
+        phq9_score: result.phq9.unwrap_or(0.0),
+        gad7_score: result.gad7.unwrap_or(0.0),
+        mbi_score: result.mbi.unwrap_or(0.0),
+        sleep_duration: result.sleep_duration.unwrap_or(0.0),
+        work_life_balance: result.work_life_balance.unwrap_or(0.0),
+        stress_level: result.stress_level.unwrap_or(0.0),
     }))
 }

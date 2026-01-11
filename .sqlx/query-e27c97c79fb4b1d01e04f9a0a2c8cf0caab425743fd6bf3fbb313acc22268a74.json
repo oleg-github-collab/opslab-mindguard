@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT question_type, CAST(AVG(value) AS DOUBLE PRECISION) as \"avg_value: f64\"\n        FROM checkin_answers\n        WHERE user_id = $1\n          AND created_at >= NOW() - INTERVAL '3 days'\n        GROUP BY question_type\n        ",
+  "query": "\n        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as \"avg_value: f64\"\n        FROM checkin_answers\n        WHERE user_id = $1\n          AND created_at >= NOW() - INTERVAL '3 days'\n        GROUP BY question_type\n        ",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       null
     ]
   },
-  "hash": "63a3e48cfb186723af0e16f9917f810e4c1a7d5b5b02f95e0d3d357eeb48ab6a"
+  "hash": "e27c97c79fb4b1d01e04f9a0a2c8cf0caab425743fd6bf3fbb313acc22268a74"
 }
