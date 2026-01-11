@@ -21,7 +21,14 @@ use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("Application error: {:#}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     tracing_subscriber::registry()
@@ -29,7 +36,11 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    tracing::info!("🚀 OpsLab Mindguard starting...");
+    tracing::info!("Environment: {}", std::env::var("RAILWAY_ENVIRONMENT").unwrap_or_else(|_| "development".to_string()));
+
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
+    tracing::info!("Database URL configured");
     tracing::info!("Connecting to database...");
     let pool = PgPoolOptions::new()
         .max_connections(10)
