@@ -197,7 +197,7 @@ async fn run() -> anyhow::Result<()> {
         .fallback_service(get_service(static_handler))
         .layer(TraceLayer::new_for_http())
         // Prevent stale CDN/edge caches for index.html and static assets
-        .layer(SetResponseHeaderLayer::if_not_present(
+        .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,
             header::HeaderValue::from_static("no-store"),
         ));
