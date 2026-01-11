@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: opslab_mindguard
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/opslab_mindguard
+      SQLX_OFFLINE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres,rustls --locked
+        working-directory: backend
+
+      - name: Prepare database (create + migrate)
+        run: |
+          sqlx database create
+          sqlx migrate run
+        working-directory: backend
+
+      - name: Format
+        run: cargo fmt --all -- --check
+        working-directory: backend
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+        working-directory: backend
+
+      - name: Build check
+        run: cargo check --locked
+        working-directory: backend
+
+      - name: Tests
+        run: cargo test --locked -- --nocapture
+        working-directory: backend

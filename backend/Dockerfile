@@ -34,6 +34,9 @@ COPY --from=builder /app/migrations migrations
 COPY --from=builder /app/index.html index.html
 COPY --from=builder /app/static static
 
+# Verify correct file was copied
+RUN head -7 index.html | grep "Mental Health" || (echo "ERROR: Old index.html in runtime!" && cat index.html | head -10 && exit 1)
+
 ENV RUST_LOG=info
 EXPOSE 3000
 CMD ["/usr/local/bin/opslab-mindguard"]
