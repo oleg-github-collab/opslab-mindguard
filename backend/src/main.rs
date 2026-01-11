@@ -199,7 +199,19 @@ async fn run() -> anyhow::Result<()> {
         // Prevent stale CDN/edge caches for index.html and static assets
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,
-            header::HeaderValue::from_static("no-store"),
+            header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::PRAGMA,
+            header::HeaderValue::from_static("no-cache"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::EXPIRES,
+            header::HeaderValue::from_static("0"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("x-content-version"),
+            header::HeaderValue::from_static("20260111-2350"),
         ));
 
     // Railway sets PORT automatically, prefer it over BIND_ADDR
