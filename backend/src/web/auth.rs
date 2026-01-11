@@ -22,6 +22,11 @@ pub struct LoginRequest {
     pub telegram_id: Option<i64>,
 }
 
+#[derive(Deserialize)]
+pub struct TokenLoginRequest {
+    pub token: String,
+}
+
 #[derive(Serialize)]
 pub struct LoginResponse {
     pub user_id: Uuid,
@@ -30,7 +35,10 @@ pub struct LoginResponse {
 }
 
 pub fn router(state: SharedState) -> Router {
-    Router::new().route("/login", post(login)).with_state(state)
+    Router::new()
+        .route("/login", post(login))
+        .route("/token-login", post(token_login))
+        .with_state(state)
 }
 
 async fn login(
@@ -93,5 +101,91 @@ async fn login(
         axum::http::header::SET_COOKIE,
         format!("session={token}; HttpOnly; SameSite=Lax; Path={}{}", "/", secure_flag).parse().unwrap(),
     );
+    Ok((headers, Json(resp)))
+}
+
+async fn token_login(
+    State(state): State<SharedState>,
+    Json(payload): Json<TokenLoginRequest>,
+) -> Result<impl IntoResponse, StatusCode> {
+    // Verify token and get user
+    let token_record = sqlx::query!(
+        r#"
+        SELECT user_id, used, expires_at
+        FROM telegram_login_tokens
+        WHERE token = $1
+        "#,
+        payload.token
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Token lookup failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Check if token is valid
+    if token_record.used {
+        tracing::warn!("Attempt to reuse token: {}", payload.token);
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    if token_record.expires_at < chrono::Utc::now() {
+        tracing::warn!("Expired token used: {}", payload.token);
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Mark token as used
+    sqlx::query!(
+        r#"
+        UPDATE telegram_login_tokens
+        SET used = TRUE
+        WHERE token = $1
+        "#,
+        payload.token
+    )
+    .execute(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Get user details
+    let user = db::find_user_by_id(&state.pool, token_record.user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let name = state
+        .crypto
+        .decrypt_str(&user.enc_name)
+        .unwrap_or_else(|_| "User".to_string());
+
+    let resp = LoginResponse {
+        user_id: user.id,
+        role: user.role.clone(),
+        name,
+    };
+
+    let session_token = session::sign_session(user.id, &user.role, &state.session_key)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // SECURITY: Use Secure flag in production (HTTPS only)
+    let is_production = std::env::var("RAILWAY_ENVIRONMENT").is_ok()
+        || std::env::var("RENDER").is_ok()
+        || std::env::var("FLY_APP_NAME").is_ok()
+        || std::env::var("PRODUCTION").is_ok();
+
+    let secure_flag = if is_production { "; Secure" } else { "" };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        format!("session={}; HttpOnly; SameSite=Lax; Path={}{}", session_token, "/", secure_flag)
+            .parse()
+            .unwrap(),
+    );
+
+    tracing::info!("User {} logged in via Telegram token", user.id);
+
     Ok((headers, Json(resp)))
 }

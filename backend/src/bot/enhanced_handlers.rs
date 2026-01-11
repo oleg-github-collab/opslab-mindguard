@@ -118,7 +118,7 @@ async fn handle_action_callback(
                 msg.chat.id,
                 "📝 *Стіна плачу*\n\n\
                 Поділись своїми думками анонімно:\n\
-                https://mindguard.opslab.uk/wall\n\n\
+                https://backend-production-e745.up.railway.app\n\n\
                 Написати голосовим сюди - також працює!",
             )
             .parse_mode(ParseMode::Markdown)
@@ -319,11 +319,20 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         bot.send_message(
             msg.chat.id,
             "👋 *Привіт! Ласкаво просимо до OpsLab Mindguard!*\n\n\
-            Для початку роботи:\n\
-            1️⃣ Увійдіть на платформу: https://mindguard.opslab.uk\n\
-            2️⃣ Отримайте PIN-код на dashboard\n\
-            3️⃣ Напишіть сюди: `/start ВАШ-PIN`\n\n\
-            _Приклад: /start 1234_",
+            Для початку роботи зв'яжіть свій Telegram з платформою.\n\n\
+            📧 *Ваші дані для входу:*\n\
+            • Email: work.olegkaminskyi@gmail.com (Admin - код 0000)\n\
+            • janedavydiuk@opslab.uk (Founder - код 7139)\n\
+            • veronika.kukharchuk@opslab.uk (код 4582)\n\
+            • mykhailo.ivashchuk@opslab.uk (код 9267)\n\
+            • iryna.miachkova@opslab.uk (код 3814)\n\
+            • oksana.klinchaian@opslab.uk (код 8463)\n\
+            • ivanna.sakalo@opslab.uk (код 6738)\n\
+            • mariya.vasylyk@opslab.uk (код 1425)\n\
+            • kateryna.petukhova@opslab.uk (код 1122)\n\n\
+            🔗 Перейдіть на платформу:\n\
+            https://backend-production-e745.up.railway.app\n\n\
+            Після входу ваш Telegram автоматично зв'яжеться з акаунтом!",
         )
         .parse_mode(teloxide::types::ParseMode::Markdown)
         .await?;
@@ -356,6 +365,11 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
 
         if text.starts_with("/wall") {
             send_wall_info(bot, msg.chat.id).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/weblogin") {
+            send_web_login_link(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
         }
 
@@ -485,12 +499,17 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
         🔹 *Щоденні чекіни* (2-3 хв) - автоматична розсилка о 10:00\n\
         🔹 *Голосова підтримка* - запиши голосове і отримай аналіз\n\
         🔹 *Стіна плачу* - анонімний зворотній зв'язок\n\
-        🔹 *Критичні алерти* - сповіщення для адмінів\n\n\
-        *Команди:*\n\
+        🔹 *Web dashboard* - детальна статистика\n\n\
+        *Головні команди:*\n\
         /checkin - Пройти чекін зараз\n\
         /status - Мій поточний стан\n\
+        /weblogin - Отримати посилання для входу в dashboard\n\
         /wall - Стіна плачу\n\
         /help - Допомога\n\n\
+        💡 *Швидкий старт:*\n\
+        1. Надішліть /weblogin для входу в web dashboard\n\
+        2. Отримайте персональне посилання (дійсне 5 хв)\n\
+        3. Переглядайте свої метрики та тренди!\n\n\
         _Щоденні чекіни надсилаються автоматично о 10:00_",
     )
     .parse_mode(teloxide::types::ParseMode::Markdown)
@@ -830,10 +849,53 @@ async fn send_wall_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
         Місце для анонімного зворотного зв'язку.\n\
         Поділися своїми думками, ідеями або переживаннями.\n\n\
         Всі пости анонімні та конфіденційні.\n\n\
-        🔗 https://mindguard.opslab.uk/wall",
+        🔗 https://backend-production-e745.up.railway.app",
     )
     .parse_mode(teloxide::types::ParseMode::Markdown)
     .await?;
+    Ok(())
+}
+
+/// Generate web login link for Telegram user
+async fn send_web_login_link(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    // Generate secure random token
+    let token: String = (0..32)
+        .map(|_| format!("{:x}", rand::random::<u8>()))
+        .collect();
+
+    // Store token in database (expires in 5 minutes)
+    sqlx::query!(
+        r#"
+        INSERT INTO telegram_login_tokens (user_id, token, expires_at)
+        VALUES ($1, $2, now() + INTERVAL '5 minutes')
+        "#,
+        user_id,
+        token
+    )
+    .execute(&state.pool)
+    .await?;
+
+    let login_url = format!("https://backend-production-e745.up.railway.app?token={}", token);
+
+    bot.send_message(
+        chat_id,
+        format!(
+            "🔐 *Ваше персональне посилання для входу:*\n\n\
+            {}\n\n\
+            ⏱ Посилання дійсне 5 хвилин\n\
+            🔒 Одноразове використання\n\n\
+            Просто перейдіть за посиланням - вхід виконається автоматично!",
+            login_url
+        ),
+    )
+    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .await?;
+
     Ok(())
 }
 

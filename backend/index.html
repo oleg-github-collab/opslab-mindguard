@@ -414,8 +414,26 @@
   <script>
     let currentUser = null;
 
-    // Check for existing session
+    // Check for existing session or token in URL
     window.addEventListener('DOMContentLoaded', async () => {
+      // Check for token in URL (from Telegram link)
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+
+      if (token) {
+        // Auto-login with token
+        try {
+          await loginWithToken(token);
+          // Remove token from URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        } catch (e) {
+          showError('Недійсне або прострочене посилання. Увійдіть вручну.');
+          showLogin();
+          return;
+        }
+      }
+
       // Try to load dashboard - if session exists, it will work
       try {
         await checkSession();
@@ -424,6 +442,24 @@
         showLogin();
       }
     });
+
+    async function loginWithToken(token) {
+      const response = await fetch('/auth/token-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Token login failed');
+      }
+
+      const data = await response.json();
+      currentUser = data;
+      showDashboard();
+      await loadDashboard();
+    }
 
     async function checkSession() {
       const response = await fetch('/dashboard/me', {
