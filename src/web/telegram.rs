@@ -32,9 +32,10 @@ struct TelegramStatus {
 }
 
 /// Generate new PIN code for Telegram linking
+#[axum::debug_handler]
 async fn generate_pin(
-    State(state): State<SharedState>,
     UserSession(user_id): UserSession,
+    State(state): State<SharedState>,
 ) -> Result<Json<PinResponse>, StatusCode> {
     let pin_code = db::generate_telegram_pin(&state.pool, user_id)
         .await
@@ -51,8 +52,8 @@ async fn generate_pin(
 
 /// Get Telegram connection status
 async fn telegram_status(
-    State(state): State<SharedState>,
     UserSession(user_id): UserSession,
+    State(state): State<SharedState>,
 ) -> Result<Json<TelegramStatus>, StatusCode> {
     let user = db::find_user_by_id(&state.pool, user_id)
         .await

@@ -74,7 +74,7 @@ async fn login(
 
     let resp = LoginResponse {
         user_id: user.id,
-        role: user.role,
+        role: user.role.clone(),
         name,
     };
 

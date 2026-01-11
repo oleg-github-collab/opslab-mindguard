@@ -99,7 +99,7 @@ impl WallPostCategorizer {
             .model("gpt-3.5-turbo") // Faster & cheaper for classification
             .messages(messages)
             .temperature(0.3) // Lower temperature for consistent classification
-            .max_tokens(10)
+            .max_tokens(10u16)
             .build()?;
 
         let response = self.client.chat().create(request).await?;

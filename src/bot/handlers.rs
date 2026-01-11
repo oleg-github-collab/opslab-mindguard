@@ -151,7 +151,7 @@ async fn handle_voice(
             "⚠️ Високий ризик: зробіть паузу 5 хв. Практика: 4-7-8 дихання + складіть 3 пункти плану на найближчу годину. Якщо потрібно — напишіть \"паніка\" щоб отримати швидку підтримку.",
         )
         .await?;
-        if let Ok(admin_id) = env::var("ADMIN_TELEGRAM_ID")
+        if let Some(admin_id) = env::var("ADMIN_TELEGRAM_ID")
             .ok()
             .and_then(|v| v.parse::<i64>().ok())
         {

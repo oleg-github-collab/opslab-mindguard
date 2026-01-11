@@ -203,7 +203,7 @@ pub async fn get_recent_checkin_answers(
         ORDER BY created_at DESC
         "#,
         user_id,
-        days
+        &days.to_string()
     )
     .fetch_all(pool)
     .await?;
@@ -244,7 +244,7 @@ pub async fn get_checkin_answer_count(
           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
         "#,
         user_id,
-        days
+        &days.to_string()
     )
     .fetch_one(pool)
     .await?;
@@ -257,9 +257,11 @@ pub async fn get_checkin_answer_count(
 pub async fn generate_telegram_pin(pool: &PgPool, user_id: Uuid) -> Result<String> {
     use rand::Rng;
 
-    // Generate 4-digit PIN
-    let mut rng = rand::thread_rng();
-    let pin_code = format!("{:04}", rng.gen_range(1000..10000));
+    // Generate 4-digit PIN (before any await to ensure Send)
+    let pin_code = {
+        let mut rng = rand::thread_rng();
+        format!("{:04}", rng.gen_range(1000..10000))
+    };
 
     // Mark old PINs as used
     sqlx::query!(
@@ -431,8 +433,8 @@ pub async fn get_users_for_reminder_time(
           AND COALESCE(p.reminder_minute, 0) = $2
           AND COALESCE(p.notification_enabled, true) = true
         "#,
-        hour,
-        minute
+        hour as i32,
+        minute as i32
     )
     .fetch_all(pool)
     .await?;
@@ -567,7 +569,7 @@ pub struct KudosRecord {
     pub from_user_id: Uuid,
     pub to_user_id: Uuid,
     pub message: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
     pub from_user_enc_name: Vec<u8>,
 }
 
@@ -689,7 +691,7 @@ pub async fn get_user_recent_pattern(
     pool: &PgPool,
     user_id: Uuid,
 ) -> Result<Vec<(String, f64)>> {
-    let patterns = sqlx::query!(
+    let patterns: Vec<_> = sqlx::query!(
         r#"
         SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as "avg_value: f64"
         FROM checkin_answers

@@ -45,8 +45,8 @@ struct WallPostRow {
     user_id: Uuid,
     enc_content: Vec<u8>,
     category: Option<PostCategory>,
-    ai_categorized: bool,
-    created_at: chrono::DateTime<chrono::Utc>,
+    ai_categorized: Option<bool>,
+    created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 pub fn router(state: SharedState) -> Router {
@@ -145,8 +145,8 @@ async fn create_wall_post(
         "#,
         post_id,
         user_id, // SECURITY FIX: Use authenticated user_id, not from payload
-        enc_content,
-        category as PostCategory,
+        enc_content.as_bytes(),
+        category.clone() as PostCategory,
         ai_categorized
     )
     .execute(&state.pool)
@@ -190,14 +190,15 @@ async fn get_wall_posts(
     let posts: Vec<WallPost> = rows
         .into_iter()
         .filter_map(|row| {
-            match state.crypto.decrypt_str(&row.enc_content) {
+            let enc_str = String::from_utf8_lossy(&row.enc_content);
+            match state.crypto.decrypt_str(&enc_str) {
                 Ok(content) => Some(WallPost {
                     id: row.id,
                     user_id: row.user_id,
                     content,
                     category: row.category,
-                    ai_categorized: row.ai_categorized,
-                    created_at: row.created_at,
+                    ai_categorized: row.ai_categorized.unwrap_or(false),
+                    created_at: row.created_at.unwrap_or_else(|| chrono::Utc::now()),
                 }),
                 Err(e) => {
                     tracing::error!("Failed to decrypt wall post {}: {}", row.id, e);

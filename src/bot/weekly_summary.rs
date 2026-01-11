@@ -147,8 +147,9 @@ impl WeeklySummary {
             msg.push_str("\n🎉 *Kudos від колег:*\n");
             let kudos_list = db::get_recent_kudos(pool, self.user_id, 3).await?;
             for kudos in kudos_list {
+                let enc_str = String::from_utf8_lossy(&kudos.from_user_enc_name);
                 let from_name = crypto
-                    .decrypt_str(&kudos.from_user_enc_name)
+                    .decrypt_str(&enc_str)
                     .unwrap_or_else(|_| "Colleague".to_string());
                 msg.push_str(&format!("• \"{}\" - _{}_\n", kudos.message, from_name));
             }
@@ -294,42 +295,42 @@ impl WeeklySummary {
     }
 
     fn generate_insights(&self) -> String {
-        let mut insights = Vec::new();
+        let mut insights: Vec<String> = Vec::new();
 
         if self.current_metrics.who5_score >= 75.0 {
-            insights.push("• Твій well-being на високому рівні! 🎉");
+            insights.push("• Твій well-being на високому рівні! 🎉".to_string());
         } else if self.current_metrics.who5_score < 50.0 {
-            insights.push("• Well-being низький. Поговори з Jane або керівником 💙");
+            insights.push("• Well-being низький. Поговори з Jane або керівником 💙".to_string());
         }
 
         if self.streak >= 7 {
-            insights.push(&format!("• {} днів streak! Ти супер! 🔥", self.streak));
+            insights.push(format!("• {} днів streak! Ти супер! 🔥", self.streak));
         } else if self.checkin_count < 5 {
-            insights.push("• Спробуй проходити чекіни частіше для точнішої картини");
+            insights.push("• Спробуй проходити чекіни частіше для точнішої картини".to_string());
         }
 
         if self.current_metrics.phq9_score < 5.0 {
-            insights.push("• Депресивні симптоми мінімальні ✨");
+            insights.push("• Депресивні симптоми мінімальні ✨".to_string());
         } else if self.current_metrics.phq9_score >= 15.0 {
-            insights.push("• ⚠️ Високий рівень депресивних симптомів - не ігноруй це!");
+            insights.push("• ⚠️ Високий рівень депресивних симптомів - не ігноруй це!".to_string());
         }
 
         if self.current_metrics.burnout_percentage() < 30.0 {
-            insights.push("• Ризик burnout низький 💚");
+            insights.push("• Ризик burnout низький 💚".to_string());
         } else if self.current_metrics.burnout_percentage() > 70.0 {
-            insights.push("• ⚠️ Високий ризик burnout! Потрібна перерва негайно");
+            insights.push("• ⚠️ Високий ризик burnout! Потрібна перерва негайно".to_string());
         }
 
         if self.current_metrics.stress_level > 30.0 {
-            insights.push("• Високий stress - спробуй meditation 4-7-8");
+            insights.push("• Високий stress - спробуй meditation 4-7-8".to_string());
         }
 
         if self.current_metrics.sleep_quality() < 6.0 {
-            insights.push("• Поганий сон впливає на все - пріоритизуй 7-8 годин");
+            insights.push("• Поганий сон впливає на все - пріоритизуй 7-8 годин".to_string());
         }
 
         if insights.is_empty() {
-            insights.push("• Продовжуй моніторити своє здоров'я регулярно!");
+            insights.push("• Продовжуй моніторити своє здоров'я регулярно!".to_string());
         }
 
         insights.join("\n")

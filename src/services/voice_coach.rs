@@ -55,7 +55,7 @@ impl VoiceCoach {
             .model("gpt-4-turbo-preview")
             .messages(messages)
             .temperature(0.7)
-            .max_tokens(500)
+            .max_tokens(500u16)
             .build()?;
 
         let response = self.client.chat().create(request).await?;

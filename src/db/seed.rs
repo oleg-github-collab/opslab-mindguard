@@ -94,7 +94,8 @@ async fn seed_users(pool: &PgPool, crypto: &Crypto) -> Result<()> {
         let salt = SaltString::generate(rand_core::OsRng);
         let hash = argon
             .hash_password(user.code.as_bytes(), &salt)
-            .map(|h| h.to_string())?;
+            .map_err(|e| anyhow::anyhow!("Failed to hash password: {}", e))?
+            .to_string();
 
         let enc_name = crypto.encrypt_str(user.name)?;
         sqlx::query!(
