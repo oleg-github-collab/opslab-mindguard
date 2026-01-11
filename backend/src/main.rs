@@ -11,7 +11,13 @@ mod web;
 
 use crate::db::seed;
 use crate::state::SharedState;
-use axum::{http::header, routing::get_service, Router};
+use axum::{
+    body::Body,
+    http::{header, Request, Response, StatusCode},
+    middleware::{self, Next},
+    routing::get_service,
+    Router,
+};
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Timelike;
 use sqlx::postgres::PgPoolOptions;
@@ -20,6 +26,31 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Custom middleware to add cache-busting headers
+async fn add_cache_headers(req: Request<Body>, next: Next) -> Response<Body> {
+    let mut response = next.run(req).await;
+    let headers = response.headers_mut();
+
+    headers.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
+    );
+    headers.insert(
+        header::PRAGMA,
+        header::HeaderValue::from_static("no-cache"),
+    );
+    headers.insert(
+        header::EXPIRES,
+        header::HeaderValue::from_static("0"),
+    );
+    headers.insert(
+        header::HeaderName::from_static("x-mindguard-version"),
+        header::HeaderValue::from_static("2026-01-12"),
+    );
+
+    response
+}
 
 #[tokio::main]
 async fn main() {
@@ -190,31 +221,12 @@ async fn run() -> anyhow::Result<()> {
 
     let static_handler = ServeDir::new("static").not_found_service(ServeFile::new("index.html"));
 
-    // Create cache headers stack
-    let cache_headers = tower::ServiceBuilder::new()
-        .layer(SetResponseHeaderLayer::overriding(
-            header::CACHE_CONTROL,
-            header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            header::PRAGMA,
-            header::HeaderValue::from_static("no-cache"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            header::EXPIRES,
-            header::HeaderValue::from_static("0"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            header::HeaderName::from_static("x-content-version"),
-            header::HeaderValue::from_static("20260111-2355"),
-        ));
-
     let app = Router::new()
         .merge(web::routes(shared.clone()))
         .merge(bot::enhanced_handlers::routes(shared.clone()))
         .nest_service("/static", get_service(ServeDir::new("static")))
         .fallback_service(get_service(static_handler))
-        .layer(cache_headers)
+        .layer(middleware::from_fn(add_cache_headers))
         .layer(TraceLayer::new_for_http());
 
     // Railway sets PORT automatically, prefer it over BIND_ADDR
