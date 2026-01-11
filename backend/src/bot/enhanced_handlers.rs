@@ -869,14 +869,11 @@ async fn send_web_login_link(
         .collect();
 
     // Store token in database (expires in 5 minutes)
-    sqlx::query!(
-        r#"
-        INSERT INTO telegram_login_tokens (user_id, token, expires_at)
-        VALUES ($1, $2, now() + INTERVAL '5 minutes')
-        "#,
-        user_id,
-        token
+    sqlx::query(
+        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '5 minutes')"
     )
+    .bind(user_id)
+    .bind(&token)
     .execute(&state.pool)
     .await?;
 

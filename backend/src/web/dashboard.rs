@@ -134,9 +134,20 @@ async fn user_history(
     }
 
     // Query monthly aggregated check-in data
-    let monthly_data = sqlx::query!(
-        r#"
-        SELECT
+    #[derive(sqlx::FromRow)]
+    struct MonthlyRow {
+        year: Option<i32>,
+        month: Option<i32>,
+        who5_score: Option<f64>,
+        phq9_score: Option<f64>,
+        gad7_score: Option<f64>,
+        burnout_percentage: Option<f64>,
+        stress_level: Option<f64>,
+        checkins_count: Option<i64>,
+    }
+
+    let monthly_data: Vec<MonthlyRow> = sqlx::query_as(
+        "SELECT
             EXTRACT(YEAR FROM created_at)::int AS year,
             EXTRACT(MONTH FROM created_at)::int AS month,
             AVG(who5_score) AS who5_score,
@@ -148,10 +159,9 @@ async fn user_history(
         FROM checkin_answers
         WHERE user_id = $1
         GROUP BY year, month
-        ORDER BY year DESC, month DESC
-        "#,
-        id
+        ORDER BY year DESC, month DESC"
     )
+    .bind(id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| {

@@ -109,14 +109,17 @@ async fn token_login(
     Json(payload): Json<TokenLoginRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     // Verify token and get user
-    let token_record = sqlx::query!(
-        r#"
-        SELECT user_id, used, expires_at
-        FROM telegram_login_tokens
-        WHERE token = $1
-        "#,
-        payload.token
+    #[derive(sqlx::FromRow)]
+    struct TokenRecord {
+        user_id: Uuid,
+        used: bool,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    }
+
+    let token_record: TokenRecord = sqlx::query_as(
+        "SELECT user_id, used, expires_at FROM telegram_login_tokens WHERE token = $1"
     )
+    .bind(&payload.token)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| {
@@ -137,17 +140,11 @@ async fn token_login(
     }
 
     // Mark token as used
-    sqlx::query!(
-        r#"
-        UPDATE telegram_login_tokens
-        SET used = TRUE
-        WHERE token = $1
-        "#,
-        payload.token
-    )
-    .execute(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    sqlx::query("UPDATE telegram_login_tokens SET used = TRUE WHERE token = $1")
+        .bind(&payload.token)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Get user details
     let user = db::find_user_by_id(&state.pool, token_record.user_id)

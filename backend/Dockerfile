@@ -11,6 +11,10 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo fetch
 RUN rm -rf src
 
+# Force cache invalidation
+COPY .cache-bust /tmp/.cache-bust
+RUN cat /tmp/.cache-bust && echo " - cache invalidated"
+
 # Copy full source
 COPY . .
 
