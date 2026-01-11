@@ -1,4 +1,4 @@
-FROM rust:1.82 as builder
+FROM rust:latest as builder
 WORKDIR /app
 
 # Copy manifests; Cargo.lock/sqlx-data.json are optional and can be added later
