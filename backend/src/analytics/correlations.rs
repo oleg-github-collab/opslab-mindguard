@@ -1,6 +1,5 @@
 ///! Correlation Insights (#7)
 ///! Аналізує кореляції між показниками (sleep→mood, stress→concentration, day patterns)
-
 use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -72,8 +71,13 @@ pub async fn analyze_correlations(pool: &PgPool, user_id: Uuid) -> Result<Vec<Co
             insights.push(CorrelationInsight {
                 correlation_type: "energy_productivity".to_string(),
                 strength: energy_prod,
-                description: format!("Енергія сильно впливає на продуктивність (r={:.2})", energy_prod),
-                recommendation: "⚡ Підтримуй енергію: якісний сон, healthy snacks, рухайся кожні 2 години!".to_string(),
+                description: format!(
+                    "Енергія сильно впливає на продуктивність (r={:.2})",
+                    energy_prod
+                ),
+                recommendation:
+                    "⚡ Підтримуй енергію: якісний сон, healthy snacks, рухайся кожні 2 години!"
+                        .to_string(),
             });
         }
     }

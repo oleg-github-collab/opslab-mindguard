@@ -1,6 +1,5 @@
 ///! Weekly Summary System (#6 + #10)
 ///! Відправляє щоп'ятниці о 17:00 детальний summary з метриками та team benchmark
-
 use crate::bot::daily_checkin::Metrics;
 use crate::db::{self, TeamAverage};
 use crate::state::SharedState;
@@ -80,7 +79,11 @@ impl WeeklySummary {
         })
     }
 
-    pub async fn format_telegram_message(&self, pool: &sqlx::PgPool, crypto: &crate::crypto::Crypto) -> Result<String> {
+    pub async fn format_telegram_message(
+        &self,
+        pool: &sqlx::PgPool,
+        crypto: &crate::crypto::Crypto,
+    ) -> Result<String> {
         let mut msg = String::from("📊 *ТВІЙ ТИЖНЕВИЙ SUMMARY*\n\n");
 
         // Check-ins & Streak
@@ -347,7 +350,10 @@ pub async fn send_weekly_summaries(state: &SharedState) -> Result<()> {
     for (user_id, telegram_id) in users {
         match WeeklySummary::generate(&state.pool, user_id).await {
             Ok(summary) => {
-                match summary.format_telegram_message(&state.pool, &state.crypto).await {
+                match summary
+                    .format_telegram_message(&state.pool, &state.crypto)
+                    .await
+                {
                     Ok(msg) => {
                         let bot = teloxide::Bot::new(
                             std::env::var("TELEGRAM_BOT_TOKEN")

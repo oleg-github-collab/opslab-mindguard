@@ -2,7 +2,6 @@
 ///! - Короткі опитування (2-4 питання, до 3 хвилин)
 ///! - Різні варіанти питань для підтримки інтересу
 ///! - Повна картина за 7-10 днів
-
 use chrono::{Datelike, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -245,9 +244,7 @@ impl AdaptiveQuestionEngine {
                 QuestionType::Sleep => {
                     "Привіт! 😴 Як спалося? Сон дуже важливий для здоров'я.".to_string()
                 }
-                QuestionType::Energy => {
-                    "Вітаю! ⚡ Як рівень енергії? Подбай про себе.".to_string()
-                }
+                QuestionType::Energy => "Вітаю! ⚡ Як рівень енергії? Подбай про себе.".to_string(),
                 QuestionType::Mood => {
                     "Доброго ранку! 💙 Як настрій? Ти не один, ми поруч.".to_string()
                 }
@@ -562,7 +559,9 @@ mod tests {
 
         assert_eq!(checkin.questions.len(), 3);
         assert_eq!(checkin.day_of_week, 0);
-        assert!(checkin.intro_message.contains("Понеділок") || checkin.intro_message.contains("ранку"));
+        assert!(
+            checkin.intro_message.contains("Понеділок") || checkin.intro_message.contains("ранку")
+        );
     }
 
     #[test]

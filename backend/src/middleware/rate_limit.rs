@@ -1,6 +1,5 @@
 ///! Simple in-memory rate limiter for anonymous endpoints
 ///! Production: use Redis or dedicated service like Cloudflare
-
 use axum::{
     body::Body,
     extract::ConnectInfo,
@@ -36,7 +35,9 @@ impl RateLimiter {
         let mut requests = self.requests.write().await;
 
         // Get or create request history for this identifier
-        let history = requests.entry(identifier.to_string()).or_insert_with(Vec::new);
+        let history = requests
+            .entry(identifier.to_string())
+            .or_insert_with(Vec::new);
 
         // Remove old requests outside the window
         history.retain(|&timestamp| now.duration_since(timestamp) < self.window);
@@ -60,7 +61,10 @@ impl RateLimiter {
             !history.is_empty()
         });
 
-        tracing::debug!("Rate limiter cleanup: {} active identifiers", requests.len());
+        tracing::debug!(
+            "Rate limiter cleanup: {} active identifiers",
+            requests.len()
+        );
     }
 }
 

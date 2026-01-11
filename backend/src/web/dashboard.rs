@@ -1,7 +1,7 @@
 use crate::db::{self, DbUser};
 use crate::domain::models::{DashboardPayload, UserRole};
-use crate::web::session;
 use crate::state::SharedState;
+use crate::web::session;
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
@@ -77,9 +77,14 @@ async fn get_current_user(
     }))
 }
 
-async fn user_view(headers: HeaderMap, State(state): State<SharedState>, Path(id): Path<Uuid>) -> Result<Json<DashboardPayload>, StatusCode> {
+async fn user_view(
+    headers: HeaderMap,
+    State(state): State<SharedState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<DashboardPayload>, StatusCode> {
     let token = session::extract_token(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
-    let claims = session::verify_session(&token, &state.session_key).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = session::verify_session(&token, &state.session_key)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
     if claims.user_id != id && !matches!(claims.role, UserRole::Admin | UserRole::Founder) {
         return Err(StatusCode::FORBIDDEN);
     }
@@ -159,7 +164,7 @@ async fn user_history(
         FROM checkin_answers
         WHERE user_id = $1
         GROUP BY year, month
-        ORDER BY year DESC, month DESC"
+        ORDER BY year DESC, month DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)
@@ -207,9 +212,13 @@ async fn user_history(
     Ok(Json(HistoricalData { months }))
 }
 
-async fn team_view(headers: HeaderMap, State(state): State<SharedState>) -> Result<Json<TeamDashboard>, StatusCode> {
+async fn team_view(
+    headers: HeaderMap,
+    State(state): State<SharedState>,
+) -> Result<Json<TeamDashboard>, StatusCode> {
     let token = session::extract_token(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
-    let claims = session::verify_session(&token, &state.session_key).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = session::verify_session(&token, &state.session_key)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
     if !matches!(claims.role, UserRole::Admin | UserRole::Founder) {
         return Err(StatusCode::FORBIDDEN);
     }

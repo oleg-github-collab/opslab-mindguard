@@ -1,7 +1,7 @@
+use crate::bot::daily_checkin::CheckIn;
 use crate::crypto::Crypto;
 use crate::domain::polling::PollEngine;
 use crate::services::ai::AiService;
-use crate::bot::daily_checkin::CheckIn;
 use axum::extract::FromRef;
 use sqlx::PgPool;
 use std::collections::HashMap;

@@ -1,6 +1,5 @@
 ///! Voice AI Coach (#11)
 ///! Enhanced voice message analysis з персоналізованими рекомендаціями на основі user metrics
-
 use crate::bot::daily_checkin::Metrics;
 use anyhow::Result;
 use async_openai::types::{
@@ -8,7 +7,7 @@ use async_openai::types::{
     ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
     CreateChatCompletionRequestArgs, Role,
 };
-use async_openai::{Client, config::OpenAIConfig};
+use async_openai::{config::OpenAIConfig, Client};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -14,10 +14,24 @@ impl PollEngine {
         Self { decay_days: 21.0 }
     }
 
-    pub async fn next_questions(&self, pool: &PgPool, user_id: Uuid, limit: usize) -> Result<Vec<Question>> {
+    pub async fn next_questions(
+        &self,
+        pool: &PgPool,
+        user_id: Uuid,
+        limit: usize,
+    ) -> Result<Vec<Question>> {
         // FIXED: Use checkin_answers instead of answers table
         // Group by question_type to find least recently answered types
-        let question_types = vec!["mood", "energy", "stress", "sleep", "workload", "motivation", "focus", "wellbeing"];
+        let question_types = vec![
+            "mood",
+            "energy",
+            "stress",
+            "sleep",
+            "workload",
+            "motivation",
+            "focus",
+            "wellbeing",
+        ];
 
         let mut type_scores: Vec<(String, chrono::DateTime<Utc>)> = Vec::new();
 
@@ -34,7 +48,8 @@ impl PollEngine {
             .fetch_one(pool)
             .await?;
 
-            let timestamp = last_answer.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+            let timestamp =
+                last_answer.unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
             type_scores.push((qtype.to_string(), timestamp));
         }
 
@@ -87,10 +102,7 @@ impl PollEngine {
             total += normalized_value * weight;
         }
 
-        Ok(RollingScore {
-            window_days,
-            total,
-        })
+        Ok(RollingScore { window_days, total })
     }
 
     fn decay_weight(&self, age_days: f32) -> f32 {

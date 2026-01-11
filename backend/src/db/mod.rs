@@ -1,8 +1,8 @@
 pub mod seed;
 
+use crate::bot::daily_checkin::{CheckInAnswer, Metrics};
 use crate::crypto::Crypto;
 use crate::domain::models::UserRole;
-use crate::bot::daily_checkin::{CheckInAnswer, Metrics};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -95,7 +95,12 @@ pub async fn attach_telegram(pool: &PgPool, user_id: Uuid, telegram_id: i64) -> 
 /// DEPRECATED: Legacy function for backward compatibility with old handlers.rs
 /// Converts 0-3 scale answers to 1-10 scale and stores in checkin_answers
 /// New code should use insert_checkin_answer() directly
-pub async fn insert_answer(pool: &PgPool, user_id: Uuid, question_id: i32, value: i16) -> Result<()> {
+pub async fn insert_answer(
+    pool: &PgPool,
+    user_id: Uuid,
+    question_id: i32,
+    value: i16,
+) -> Result<()> {
     // Map question_id to question_type (legacy mapping)
     let question_type = match question_id {
         1 => "mood",
@@ -231,11 +236,7 @@ pub async fn calculate_user_metrics(pool: &PgPool, user_id: Uuid) -> Result<Opti
 }
 
 /// Get the count of check-in answers for a user in the last N days
-pub async fn get_checkin_answer_count(
-    pool: &PgPool,
-    user_id: Uuid,
-    days: i32,
-) -> Result<i64> {
+pub async fn get_checkin_answer_count(pool: &PgPool, user_id: Uuid, days: i32) -> Result<i64> {
     let result = sqlx::query!(
         r#"
         SELECT COUNT(*) as count
@@ -481,10 +482,7 @@ pub async fn get_checkin_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<
 }
 
 /// Get last check-in date for user
-pub async fn get_last_checkin_date(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Option<DateTime<Utc>>> {
+pub async fn get_last_checkin_date(pool: &PgPool, user_id: Uuid) -> Result<Option<DateTime<Utc>>> {
     let result = sqlx::query_scalar!(
         r#"
         SELECT MAX(created_at) as "last_checkin"
@@ -687,10 +685,7 @@ pub async fn get_user_role(pool: &PgPool, user_id: Uuid) -> Result<UserRole> {
 // ---------- Adaptive Questions (#1) ----------
 
 /// Get question type pattern for adaptive logic
-pub async fn get_user_recent_pattern(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Vec<(String, f64)>> {
+pub async fn get_user_recent_pattern(pool: &PgPool, user_id: Uuid) -> Result<Vec<(String, f64)>> {
     let patterns: Vec<_> = sqlx::query!(
         r#"
         SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as "avg_value: f64"

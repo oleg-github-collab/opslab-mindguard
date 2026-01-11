@@ -1,6 +1,5 @@
 ///! Row Level Security (RLS) context middleware
 ///! Sets PostgreSQL session variables for RLS policies
-
 use crate::db;
 use crate::state::SharedState;
 use crate::web::session::UserSession;
@@ -34,23 +33,15 @@ pub async fn set_rls_context(
             // Set PostgreSQL session variables for RLS policies
             let role_str = format!("{:?}", user.role).to_uppercase();
 
-            sqlx::query!(
-                "SELECT set_user_context($1, $2)",
-                user_id,
-                role_str
-            )
-            .execute(&state.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to set RLS context: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            sqlx::query!("SELECT set_user_context($1, $2)", user_id, role_str)
+                .execute(&state.pool)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to set RLS context: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
 
-            tracing::debug!(
-                "RLS context set: user_id={}, role={}",
-                user_id,
-                role_str
-            );
+            tracing::debug!("RLS context set: user_id={}, role={}", user_id, role_str);
         }
     }
 

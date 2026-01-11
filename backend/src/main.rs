@@ -14,9 +14,11 @@ use crate::state::SharedState;
 use axum::{routing::get_service, Router};
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Timelike;
+use http::header;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -32,12 +34,17 @@ async fn run() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     tracing::info!("🚀 OpsLab Mindguard starting...");
-    tracing::info!("Environment: {}", std::env::var("RAILWAY_ENVIRONMENT").unwrap_or_else(|_| "development".to_string()));
+    tracing::info!(
+        "Environment: {}",
+        std::env::var("RAILWAY_ENVIRONMENT").unwrap_or_else(|_| "development".to_string())
+    );
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
     tracing::info!("Database URL configured");
@@ -64,8 +71,9 @@ async fn run() -> anyhow::Result<()> {
     tracing::info!("Database migrations completed");
 
     let crypto = Arc::new(crypto::Crypto::from_env()?);
-    let session_key_b64 =
-        std::env::var("SESSION_KEY").or_else(|_| std::env::var("APP_ENC_KEY")).expect("SESSION_KEY missing");
+    let session_key_b64 = std::env::var("SESSION_KEY")
+        .or_else(|_| std::env::var("APP_ENC_KEY"))
+        .expect("SESSION_KEY missing");
     let session_key = general_purpose::STANDARD
         .decode(session_key_b64)
         .expect("SESSION_KEY must be base64");
@@ -106,7 +114,12 @@ async fn run() -> anyhow::Result<()> {
                     match db::get_users_for_reminder_time(&state.pool, hour, minute).await {
                         Ok(users) => {
                             if !users.is_empty() {
-                                tracing::info!("Sending smart reminders to {} users at {:02}:{:02}", users.len(), hour, minute);
+                                tracing::info!(
+                                    "Sending smart reminders to {} users at {:02}:{:02}",
+                                    users.len(),
+                                    hour,
+                                    minute
+                                );
                                 if let Err(e) = send_smart_reminders(&state, users).await {
                                     tracing::error!("Failed to send smart reminders: {}", e);
                                 }
@@ -183,7 +196,12 @@ async fn run() -> anyhow::Result<()> {
         .merge(bot::enhanced_handlers::routes(shared.clone()))
         .nest_service("/static", ServeDir::new("static"))
         .fallback_service(get_service(static_handler))
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        // Prevent stale CDN/edge caches for index.html and static assets
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::CACHE_CONTROL,
+            header::HeaderValue::from_static("no-store"),
+        ));
 
     // Railway sets PORT automatically, prefer it over BIND_ADDR
     let port = std::env::var("PORT").unwrap_or_else(|_| {
@@ -223,7 +241,11 @@ async fn send_smart_reminders(
         match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, user_id).await {
             Ok(_) => {
                 success_count += 1;
-                tracing::debug!("Sent smart reminder to user {} (telegram: {})", user_id, telegram_id);
+                tracing::debug!(
+                    "Sent smart reminder to user {} (telegram: {})",
+                    user_id,
+                    telegram_id
+                );
             }
             Err(e) => {
                 error_count += 1;
@@ -280,7 +302,11 @@ async fn send_daily_checkins_to_all(state: &SharedState) -> anyhow::Result<()> {
             match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, user.id).await {
                 Ok(_) => {
                     success_count += 1;
-                    tracing::debug!("Sent check-in to user {} (telegram: {})", user.id, telegram_id);
+                    tracing::debug!(
+                        "Sent check-in to user {} (telegram: {})",
+                        user.id,
+                        telegram_id
+                    );
                 }
                 Err(e) => {
                     error_count += 1;

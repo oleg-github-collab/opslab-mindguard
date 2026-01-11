@@ -117,8 +117,7 @@ async fn create_wall_post(
     }
 
     // #12 WOW Feature: Auto categorization with AI
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let categorizer = WallPostCategorizer::new(api_key);
 
@@ -158,7 +157,10 @@ async fn create_wall_post(
 
     tracing::info!(
         "Wall post created: id={}, user_id={}, category={:?}, ai_categorized={}",
-        post_id, user_id, category, ai_categorized
+        post_id,
+        user_id,
+        category,
+        ai_categorized
     );
 
     Ok(Json(WallPostResponse {

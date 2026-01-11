@@ -86,7 +86,8 @@ async fn login(
         name,
     };
 
-    let token = session::sign_session(user.id, &user.role, &state.session_key).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let token = session::sign_session(user.id, &user.role, &state.session_key)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // SECURITY: Use Secure flag in production (HTTPS only)
     let is_production = std::env::var("RAILWAY_ENVIRONMENT").is_ok()
@@ -99,7 +100,12 @@ async fn login(
     let mut headers = HeaderMap::new();
     headers.insert(
         axum::http::header::SET_COOKIE,
-        format!("session={token}; HttpOnly; SameSite=Lax; Path={}{}", "/", secure_flag).parse().unwrap(),
+        format!(
+            "session={token}; HttpOnly; SameSite=Lax; Path={}{}",
+            "/", secure_flag
+        )
+        .parse()
+        .unwrap(),
     );
     Ok((headers, Json(resp)))
 }
@@ -117,7 +123,7 @@ async fn token_login(
     }
 
     let token_record: TokenRecord = sqlx::query_as(
-        "SELECT user_id, used, expires_at FROM telegram_login_tokens WHERE token = $1"
+        "SELECT user_id, used, expires_at FROM telegram_login_tokens WHERE token = $1",
     )
     .bind(&payload.token)
     .fetch_optional(&state.pool)
@@ -177,9 +183,12 @@ async fn token_login(
     let mut headers = HeaderMap::new();
     headers.insert(
         axum::http::header::SET_COOKIE,
-        format!("session={}; HttpOnly; SameSite=Lax; Path={}{}", session_token, "/", secure_flag)
-            .parse()
-            .unwrap(),
+        format!(
+            "session={}; HttpOnly; SameSite=Lax; Path={}{}",
+            session_token, "/", secure_flag
+        )
+        .parse()
+        .unwrap(),
     );
 
     tracing::info!("User {} logged in via Telegram token", user.id);

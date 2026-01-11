@@ -2,7 +2,7 @@ use crate::domain::models::UserRole;
 use axum::{
     async_trait,
     extract::{FromRef, FromRequestParts},
-    http::{request::Parts, StatusCode, HeaderMap},
+    http::{request::Parts, HeaderMap, StatusCode},
 };
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Duration, Utc};
@@ -59,7 +59,8 @@ pub fn verify_session(token: &str, key: &[u8]) -> Result<SessionClaims, SessionE
 
     let mut mac = HmacSha256::new_from_slice(key).map_err(|_| SessionError::Invalid)?;
     mac.update(&payload_bytes);
-    mac.verify_slice(&sig_bytes).map_err(|_| SessionError::Signature)?;
+    mac.verify_slice(&sig_bytes)
+        .map_err(|_| SessionError::Signature)?;
 
     let payload = String::from_utf8(payload_bytes).map_err(|_| SessionError::Invalid)?;
     let pieces: Vec<&str> = payload.split('|').collect();
@@ -140,11 +141,10 @@ where
 
         let token = extract_token(&parts.headers).ok_or(StatusCode::UNAUTHORIZED)?;
 
-        let claims = verify_session(&token, &shared_state.session_key)
-            .map_err(|e| {
-                tracing::warn!("Session verification failed: {}", e);
-                StatusCode::UNAUTHORIZED
-            })?;
+        let claims = verify_session(&token, &shared_state.session_key).map_err(|e| {
+            tracing::warn!("Session verification failed: {}", e);
+            StatusCode::UNAUTHORIZED
+        })?;
 
         Ok(UserSession(claims.user_id))
     }

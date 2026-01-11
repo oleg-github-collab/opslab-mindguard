@@ -2,12 +2,7 @@ use crate::db;
 use crate::domain::models::UserRole;
 use crate::state::SharedState;
 use crate::web::session::UserSession;
-use axum::{
-    extract::State,
-    http::StatusCode,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -34,11 +29,11 @@ pub struct UserHeatmapEntry {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum UserStatus {
-    Excellent,   // All green
-    Good,        // Mostly good
-    Concerning,  // Some yellow flags
-    Critical,    // Red flags - needs attention
-    NoData,      // No recent check-ins
+    Excellent,  // All green
+    Good,       // Mostly good
+    Concerning, // Some yellow flags
+    Critical,   // Red flags - needs attention
+    NoData,     // No recent check-ins
 }
 
 pub fn router(state: SharedState) -> Router {
@@ -66,12 +61,10 @@ async fn get_team_heatmap(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let users = db::get_all_users(&state.pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to get all users: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let users = db::get_all_users(&state.pool).await.map_err(|e| {
+        tracing::error!("Failed to get all users: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut heatmap_entries = Vec::new();
 
@@ -99,7 +92,13 @@ async fn get_team_heatmap(
 
         let (status, who5, phq9, gad7, burnout) = if let Some(m) = metrics {
             let status = calculate_user_status(&m);
-            (status, m.who5_score, m.phq9_score, m.gad7_score, m.burnout_percentage())
+            (
+                status,
+                m.who5_score,
+                m.phq9_score,
+                m.gad7_score,
+                m.burnout_percentage(),
+            )
         } else {
             (UserStatus::NoData, 0.0, 0.0, 0.0, 0.0)
         };

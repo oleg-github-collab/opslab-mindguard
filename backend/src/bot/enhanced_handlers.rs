@@ -1,5 +1,5 @@
 ///! Розширені handlers для Telegram бота з щоденними чекінами
-use crate::bot::daily_checkin::{CheckInGenerator, MetricsCalculator, CheckInAnswer, Metrics};
+use crate::bot::daily_checkin::{CheckInAnswer, CheckInGenerator, Metrics, MetricsCalculator};
 use crate::db;
 use crate::services::ai::AiOutcome;
 use crate::state::SharedState;
@@ -7,11 +7,13 @@ use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use chrono::{Datelike, Utc};
 use serde_json::json;
+use sqlx;
 use std::env;
 use teloxide::net::Download;
 use teloxide::prelude::*;
-use teloxide::types::{ChatKind, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update, ParseMode};
-use sqlx;
+use teloxide::types::{
+    ChatKind, InlineKeyboardButton, InlineKeyboardMarkup, Message, ParseMode, Update,
+};
 use uuid::Uuid;
 
 // ========== WOW Features Helper Functions ==========
@@ -269,21 +271,19 @@ async fn handle_update(
     let bot = bot();
 
     match update.kind {
-        teloxide::types::UpdateKind::Message(message) => {
-            match &message.chat.kind {
-                ChatKind::Private(_) => {
-                    handle_private(&bot, state, message)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                }
-                ChatKind::Public(_) => {
-                    handle_group(&bot, state, message)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                }
-                _ => {}
+        teloxide::types::UpdateKind::Message(message) => match &message.chat.kind {
+            ChatKind::Private(_) => {
+                handle_private(&bot, state, message)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
-        }
+            ChatKind::Public(_) => {
+                handle_group(&bot, state, message)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            }
+            _ => {}
+        },
         teloxide::types::UpdateKind::CallbackQuery(callback) => {
             handle_callback(&bot, state, callback)
                 .await
@@ -387,7 +387,8 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             return Ok(());
         }
 
-        if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка") {
+        if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка")
+        {
             bot.send_message(
                 msg.chat.id,
                 "💆 *Миттєва підтримка*\n\n\
@@ -436,7 +437,10 @@ async fn handle_pin_verification(
             // Success! Telegram linked
             let user = db::find_user_by_id(&state.pool, user_id).await?;
             let name = if let Some(user) = user {
-                state.crypto.decrypt_str(&user.enc_name).unwrap_or("користувач".to_string())
+                state
+                    .crypto
+                    .decrypt_str(&user.enc_name)
+                    .unwrap_or("користувач".to_string())
             } else {
                 "користувач".to_string()
             };
@@ -576,10 +580,7 @@ async fn send_checkin_question(
     // Перший ряд: 1-5
     let row1: Vec<InlineKeyboardButton> = (1..=5)
         .map(|i| {
-            InlineKeyboardButton::callback(
-                i.to_string(),
-                format!("ans_{}_{}", question.id, i),
-            )
+            InlineKeyboardButton::callback(i.to_string(), format!("ans_{}_{}", question.id, i))
         })
         .collect();
     rows.push(row1);
@@ -587,10 +588,7 @@ async fn send_checkin_question(
     // Другий ряд: 6-10
     let row2: Vec<InlineKeyboardButton> = (6..=10)
         .map(|i| {
-            InlineKeyboardButton::callback(
-                i.to_string(),
-                format!("ans_{}_{}", question.id, i),
-            )
+            InlineKeyboardButton::callback(i.to_string(), format!("ans_{}_{}", question.id, i))
         })
         .collect();
     rows.push(row2);
@@ -662,8 +660,9 @@ async fn handle_callback(
                             user.id,
                             question_id,
                             &question.qtype,
-                            value
-                        ).await?;
+                            value,
+                        )
+                        .await?;
 
                         // #4 WOW Feature: Emoji reactions based on mood
                         let reaction = get_emoji_reaction(&question.qtype, value);
@@ -676,7 +675,9 @@ async fn handle_callback(
                         bot.delete_message(msg.chat.id, msg.id).await.ok();
 
                         // Знайти індекс поточного питання
-                        let current_index = checkin.questions.iter()
+                        let current_index = checkin
+                            .questions
+                            .iter()
                             .position(|q| q.id == question_id)
                             .unwrap_or(0);
                         let next_index = current_index + 1;
@@ -696,18 +697,23 @@ async fn handle_callback(
                                 "✅ *Чекін завершено! Дякую!* 🙏\n\n\
                                 Твої дані збережені та будуть використані для аналізу.\n\
                                 Продовжуй проходити щоденні чекіни для повної картини.\n\n\
-                                Побачимось завтра! 👋"
+                                Побачимось завтра! 👋",
                             )
                             .parse_mode(teloxide::types::ParseMode::Markdown)
                             .await?;
 
                             // #5 WOW Feature: Quick Actions after check-in
-                            send_quick_actions(bot, &state, msg.chat.id, user.id).await.ok();
+                            send_quick_actions(bot, &state, msg.chat.id, user.id)
+                                .await
+                                .ok();
 
                             // Перевірити чи потрібно надіслати критичний алерт
-                            let count = db::get_checkin_answer_count(&state.pool, user.id, 10).await?;
+                            let count =
+                                db::get_checkin_answer_count(&state.pool, user.id, 10).await?;
                             if count >= 21 {
-                                if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user.id).await {
+                                if let Ok(Some(metrics)) =
+                                    db::calculate_user_metrics(&state.pool, user.id).await
+                                {
                                     if MetricsCalculator::is_critical(&metrics) {
                                         send_critical_alert(bot, &state, user.id, &metrics).await?;
 
@@ -877,7 +883,10 @@ async fn send_web_login_link(
     .execute(&state.pool)
     .await?;
 
-    let login_url = format!("https://backend-production-e745.up.railway.app?token={}", token);
+    let login_url = format!(
+        "https://backend-production-e745.up.railway.app?token={}",
+        token
+    );
 
     bot.send_message(
         chat_id,
@@ -1026,14 +1035,16 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
             2. Вийди на прогулянку\n\
             3. Поговори з колегою\n\
             4. Зроби перерву\n\n\
-            Пам'ятай: /checkin для відстеження стану".to_string()
+            Пам'ятай: /checkin для відстеження стану"
+                .to_string()
         } else if text.contains("втома") || text.contains("вигорання") {
             "🔥 *При вигоранні:*\n\n\
             1. Візьми відпочинок\n\
             2. Встанови межі\n\
             3. Делегуй задачі\n\
             4. Поговори з HR\n\n\
-            Твоє здоров'я важливіше!".to_string()
+            Твоє здоров'я важливіше!"
+                .to_string()
         } else {
             // AI відповідь
             state
@@ -1041,7 +1052,8 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
                 .group_coach_response(text)
                 .await
                 .unwrap_or_else(|_| {
-                    "Дихайте глибоко 4-4-4, зробіть перерву на 2 хвилини та поверніться до задачі.".to_string()
+                    "Дихайте глибоко 4-4-4, зробіть перерву на 2 хвилини та поверніться до задачі."
+                        .to_string()
                 })
         };
 
@@ -1224,7 +1236,10 @@ async fn handle_kudos_command(
         None => {
             bot.send_message(
                 chat_id,
-                format!("❌ Користувача {} не знайдено.\n\nПеревір email!", recipient_email),
+                format!(
+                    "❌ Користувача {} не знайдено.\n\nПеревір email!",
+                    recipient_email
+                ),
             )
             .await?;
             return Ok(());

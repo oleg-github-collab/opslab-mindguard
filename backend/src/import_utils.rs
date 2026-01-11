@@ -45,7 +45,11 @@ pub async fn import_answers(pool: &PgPool, payload: &[HistoricalAnswer]) -> Resu
     Ok(())
 }
 
-pub async fn import_voice_logs(pool: &PgPool, crypto: &Crypto, payload: &[HistoricalVoiceLog]) -> Result<()> {
+pub async fn import_voice_logs(
+    pool: &PgPool,
+    crypto: &Crypto,
+    payload: &[HistoricalVoiceLog],
+) -> Result<()> {
     for entry in payload {
         let enc_transcript = crypto.encrypt_str(&entry.transcript)?;
         let enc_ai = crypto.encrypt_str(&entry.ai_json.to_string())?;

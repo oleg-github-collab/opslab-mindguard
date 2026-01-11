@@ -5,11 +5,11 @@ use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use chrono::Utc;
 use serde_json::json;
+use sqlx;
 use std::env;
 use teloxide::net::Download;
 use teloxide::prelude::*;
 use teloxide::types::{ChatKind, Message, Update};
-use sqlx;
 use uuid::Uuid;
 
 pub fn routes(state: SharedState) -> Router {
@@ -51,8 +51,11 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
     let telegram_id = msg.chat.id.0;
     let user = db::find_user_by_telegram(&state.pool, telegram_id).await?;
     let Some(user) = user else {
-        bot.send_message(msg.chat.id, "Спочатку авторизуйтесь у вебі (email + код), тоді напишіть сюди ще раз.")
-            .await?;
+        bot.send_message(
+            msg.chat.id,
+            "Спочатку авторизуйтесь у вебі (email + код), тоді напишіть сюди ще раз.",
+        )
+        .await?;
         return Ok(());
     };
 
@@ -64,11 +67,15 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
 
     if let Some(text) = msg.text() {
         if text.starts_with("/start") {
-            bot.send_message(msg.chat.id, "Щоденний чекін: надішліть /checkin, щоб отримати 2-3 питання + голосове промпт.")
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                "Щоденний чекін: надішліть /checkin, щоб отримати 2-3 питання + голосове промпт.",
+            )
+            .await?;
             return Ok(());
         }
-        if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка") {
+        if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка")
+        {
             bot.send_message(
                 msg.chat.id,
                 "Миттєва підтримка: спробуйте дихання 4-7-8 (4с вдих, 7с затримка, 8с видих, 4 цикли). Потім запишіть коротке голосове, як почуваєтесь.",
@@ -96,7 +103,8 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
 
         if let Some((qid, value)) = parse_answer(text) {
             db::insert_answer(&state.pool, user.id, qid, value).await?;
-            bot.send_message(msg.chat.id, "Відповідь збережена ✅").await?;
+            bot.send_message(msg.chat.id, "Відповідь збережена ✅")
+                .await?;
         } else {
             bot.send_message(msg.chat.id, "Надішліть /checkin або голосове повідомлення.")
                 .await?;
@@ -172,9 +180,14 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
         if !bot_name.is_empty() && !text.contains(&bot_name) {
             return Ok(()); // ignore messages without mention
         }
-        let reply = state.ai.group_coach_response(text).await.unwrap_or_else(|_| {
-            "Дихайте глибоко 4-4-4, зробіть перерву на 2 хвилини та поверніться до задачі.".to_string()
-        });
+        let reply = state
+            .ai
+            .group_coach_response(text)
+            .await
+            .unwrap_or_else(|_| {
+                "Дихайте глибоко 4-4-4, зробіть перерву на 2 хвилини та поверніться до задачі."
+                    .to_string()
+            });
         bot.send_message(msg.chat.id, reply).await?;
     }
     Ok(())

@@ -5,7 +5,7 @@ use async_openai::types::{
     ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
     CreateChatCompletionRequestArgs, Role,
 };
-use async_openai::{Client, config::OpenAIConfig};
+use async_openai::{config::OpenAIConfig, Client};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -81,12 +81,10 @@ If self-harm cues such as "suicide", "kill myself", "hopeless" appear, force ris
                         .first()
                         .and_then(|c| c.message.content.clone())
                         .unwrap_or_default();
-                    let json: serde_json::Value =
-                        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({ "sentiment": "unknown" }));
-                    let mut risk_score = json
-                        .get("risk_score")
-                        .and_then(|v| v.as_i64())
-                        .unwrap_or(1) as i16;
+                    let json: serde_json::Value = serde_json::from_str(&content)
+                        .unwrap_or_else(|_| serde_json::json!({ "sentiment": "unknown" }));
+                    let mut risk_score =
+                        json.get("risk_score").and_then(|v| v.as_i64()).unwrap_or(1) as i16;
                     let urgent = contains_urgent || risk_score >= 9;
                     if urgent {
                         risk_score = risk_score.max(10);
