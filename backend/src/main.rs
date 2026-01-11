@@ -185,10 +185,16 @@ async fn run() -> anyhow::Result<()> {
         .fallback_service(get_service(static_handler))
         .layer(TraceLayer::new_for_http());
 
-    let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| {
-        let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
-        format!("0.0.0.0:{}", port)
+    // Railway sets PORT automatically, prefer it over BIND_ADDR
+    let port = std::env::var("PORT").unwrap_or_else(|_| {
+        std::env::var("BIND_ADDR")
+            .ok()
+            .and_then(|addr| addr.split(':').nth(1).map(|p| p.to_string()))
+            .unwrap_or_else(|| "3000".to_string())
     });
+    let addr = format!("0.0.0.0:{}", port);
+    tracing::info!("PORT env: {:?}", std::env::var("PORT"));
+    tracing::info!("BIND_ADDR env: {:?}", std::env::var("BIND_ADDR"));
     tracing::info!("Binding to {addr}");
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
         tracing::error!("Failed to bind to {}: {}", addr, e);
