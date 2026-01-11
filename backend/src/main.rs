@@ -190,13 +190,8 @@ async fn run() -> anyhow::Result<()> {
 
     let static_handler = ServeDir::new("static").not_found_service(ServeFile::new("index.html"));
 
-    let app = Router::new()
-        .merge(web::routes(shared.clone()))
-        .merge(bot::enhanced_handlers::routes(shared.clone()))
-        .nest_service("/static", ServeDir::new("static"))
-        .fallback_service(get_service(static_handler))
-        .layer(TraceLayer::new_for_http())
-        // Prevent stale CDN/edge caches for index.html and static assets
+    // Create cache headers stack
+    let cache_headers = tower::ServiceBuilder::new()
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,
             header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
@@ -211,8 +206,16 @@ async fn run() -> anyhow::Result<()> {
         ))
         .layer(SetResponseHeaderLayer::overriding(
             header::HeaderName::from_static("x-content-version"),
-            header::HeaderValue::from_static("20260111-2350"),
+            header::HeaderValue::from_static("20260111-2355"),
         ));
+
+    let app = Router::new()
+        .merge(web::routes(shared.clone()))
+        .merge(bot::enhanced_handlers::routes(shared.clone()))
+        .nest_service("/static", get_service(ServeDir::new("static")))
+        .fallback_service(get_service(static_handler))
+        .layer(cache_headers)
+        .layer(TraceLayer::new_for_http());
 
     // Railway sets PORT automatically, prefer it over BIND_ADDR
     let port = std::env::var("PORT").unwrap_or_else(|_| {
