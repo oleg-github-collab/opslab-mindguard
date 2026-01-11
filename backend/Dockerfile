@@ -18,6 +18,9 @@ RUN cat /tmp/.cache-bust && echo " - cache invalidated"
 # Copy full source
 COPY . .
 
+# Verify index.html was copied correctly
+RUN head -7 index.html | grep "Mental Health" || (echo "ERROR: Old index.html detected!" && exit 1)
+
 # Build application (expects DATABASE_URL at build time unless SQLX_OFFLINE + sqlx-data.json are provided)
 RUN cargo build --release
 
@@ -25,10 +28,11 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
+# Copy files in different order to break cache
 COPY --from=builder /app/target/release/opslab_mindguard /usr/local/bin/opslab-mindguard
-COPY --from=builder /app/static static
-COPY --from=builder /app/index.html index.html
 COPY --from=builder /app/migrations migrations
+COPY --from=builder /app/index.html index.html
+COPY --from=builder /app/static static
 
 ENV RUST_LOG=info
 EXPOSE 3000
