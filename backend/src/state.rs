@@ -2,7 +2,6 @@ use crate::bot::daily_checkin::CheckIn;
 use crate::crypto::Crypto;
 use crate::domain::polling::PollEngine;
 use crate::services::ai::AiService;
-use axum::extract::FromRef;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;

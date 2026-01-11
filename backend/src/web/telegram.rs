@@ -9,7 +9,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub fn router(state: SharedState) -> Router {
     Router::new()

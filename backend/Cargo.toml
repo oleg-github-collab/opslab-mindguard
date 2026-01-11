@@ -22,7 +22,7 @@ teloxide = { version = "0.12", features = ["macros", "throttle", "webhooks", "ru
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors", "compression-full", "fs"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "compression-full", "fs", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 uuid = { version = "1", features = ["serde", "v4"] }

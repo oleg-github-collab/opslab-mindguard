@@ -35,7 +35,6 @@ async fn handle_update(
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
-            _ => {}
         }
     }
 

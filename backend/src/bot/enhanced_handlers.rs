@@ -1,5 +1,5 @@
 ///! Розширені handlers для Telegram бота з щоденними чекінами
-use crate::bot::daily_checkin::{CheckInAnswer, CheckInGenerator, Metrics, MetricsCalculator};
+use crate::bot::daily_checkin::{CheckInGenerator, Metrics, MetricsCalculator};
 use crate::db;
 use crate::services::ai::AiOutcome;
 use crate::state::SharedState;
@@ -282,7 +282,6 @@ async fn handle_update(
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             }
-            _ => {}
         },
         teloxide::types::UpdateKind::CallbackQuery(callback) => {
             handle_callback(&bot, state, callback)
@@ -910,7 +909,7 @@ async fn send_critical_alert(
     bot: &teloxide::Bot,
     state: &SharedState,
     user_id: Uuid,
-    metrics: &crate::bot::daily_checkin::Metrics,
+    metrics: &Metrics,
 ) -> Result<()> {
     let admin_id = env::var("ADMIN_TELEGRAM_ID")
         .ok()
