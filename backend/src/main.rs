@@ -13,8 +13,8 @@ use crate::db::seed;
 use crate::state::SharedState;
 use axum::{
     body::Body,
-    http::{header, Request, Response, StatusCode},
-    middleware::{self, Next},
+    http::{header, Request, Response},
+    middleware::{self as axum_middleware, Next},
     routing::get_service,
     Router,
 };
@@ -23,7 +23,6 @@ use chrono::Timelike;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -226,7 +225,7 @@ async fn run() -> anyhow::Result<()> {
         .merge(bot::enhanced_handlers::routes(shared.clone()))
         .nest_service("/static", get_service(ServeDir::new("static")))
         .fallback_service(get_service(static_handler))
-        .layer(middleware::from_fn(add_cache_headers))
+        .layer(axum_middleware::from_fn(add_cache_headers))
         .layer(TraceLayer::new_for_http());
 
     // Railway sets PORT automatically, prefer it over BIND_ADDR
