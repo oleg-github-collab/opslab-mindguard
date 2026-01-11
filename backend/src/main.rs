@@ -30,17 +30,27 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
+    tracing::info!("Connecting to database...");
     let pool = PgPoolOptions::new()
         .max_connections(10)
         .connect(&database_url)
-        .await?;
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to connect to database: {}", e);
+            e
+        })?;
+    tracing::info!("Database connection established");
 
     // Run database migrations
     tracing::info!("Running database migrations...");
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
-        .expect("Failed to run database migrations");
+        .map_err(|e| {
+            tracing::error!("Failed to run database migrations: {}", e);
+            e
+        })?;
+    tracing::info!("Database migrations completed");
 
     let crypto = Arc::new(crypto::Crypto::from_env()?);
     let session_key_b64 =
@@ -164,7 +174,10 @@ async fn main() -> anyhow::Result<()> {
         .fallback_service(get_service(static_handler))
         .layer(TraceLayer::new_for_http());
 
-    let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
+    let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| {
+        let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+        format!("0.0.0.0:{}", port)
+    });
     tracing::info!("Listening on {addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
