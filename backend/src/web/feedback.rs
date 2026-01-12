@@ -3,14 +3,16 @@ use crate::services::categorizer::{PostCategory, WallPostCategorizer};
 use crate::state::SharedState;
 use crate::web::session::UserSession;
 use axum::{
-    extract::{ConnectInfo, State},
+    extract::State,
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use uuid::Uuid;
+
+static ANON_FEEDBACK_RATE_LIMITER: Lazy<RateLimiter> = Lazy::new(|| RateLimiter::new(10, 60));
 
 #[derive(Deserialize)]
 pub struct FeedbackPayload {
@@ -58,15 +60,20 @@ pub fn router(state: SharedState) -> Router {
 }
 
 async fn anonymous(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: axum::http::HeaderMap,
     State(state): State<SharedState>,
     Json(payload): Json<FeedbackPayload>,
 ) -> Result<StatusCode, StatusCode> {
     // SECURITY: Rate limiting (10 requests per 60 seconds per IP)
-    let rate_limiter = RateLimiter::new(10, 60);
-    let ip = addr.ip().to_string();
+    // Get IP from X-Forwarded-For header (Railway proxy) or use a default
+    let ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .unwrap_or("unknown")
+        .to_string();
 
-    if !rate_limiter.check(&ip).await {
+    if !ANON_FEEDBACK_RATE_LIMITER.check(&ip).await {
         tracing::warn!("Rate limit exceeded for anonymous feedback from IP: {}", ip);
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }
