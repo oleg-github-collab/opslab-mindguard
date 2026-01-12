@@ -10,9 +10,9 @@ CREATE TABLE IF NOT EXISTS telegram_login_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Index for fast token lookup
+-- Index for fast token lookup (removed expires_at > now() from predicate - not IMMUTABLE)
 CREATE INDEX IF NOT EXISTS idx_telegram_login_tokens_token
-    ON telegram_login_tokens(token) WHERE used = FALSE AND expires_at > now();
+    ON telegram_login_tokens(token) WHERE used = FALSE;
 
 -- Index for cleanup
 CREATE INDEX IF NOT EXISTS idx_telegram_login_tokens_expires
