@@ -10,8 +10,11 @@ CREATE TABLE IF NOT EXISTS telegram_login_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Drop old index first (if exists) to recreate without IMMUTABLE issue
+DROP INDEX IF EXISTS idx_telegram_login_tokens_token;
+
 -- Index for fast token lookup (removed expires_at > now() from predicate - not IMMUTABLE)
-CREATE INDEX IF NOT EXISTS idx_telegram_login_tokens_token
+CREATE INDEX idx_telegram_login_tokens_token
     ON telegram_login_tokens(token) WHERE used = FALSE;
 
 -- Index for cleanup
