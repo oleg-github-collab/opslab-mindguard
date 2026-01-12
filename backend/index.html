@@ -348,13 +348,13 @@
 
       <form id="login-form">
         <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required placeholder="your@email.com" />
+          <label for="email">Корпоративна пошта</label>
+          <input type="email" id="email" name="email" required placeholder="your@opslab.uk" />
         </div>
 
         <div class="form-group">
-          <label for="code">Access Code</label>
-          <input type="password" id="code" name="code" required placeholder="••••" />
+          <label for="code">Ваш унікальний 4-значний код</label>
+          <input type="password" id="code" name="code" required placeholder="••••" maxlength="4" />
         </div>
 
         <button type="submit" class="btn-login">Увійти</button>
@@ -397,6 +397,21 @@
         <section class="section fade-in">
           <div class="section-title">Твої тренди</div>
           <div id="user-trends" class="grid trend-grid"></div>
+        </section>
+
+        <!-- Wall of Tears -->
+        <section class="section fade-in">
+          <div class="section-title">Стіна плачу</div>
+          <div class="two-col">
+            <div class="card">
+              <h3>Анонімний пост</h3>
+              <p class="muted">Поділись своїми думками або переживаннями. Ім'я не відображається.</p>
+              <textarea id="wall-input" rows="6" maxlength="5000" placeholder="Напиши сюди..."></textarea>
+              <button id="wall-submit">Опублікувати</button>
+              <div id="wall-status" class="muted"></div>
+            </div>
+            <div id="wall-posts" class="stack"></div>
+          </div>
         </section>
       </div>
 
@@ -545,7 +560,7 @@
           await loadPersonalDashboard(userResponse);
 
           // If admin, load team heatmap
-          if (currentUser?.role === 'Admin' || currentUser?.role === 'Founder') {
+          if (currentUser?.role === 'ADMIN' || currentUser?.role === 'FOUNDER') {
             await loadAdminDashboard();
           }
         }
@@ -566,6 +581,9 @@
 
       // Load historical data
       await loadHistoricalData(currentUser.user_id);
+
+      // Load wall posts
+      await loadWallPosts();
     }
 
     async function loadAdminDashboard() {
@@ -618,9 +636,9 @@
         ${voiceRisk !== null && voiceRisk !== undefined ? `
           <div class="card metric-card">
             <h3>Voice Analysis Risk</h3>
-            <div class="metric-value">${voiceRisk}/100</div>
+            <div class="metric-value">${voiceRisk}/10</div>
             <div style="font-size: 14px; color: #666; margin-top: 8px;">
-              ${voiceRisk > 70 ? '⚠️ Високий ризик' : voiceRisk > 40 ? '⚡ Помірний ризик' : '✅ Низький ризик'}
+              ${voiceRisk >= 8 ? '⚠️ Високий ризик' : voiceRisk >= 5 ? '⚡ Помірний ризик' : '✅ Низький ризик'}
             </div>
           </div>
         ` : ''}
@@ -762,6 +780,67 @@
       }
     }
 
+    const wallCategoryMap = {
+      Complaint: { label: 'Скарга', emoji: '😤' },
+      Suggestion: { label: 'Пропозиція', emoji: '💡' },
+      Celebration: { label: 'Успіх', emoji: '🎉' },
+      Question: { label: 'Питання', emoji: '❓' },
+      SupportNeeded: { label: 'Потрібна підтримка', emoji: '💙' }
+    };
+
+    function wallCategoryInfo(category) {
+      if (!category) {
+        return { label: 'Без категорії', emoji: '💬' };
+      }
+      return wallCategoryMap[category] || { label: category, emoji: '💬' };
+    }
+
+    async function loadWallPosts() {
+      const container = document.getElementById('wall-posts');
+      if (!container) return;
+
+      container.innerHTML = '<div class="muted">Завантаження...</div>';
+
+      try {
+        const response = await fetch('/feedback/wall', { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error(`Wall load failed: ${response.status}`);
+        }
+
+        const posts = await response.json();
+        if (!posts || posts.length === 0) {
+          container.innerHTML = '<div class="muted">Поки що немає постів</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        posts.forEach((post) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          const info = wallCategoryInfo(post.category);
+          const createdAt = post.created_at ? new Date(post.created_at) : null;
+          const timestamp = createdAt && !isNaN(createdAt)
+            ? createdAt.toLocaleString('uk-UA')
+            : 'Нещодавно';
+          const meta = document.createElement('div');
+          meta.className = 'muted';
+          meta.textContent = `${info.emoji} ${info.label} · ${timestamp}${post.ai_categorized ? ' · AI' : ''}`;
+
+          const content = document.createElement('div');
+          content.style.whiteSpace = 'pre-wrap';
+          content.textContent = post.content;
+
+          card.appendChild(meta);
+          card.appendChild(content);
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Failed to load wall posts:', error);
+        container.innerHTML = '<div class="muted" style="color: #CC0000;">Помилка завантаження стіни</div>';
+      }
+    }
+
     function renderTeamHeatmap(data) {
       const container = document.getElementById('team-heatmap');
       container.innerHTML = '';
@@ -799,6 +878,47 @@
 
       return response.json();
     }
+
+    // Wall submit
+    document.getElementById('wall-submit')?.addEventListener('click', async () => {
+      const input = document.getElementById('wall-input');
+      const statusEl = document.getElementById('wall-status');
+      if (!input || !statusEl) return;
+
+      const content = input.value.trim();
+      if (!content) {
+        statusEl.textContent = 'Текст не може бути порожнім.';
+        return;
+      }
+
+      statusEl.textContent = 'Надсилання...';
+
+      try {
+        const response = await fetch('/feedback/wall', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+          credentials: 'include'
+        });
+
+        if (response.status === 401) {
+          showLogin();
+          statusEl.textContent = 'Потрібен вхід.';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Wall post failed: ${response.status}`);
+        }
+
+        input.value = '';
+        statusEl.textContent = 'Опубліковано ✅';
+        await loadWallPosts();
+      } catch (error) {
+        console.error('Failed to post on wall:', error);
+        statusEl.textContent = 'Помилка під час публікації.';
+      }
+    });
 
     // Refresh heatmap button
     document.getElementById('refresh-heatmap')?.addEventListener('click', loadAdminDashboard);
