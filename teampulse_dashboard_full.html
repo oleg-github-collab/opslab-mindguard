@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamPulse Mindguard AI для OpsLab - Dashboard</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1 class="header-title">TeamPulse Mindguard AI для OpsLab</h1>
+            <nav class="header-nav">
+                <a href="/advanced.html" class="nav-btn">Advanced Analytics</a>
+                <button class="logout-btn" onclick="handleLogout()">Вийти</button>
+            </nav>
+        </header>
+
+        <!-- Month Selector -->
+        <div class="month-selector">
+            <button class="month-btn" data-month="8" onclick="selectMonth(8)">Серпень</button>
+            <button class="month-btn" data-month="9" onclick="selectMonth(9)">Вересень</button>
+            <button class="month-btn" data-month="10" onclick="selectMonth(10)">Жовтень</button>
+            <button class="month-btn" data-month="11" onclick="selectMonth(11)">Листопад</button>
+            <button class="month-btn active" data-month="12" onclick="selectMonth(12)">Грудень</button>
+        </div>
+
+        <!-- December Notice -->
+        <div class="december-notice" id="dashboardDecemberNotice" style="display: none; margin: 16px auto; max-width: 1200px; padding: 12px 16px; background: rgba(251, 191, 36, 0.1); border-left: 4px solid #f59e0b; border-radius: 8px;">
+            <p style="margin: 0; font-size: 14px; color: #f59e0b; font-weight: 500;">
+                ⚠️ <strong>Грудень 2025:</strong> Статистично кінець року пов'язаний з підвищеним ризиком вигорання та стресу через підведення підсумків, дедлайни та святкові очікування.
+            </p>
+        </div>
+
+        <!-- Metrics Section -->
+        <section class="metrics-section">
+            <h2 class="section-title">Ключові показники команди</h2>
+            <div class="metrics-grid">
+                <!-- WHO-5 Well-Being Index -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">WHO-5 Благополуччя</span>
+                            <span class="info-icon" data-tooltip="Індекс благополуччя ВООЗ (0-100). Оцінює позитивне психічне здоров'я за 5 питаннями. <50 - низьке благополуччя, потребує уваги.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="who5-value">--</div>
+                    <div class="metric-description">Середній показник</div>
+                    <span class="risk-indicator" id="who5-risk">Завантаження...</span>
+                </div>
+
+                <!-- PHQ-9 Depression -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">PHQ-9 Депресія</span>
+                            <span class="info-icon" data-tooltip="Опитувальник здоров'я пацієнта (0-27). Вимірює тяжкість депресії. 0-4: мінімальна, 5-9: легка, 10-14: помірна, 15+: тяжка депресія.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="phq9-value">--</div>
+                    <div class="metric-description">Середній показник</div>
+                    <span class="risk-indicator" id="phq9-risk">Завантаження...</span>
+                </div>
+
+                <!-- GAD-7 Anxiety -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">GAD-7 Тривожність</span>
+                            <span class="info-icon" data-tooltip="Шкала генералізованої тривожності (0-21). 0-4: мінімальна, 5-9: легка, 10-14: помірна, 15+: тяжка тривожність.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="gad7-value">--</div>
+                    <div class="metric-description">Середній показник</div>
+                    <span class="risk-indicator" id="gad7-risk">Завантаження...</span>
+                </div>
+
+                <!-- MBI Burnout -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">MBI Вигорання</span>
+                            <span class="info-icon" data-tooltip="Опитувальник вигорання Маслач (0-100%). Вимірює емоційне виснаження. <25%: низький ризик, 25-50%: середній, >50%: високий ризик вигорання.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="mbi-value">--</div>
+                    <div class="metric-description">Середній показник (%)</div>
+                    <span class="risk-indicator" id="mbi-risk">Завантаження...</span>
+                </div>
+
+                <!-- Sleep Duration -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">Тривалість сну</span>
+                            <span class="info-icon" data-tooltip="Середня тривалість сну (години). Рекомендовано 7-9 годин для дорослих. Менше 6 год - недостатній сон.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="sleep-duration-value">--</div>
+                    <div class="metric-description">Середня кількість годин</div>
+                    <span class="risk-indicator" id="sleep-duration-risk">Завантаження...</span>
+                </div>
+
+                <!-- Sleep Quality -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">Якість сну</span>
+                            <span class="info-icon" data-tooltip="Самооцінка якості сну (1-10). 7-10: хороша якість, 4-6: задовільна, <4: погана якість сну.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="sleep-quality-value">--</div>
+                    <div class="metric-description">Середня оцінка (1-10)</div>
+                    <span class="risk-indicator" id="sleep-quality-risk">Завантаження...</span>
+                </div>
+
+                <!-- Work-Life Balance -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">Баланс життя</span>
+                            <span class="info-icon" data-tooltip="Баланс між роботою та особистим життям (1-10). 7-10: здоровий баланс, 4-6: потребує покращення, <4: критичний дисбаланс.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="work-life-value">--</div>
+                    <div class="metric-description">Середня оцінка (1-10)</div>
+                    <span class="risk-indicator" id="work-life-risk">Завантаження...</span>
+                </div>
+
+                <!-- Stress Level -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-label-wrapper">
+                            <span class="metric-label">Рівень стресу</span>
+                            <span class="info-icon" data-tooltip="Рівень стресу за шкалою PSS (0-40). 0-13: низький, 14-26: помірний, 27-40: високий рівень стресу.">i</span>
+                        </div>
+                    </div>
+                    <div class="metric-value" id="stress-value">--</div>
+                    <div class="metric-description">Середній показник (0-40)</div>
+                    <span class="risk-indicator" id="stress-risk">Завантаження...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="charts-section">
+            <h2 class="section-title">Динаміка команди (Серпень - Грудень)</h2>
+            <div class="team-trend-container">
+                <div class="chart-card">
+                    <h3 class="chart-title">Середні показники команди</h3>
+                    <div class="chart-container" style="position: relative; height: 400px; max-height: 400px;">
+                        <canvas id="teamTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Employee Analysis Table -->
+        <section class="table-section">
+            <h2 class="section-title">Аналіз працівників</h2>
+
+            <!-- Employee Month Selector -->
+            <div class="employee-month-selector">
+                <button class="employee-month-btn" data-month="8" onclick="switchEmployeeMonth(8)">Серпень</button>
+                <button class="employee-month-btn" data-month="9" onclick="switchEmployeeMonth(9)">Вересень</button>
+                <button class="employee-month-btn" data-month="10" onclick="switchEmployeeMonth(10)">Жовтень</button>
+                <button class="employee-month-btn" data-month="11" onclick="switchEmployeeMonth(11)">Листопад</button>
+                <button class="employee-month-btn active" data-month="12" onclick="switchEmployeeMonth(12)">Грудень</button>
+            </div>
+
+            <div class="table-container">
+                <table id="employee-table">
+                    <thead>
+                        <tr>
+                            <th>Співробітник</th>
+                            <th title="WHO-5: 0-100, <50 — ризик низького благополуччя, <28 — ймовірна депресія">WHO-5</th>
+                            <th title="PHQ-9: 0-27, >10 — помірна/висока депресивна симптоматика">PHQ-9</th>
+                            <th title="GAD-7: 0-21, >10 — помірна/висока тривожність">GAD-7</th>
+                            <th title="MBI: 0-100%, >40% — підвищений ризик вигорання">MBI (%)</th>
+                            <th title="Тривалість сну: ціль 7-9 годин">Сон (год)</th>
+                            <th title="Якість сну: 1-10, <6 — погіршення">Якість сну</th>
+                            <th title="Баланс: 1-10, <6 — дисбаланс">Баланс</th>
+                            <th title="Стрес: 0-40, >20 — підвищений">Стрес</th>
+                            <th>Загальний ризик</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employee-table-body">
+                        <tr>
+                            <td colspan="10" style="text-align: center; padding: 2rem;">Завантаження даних...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Risk Assessment Section -->
+        <section class="risk-assessment">
+            <h2 class="section-title">Оцінка ризиків</h2>
+            <div class="risk-items" id="risk-items">
+                <div class="risk-item medium">
+                    <div class="risk-item-title">Завантаження даних...</div>
+                    <div class="risk-item-description">Зачекайте, будь ласка</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>&copy; 2025 TeamPulse Mindguard AI. Всі права захищені.</p>
+        </footer>
+    </div>
+
+    <!-- Employee Details Modal -->
+    <div id="employeeModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeEmployeeModal()">&times;</span>
+            <h2 id="modalEmployeeName" class="modal-title"></h2>
+
+            <div class="modal-metrics">
+                <h3>Поточні показники</h3>
+                <div class="modal-metrics-grid" id="modalMetrics"></div>
+            </div>
+
+            <div class="modal-chart">
+                <h3>Динаміка за 4 місяці</h3>
+                <div class="chart-container" style="position: relative; height: 300px; max-height: 300px;">
+                    <canvas id="modalTrendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="modal-risk">
+                <h3>Рівень ризику</h3>
+                <p id="modalRiskLevel"></p>
+            </div>
+
+            <div class="modal-notes">
+                <h3>Примітки</h3>
+                <p id="modalNotes"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentMonth = 11; // November - latest month
+        let currentEmployeeMonth = 11; // Start with November for employee table
+        let teamData = null;
+        let charts = {};
+        const METRIC_HINTS = {
+            who5: "WHO-5: 0-100, <50 — ризик низького благополуччя",
+            phq9: "PHQ-9: 0-27, >10 — помірна/висока депресивна симптоматика",
+            gad7: "GAD-7: 0-21, >10 — помірна/висока тривожність",
+            mbi: "MBI: 0-100%, >40% — підвищений ризик вигорання",
+            sleepDuration: "Тривалість сну: ціль 7-9 год",
+            sleepQuality: "Якість сну: 1-10, <6 — погіршення",
+            workLifeBalance: "Баланс: 1-10, <6 — дисбаланс",
+            stressLevel: "Стрес: 0-40, >20 — підвищений"
+        };
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+        });
+
+        // Load data from API
+        async function loadData() {
+            try {
+                const response = await fetch('/api/team-data');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                teamData = await response.json();
+
+                // Show December notice if current month is December
+                const decemberNotice = document.getElementById('dashboardDecemberNotice');
+                if (decemberNotice && currentMonth === 12) {
+                    decemberNotice.style.display = 'block';
+                }
+
+                updateDashboard();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Помилка завантаження даних. Будь ласка, спробуйте пізніше.');
+            }
+        }
+
+        // Month selector
+        function selectMonth(month) {
+            currentMonth = month;
+
+            // Update active button
+            document.querySelectorAll('.month-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (parseInt(btn.dataset.month) === month) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Show/hide December notice
+            const decemberNotice = document.getElementById('dashboardDecemberNotice');
+            if (decemberNotice) {
+                decemberNotice.style.display = month === 12 ? 'block' : 'none';
+            }
+
+            updateDashboard();
+        }
+
+        // Employee table month switcher
+        async function switchEmployeeMonth(month) {
+            currentEmployeeMonth = month;
+
+            // Update button states
+            document.querySelectorAll('.employee-month-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (parseInt(btn.dataset.month) === month) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Reload employee data for selected month
+            await loadEmployeeData(month);
+        }
+
+        async function loadEmployeeData(month) {
+            try {
+                if (!teamData) return;
+
+                const monthData = teamData.months.find(m => m.month === month);
+                if (!monthData) return;
+
+                const tbody = document.getElementById('employee-table-body');
+                tbody.innerHTML = '';
+
+                monthData.employees.forEach(emp => {
+                    const row = document.createElement('tr');
+
+                    // Calculate overall risk
+                    const risks = [
+                        getRiskLevel('who5', emp.who5),
+                        getRiskLevel('phq9', emp.phq9),
+                        getRiskLevel('gad7', emp.gad7),
+                        getRiskLevel('mbi', emp.mbi),
+                        getRiskLevel('sleepDuration', emp.sleepDuration),
+                        getRiskLevel('sleepQuality', emp.sleepQuality),
+                        getRiskLevel('workLifeBalance', emp.workLifeBalance),
+                        getRiskLevel('stressLevel', emp.stressLevel)
+                    ];
+
+                    const highCount = risks.filter(r => r === 'high').length;
+                    const mediumCount = risks.filter(r => r === 'medium').length;
+
+                    let overallRisk = 'low';
+                    if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
+                        overallRisk = 'high';
+                    } else if (highCount >= 1 || mediumCount >= 3) {
+                        overallRisk = 'medium';
+                    }
+
+                    row.innerHTML = `
+                        <td class="employee-name clickable" onclick="openEmployeeModal('${emp.name}')">${emp.name}</td>
+                        <td class="score-cell ${getScoreClass('who5', emp.who5)}">${emp.who5.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('phq9', emp.phq9)}">${emp.phq9.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('gad7', emp.gad7)}">${emp.gad7.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('mbi', emp.mbi)}">${emp.mbi.toFixed(1)}%</td>
+                        <td class="score-cell ${getScoreClass('sleepDuration', emp.sleepDuration)}">${emp.sleepDuration.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('sleepQuality', emp.sleepQuality)}">${emp.sleepQuality.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('workLifeBalance', emp.workLifeBalance)}">${emp.workLifeBalance.toFixed(1)}</td>
+                        <td class="score-cell ${getScoreClass('stressLevel', emp.stressLevel)}">${emp.stressLevel.toFixed(1)}</td>
+                        <td class="score-cell"><span class="risk-indicator risk-${overallRisk}">${getRiskLabel(overallRisk)}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error loading employee data:', error);
+            }
+        }
+
+        // Update dashboard with current month data
+        function updateDashboard() {
+            if (!teamData) return;
+
+            const monthData = getMonthData();
+            updateMetrics(monthData);
+            updateTeamTrendChart();
+            updateEmployeeTable(monthData);
+            updateRiskAssessment(monthData);
+            // Load employee table with current employee month
+            loadEmployeeData(currentEmployeeMonth);
+        }
+
+        // Get data for selected month
+        function getMonthData() {
+            if (!teamData || !teamData.months) return null;
+            return teamData.months.find(m => m.month === currentMonth) || teamData.months[0];
+        }
+
+        // Update metrics cards
+        function updateMetrics(data) {
+            if (!data || !data.averages) return;
+
+            const avg = data.averages;
+
+            // WHO-5 Well-Being Index
+            document.getElementById('who5-value').textContent = avg.who5.toFixed(1);
+            updateRiskIndicator('who5-risk', getRiskLevel('who5', avg.who5));
+
+            // PHQ-9 Depression
+            document.getElementById('phq9-value').textContent = avg.phq9.toFixed(1);
+            updateRiskIndicator('phq9-risk', getRiskLevel('phq9', avg.phq9));
+
+            // GAD-7 Anxiety
+            document.getElementById('gad7-value').textContent = avg.gad7.toFixed(1);
+            updateRiskIndicator('gad7-risk', getRiskLevel('gad7', avg.gad7));
+
+            // MBI Burnout
+            document.getElementById('mbi-value').textContent = avg.mbi.toFixed(1) + '%';
+            updateRiskIndicator('mbi-risk', getRiskLevel('mbi', avg.mbi));
+
+            // Sleep Duration
+            document.getElementById('sleep-duration-value').textContent = avg.sleepDuration.toFixed(1) + ' год';
+            updateRiskIndicator('sleep-duration-risk', getRiskLevel('sleepDuration', avg.sleepDuration));
+
+            // Sleep Quality
+            document.getElementById('sleep-quality-value').textContent = avg.sleepQuality.toFixed(1);
+            updateRiskIndicator('sleep-quality-risk', getRiskLevel('sleepQuality', avg.sleepQuality));
+
+            // Work-Life Balance
+            document.getElementById('work-life-value').textContent = avg.workLifeBalance.toFixed(1);
+            updateRiskIndicator('work-life-risk', getRiskLevel('workLifeBalance', avg.workLifeBalance));
+
+            // Stress Level
+            document.getElementById('stress-value').textContent = avg.stressLevel.toFixed(1);
+            updateRiskIndicator('stress-risk', getRiskLevel('stressLevel', avg.stressLevel));
+        }
+
+        // Get risk level based on metric
+        function getRiskLevel(metric, value) {
+            const thresholds = {
+                who5: { low: 50, medium: 75 }, // Lower is worse
+                phq9: { low: 5, medium: 10 }, // Higher is worse
+                gad7: { low: 5, medium: 10 }, // Higher is worse
+                mbi: { low: 25, medium: 50 }, // Higher is worse
+                sleepDuration: { low: 6, medium: 7 }, // Lower is worse
+                sleepQuality: { low: 4, medium: 7 }, // Lower is worse
+                workLifeBalance: { low: 4, medium: 7 }, // Lower is worse
+                stressLevel: { low: 14, medium: 27 } // Higher is worse
+            };
+
+            const t = thresholds[metric];
+
+            // Metrics where lower is worse
+            if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(metric)) {
+                if (value >= t.medium) return 'low';
+                if (value >= t.low) return 'medium';
+                return 'high';
+            }
+
+            // Metrics where higher is worse
+            if (value < t.low) return 'low';
+            if (value < t.medium) return 'medium';
+            return 'high';
+        }
+
+        // Update risk indicator element
+        function updateRiskIndicator(elementId, riskLevel) {
+            const element = document.getElementById(elementId);
+            const labels = {
+                low: 'Низький ризик',
+                medium: 'Середній ризик',
+                high: 'Високий ризик'
+            };
+
+            element.textContent = labels[riskLevel];
+            element.className = 'risk-indicator risk-' + riskLevel;
+        }
+
+        // Update Team Trend Chart (4 months)
+        function updateTeamTrendChart() {
+            if (!teamData || !teamData.months) return;
+
+            const ctx = document.getElementById('teamTrendChart').getContext('2d');
+
+            if (charts.teamTrend) {
+                charts.teamTrend.destroy();
+            }
+
+            const months = ['Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+            const allMonths = teamData.months;
+
+            charts.teamTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'WHO-5 Благополуччя',
+                            metricKey: 'who5',
+                            data: allMonths.map(m => m.averages.who5),
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'PHQ-9 Депресія',
+                            metricKey: 'phq9',
+                            data: allMonths.map(m => m.averages.phq9),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'GAD-7 Тривожність',
+                            metricKey: 'gad7',
+                            data: allMonths.map(m => m.averages.gad7),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'MBI Вигорання (%)',
+                            metricKey: 'mbi',
+                            data: allMonths.map(m => m.averages.mbi),
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e2e8f0',
+                                font: { size: 13 }
+                            },
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: (context) => {
+                                    const key = context.dataset.metricKey;
+                                    const hint = METRIC_HINTS[key] || '';
+                                    return `${context.dataset.label}: ${context.parsed.y}${hint ? ' (' + hint + ')' : ''}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(99, 102, 241, 0.1)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(99, 102, 241, 0.1)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update employee table
+        function updateEmployeeTable(data) {
+            if (!data || !data.employees) return;
+
+            const tbody = document.getElementById('employee-table-body');
+            tbody.innerHTML = '';
+
+            data.employees.forEach(emp => {
+                const row = document.createElement('tr');
+
+                // Calculate overall risk
+                const risks = [
+                    getRiskLevel('who5', emp.who5),
+                    getRiskLevel('phq9', emp.phq9),
+                    getRiskLevel('gad7', emp.gad7),
+                    getRiskLevel('mbi', emp.mbi),
+                    getRiskLevel('sleepDuration', emp.sleepDuration),
+                    getRiskLevel('sleepQuality', emp.sleepQuality),
+                    getRiskLevel('workLifeBalance', emp.workLifeBalance),
+                    getRiskLevel('stressLevel', emp.stressLevel)
+                ];
+
+                const highCount = risks.filter(r => r === 'high').length;
+                const mediumCount = risks.filter(r => r === 'medium').length;
+
+                let overallRisk = 'low';
+                if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
+                    overallRisk = 'high';
+                } else if (highCount >= 1 || mediumCount >= 3) {
+                    overallRisk = 'medium';
+                }
+
+                row.innerHTML = `
+                    <td class="employee-name clickable" onclick="openEmployeeModal('${emp.name}')">${emp.name}</td>
+                    <td class="score-cell ${getScoreClass('who5', emp.who5)}">${emp.who5.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('phq9', emp.phq9)}">${emp.phq9.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('gad7', emp.gad7)}">${emp.gad7.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('mbi', emp.mbi)}">${emp.mbi.toFixed(1)}%</td>
+                    <td class="score-cell ${getScoreClass('sleepDuration', emp.sleepDuration)}">${emp.sleepDuration.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('sleepQuality', emp.sleepQuality)}">${emp.sleepQuality.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('workLifeBalance', emp.workLifeBalance)}">${emp.workLifeBalance.toFixed(1)}</td>
+                    <td class="score-cell ${getScoreClass('stressLevel', emp.stressLevel)}">${emp.stressLevel.toFixed(1)}</td>
+                    <td class="score-cell"><span class="risk-indicator risk-${overallRisk}">${getRiskLabel(overallRisk)}</span></td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // Get score class for table cells
+        function getScoreClass(metric, value) {
+            const risk = getRiskLevel(metric, value);
+            if (risk === 'low') return 'score-good';
+            if (risk === 'medium') return 'score-warning';
+            return 'score-danger';
+        }
+
+        // Get risk label
+        function getRiskLabel(risk) {
+            const labels = {
+                low: 'Низький',
+                medium: 'Середній',
+                high: 'Високий'
+            };
+            return labels[risk] || 'Невідомо';
+        }
+
+        // Update risk assessment
+        function updateRiskAssessment(data) {
+            if (!data || !data.employees) return;
+
+            const container = document.getElementById('risk-items');
+            container.innerHTML = '';
+
+            const risks = [];
+
+            // Analyze each metric
+            const avg = data.averages;
+
+            // WHO-5
+            if (avg.who5 < 50) {
+                risks.push({
+                    level: 'high',
+                    title: 'Критично низький рівень благополуччя',
+                    description: `Середній показник WHO-5: ${avg.who5.toFixed(1)}. Команда потребує термінової підтримки психічного здоров'я.`
+                });
+            } else if (avg.who5 < 75) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Знижений рівень благополуччя',
+                    description: `Середній показник WHO-5: ${avg.who5.toFixed(1)}. Рекомендується моніторинг та профілактичні заходи.`
+                });
+            }
+
+            // PHQ-9
+            if (avg.phq9 >= 10) {
+                risks.push({
+                    level: 'high',
+                    title: 'Підвищений рівень депресії',
+                    description: `Середній показник PHQ-9: ${avg.phq9.toFixed(1)}. Потрібна консультація спеціалістів.`
+                });
+            } else if (avg.phq9 >= 5) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Помірні ознаки депресії',
+                    description: `Середній показник PHQ-9: ${avg.phq9.toFixed(1)}. Слід звернути увагу на емоційний стан команди.`
+                });
+            }
+
+            // GAD-7
+            if (avg.gad7 >= 10) {
+                risks.push({
+                    level: 'high',
+                    title: 'Високий рівень тривожності',
+                    description: `Середній показник GAD-7: ${avg.gad7.toFixed(1)}. Необхідні заходи зі зниження тривожності.`
+                });
+            } else if (avg.gad7 >= 5) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Підвищена тривожність',
+                    description: `Середній показник GAD-7: ${avg.gad7.toFixed(1)}. Рекомендуються релаксаційні практики.`
+                });
+            }
+
+            // MBI
+            if (avg.mbi >= 50) {
+                risks.push({
+                    level: 'high',
+                    title: 'Високий ризик вигорання',
+                    description: `Середній показник MBI: ${avg.mbi.toFixed(1)}%. Критичний рівень емоційного виснаження.`
+                });
+            } else if (avg.mbi >= 25) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Середній ризик вигорання',
+                    description: `Середній показник MBI: ${avg.mbi.toFixed(1)}%. Потрібні превентивні заходи.`
+                });
+            }
+
+            // Sleep Duration
+            if (avg.sleepDuration < 6) {
+                risks.push({
+                    level: 'high',
+                    title: 'Недостатня тривалість сну',
+                    description: `Середня тривалість сну: ${avg.sleepDuration.toFixed(1)} год. Команда не висипається.`
+                });
+            } else if (avg.sleepDuration < 7) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Знижена тривалість сну',
+                    description: `Середня тривалість сну: ${avg.sleepDuration.toFixed(1)} год. Рекомендується покращення режиму.`
+                });
+            }
+
+            // Sleep Quality
+            if (avg.sleepQuality < 4) {
+                risks.push({
+                    level: 'high',
+                    title: 'Погана якість сну',
+                    description: `Середня якість сну: ${avg.sleepQuality.toFixed(1)}. Необхідна консультація щодо гігієни сну.`
+                });
+            } else if (avg.sleepQuality < 7) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Задовільна якість сну',
+                    description: `Середня якість сну: ${avg.sleepQuality.toFixed(1)}. Можна покращити.`
+                });
+            }
+
+            // Work-Life Balance
+            if (avg.workLifeBalance < 4) {
+                risks.push({
+                    level: 'high',
+                    title: 'Критичний дисбаланс життя',
+                    description: `Середній баланс: ${avg.workLifeBalance.toFixed(1)}. Робота сильно впливає на особисте життя.`
+                });
+            } else if (avg.workLifeBalance < 7) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Потребує покращення балансу',
+                    description: `Середній баланс: ${avg.workLifeBalance.toFixed(1)}. Рекомендується оптимізація робочого навантаження.`
+                });
+            }
+
+            // Stress Level
+            if (avg.stressLevel >= 27) {
+                risks.push({
+                    level: 'high',
+                    title: 'Високий рівень стресу',
+                    description: `Середній рівень стресу: ${avg.stressLevel.toFixed(1)}. Потрібні антистресові заходи.`
+                });
+            } else if (avg.stressLevel >= 14) {
+                risks.push({
+                    level: 'medium',
+                    title: 'Помірний рівень стресу',
+                    description: `Середній рівень стресу: ${avg.stressLevel.toFixed(1)}. Рекомендується моніторинг.`
+                });
+            }
+
+            // If no risks, show positive message
+            if (risks.length === 0) {
+                risks.push({
+                    level: 'low',
+                    title: 'Команда в хорошому стані',
+                    description: 'Всі показники в межах норми. Продовжуйте підтримувати здоровий робочий баланс.'
+                });
+            }
+
+            // Sort risks by level (high -> medium -> low)
+            risks.sort((a, b) => {
+                const order = { high: 0, medium: 1, low: 2 };
+                return order[a.level] - order[b.level];
+            });
+
+            // Render risks
+            risks.forEach(risk => {
+                const item = document.createElement('div');
+                item.className = `risk-item ${risk.level}`;
+                item.innerHTML = `
+                    <div class="risk-item-title">${risk.title}</div>
+                    <div class="risk-item-description">${risk.description}</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Logout handler
+        function handleLogout() {
+            if (confirm('Ви впевнені, що хочете вийти?')) {
+                window.location.href = '/';
+            }
+        }
+
+        // Error handling
+        function showError(message) {
+            const container = document.querySelector('.container');
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                background: rgba(239, 68, 68, 0.2);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                color: #fca5a5;
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1.5rem;
+                text-align: center;
+            `;
+            errorDiv.textContent = message;
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+
+        // Modal functions
+        let modalChart = null;
+
+        async function openEmployeeModal(employeeName) {
+            // Load full employee data
+            const response = await fetch('/api/employee-data');
+            const fullData = await response.json();
+
+            const employee = fullData.employees.find(e => e.name === employeeName);
+            if (!employee) return;
+
+            // Populate modal
+            document.getElementById('modalEmployeeName').textContent = employee.name;
+
+            // Current metrics
+            const metricsHtml = `
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        WHO-5:
+                        <span class="info-icon" data-tooltip="Індекс благополуччя ВООЗ (0-100). Оцінює позитивне психічне здоров'я за 5 питаннями. <50 - низьке благополуччя, потребує уваги.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('who5', employee.metrics.who5)}">${employee.metrics.who5}</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        PHQ-9:
+                        <span class="info-icon" data-tooltip="Опитувальник здоров'я пацієнта (0-27). Вимірює тяжкість депресії. 0-4: мінімальна, 5-9: легка, 10-14: помірна, 15+: тяжка депресія.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('phq9', employee.metrics.phq9)}">${employee.metrics.phq9}</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        GAD-7:
+                        <span class="info-icon" data-tooltip="Шкала генералізованої тривожності (0-21). 0-4: мінімальна, 5-9: легка, 10-14: помірна, 15+: тяжка тривожність.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('gad7', employee.metrics.gad7)}">${employee.metrics.gad7}</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        MBI:
+                        <span class="info-icon" data-tooltip="Опитувальник вигорання Маслач (0-100%). Вимірює емоційне виснаження. <25%: низький ризик, 25-50%: середній, >50%: високий ризик вигорання.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('mbi', employee.metrics.mbi)}">${employee.metrics.mbi.toFixed(1)}%</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        Сон:
+                        <span class="info-icon" data-tooltip="Середня тривалість сну (години). Рекомендовано 7-9 годин для дорослих. Менше 6 год - недостатній сон.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('sleepDuration', employee.metrics.sleepDuration)}">${employee.metrics.sleepDuration.toFixed(1)} год</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        Якість сну:
+                        <span class="info-icon" data-tooltip="Самооцінка якості сну (1-10). 7-10: хороша якість, 4-6: задовільна, <4: погана якість сну.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('sleepQuality', employee.metrics.sleepQuality)}">${employee.metrics.sleepQuality}/10</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        Work-Life:
+                        <span class="info-icon" data-tooltip="Баланс між роботою та особистим життям (1-10). 7-10: здоровий баланс, 4-6: потребує покращення, <4: критичний дисбаланс.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('workLifeBalance', employee.metrics.workLifeBalance)}">${employee.metrics.workLifeBalance}/10</span>
+                </div>
+                <div class="modal-metric">
+                    <span class="metric-label">
+                        Стрес:
+                        <span class="info-icon" data-tooltip="Рівень стресу за шкалою PSS (0-40). 0-13: низький, 14-26: помірний, 27-40: високий рівень стресу.">i</span>
+                    </span>
+                    <span class="metric-value ${getScoreClass('stressLevel', employee.metrics.stressLevel)}">${employee.metrics.stressLevel}</span>
+                </div>
+            `;
+            document.getElementById('modalMetrics').innerHTML = metricsHtml;
+
+            // Risk level
+            document.getElementById('modalRiskLevel').innerHTML = `
+                <span class="risk-indicator risk-${employee.riskLevel}">${getRiskLabel(employee.riskLevel)}</span>
+            `;
+
+            // Notes
+            document.getElementById('modalNotes').textContent = employee.notes;
+
+            // Create trend chart
+            createModalTrendChart(employee);
+
+            // Show modal
+            document.getElementById('employeeModal').style.display = 'flex';
+        }
+
+        function createModalTrendChart(employee) {
+            const ctx = document.getElementById('modalTrendChart').getContext('2d');
+
+            if (modalChart) {
+                modalChart.destroy();
+            }
+
+            const months = ['Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+            const history = employee.history;
+
+            modalChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'WHO-5',
+                            metricKey: 'who5',
+                            data: [history.august.who5, history.september.who5, history.october.who5, history.november.who5, history.december.who5],
+                            borderColor: '#22c55e',
+                            tension: 0.4,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'PHQ-9',
+                            metricKey: 'phq9',
+                            data: [history.august.phq9, history.september.phq9, history.october.phq9, history.november.phq9, history.december.phq9],
+                            borderColor: '#f59e0b',
+                            tension: 0.4,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'GAD-7',
+                            metricKey: 'gad7',
+                            data: [history.august.gad7, history.september.gad7, history.october.gad7, history.november.gad7, history.december.gad7],
+                            borderColor: '#ef4444',
+                            tension: 0.4,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'MBI',
+                            metricKey: 'mbi',
+                            data: [history.august.mbi, history.september.mbi, history.october.mbi, history.november.mbi, history.december.mbi],
+                            borderColor: '#8b5cf6',
+                            tension: 0.4,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e2e8f0'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const key = context.dataset.metricKey;
+                                    const hint = METRIC_HINTS[key] || '';
+                                    return `${context.dataset.label}: ${context.parsed.y}${hint ? ' (' + hint + ')' : ''}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(99, 102, 241, 0.1)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(99, 102, 241, 0.1)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('employeeModal').style.display = 'none';
+            if (modalChart) {
+                modalChart.destroy();
+                modalChart = null;
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('employeeModal');
+            if (event.target === modal) {
+                closeEmployeeModal();
+            }
+        }
+    </script>
+</body>
+</html>

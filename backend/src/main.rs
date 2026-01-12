@@ -21,6 +21,7 @@ use axum::{
 use base64::{engine::general_purpose, Engine as _};
 use chrono::Timelike;
 use sqlx::postgres::PgPoolOptions;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
@@ -245,7 +246,7 @@ async fn run() -> anyhow::Result<()> {
     })?;
     tracing::info!("✓ Server successfully started on {addr}");
     tracing::info!("✓ Health check endpoint: http://{}/health", addr);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
 

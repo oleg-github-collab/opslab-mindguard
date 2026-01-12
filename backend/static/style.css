@@ -135,7 +135,8 @@ header .tag {
 }
 
 button,
-input {
+input,
+textarea {
   border: 3px solid var(--black);
   background: var(--white);
   padding: 12px 14px;

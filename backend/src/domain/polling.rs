@@ -1,7 +1,7 @@
 use crate::domain::models::{Question, RollingScore};
 use anyhow::Result;
 use chrono::{Duration, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -80,27 +80,47 @@ impl PollEngine {
         let since = Utc::now() - Duration::days(window_days);
 
         // FIXED: Use checkin_answers instead of answers (1-10 scale instead of 0-3)
-        let answers = sqlx::query!(
+        let answers = sqlx::query(
             r#"
-            SELECT value, created_at
+            SELECT question_type, value, created_at
             FROM checkin_answers
             WHERE user_id = $1 AND created_at >= $2
             ORDER BY created_at DESC
             "#,
-            user_id,
-            since
         )
+        .bind(user_id)
+        .bind(since)
         .fetch_all(pool)
         .await?;
 
-        let mut total = 0.0;
+        let mut weighted_sum = 0.0;
+        let mut weight_total = 0.0;
+
         for row in answers {
-            let age_days = (Utc::now() - row.created_at).num_seconds() as f32 / 86_400.0;
+            let qtype: String = row.try_get("question_type")?;
+            let value: i16 = row.try_get("value")?;
+            let created_at: chrono::DateTime<Utc> = row.try_get("created_at")?;
+
+            let age_days = (Utc::now() - created_at).num_seconds() as f32 / 86_400.0;
             let weight = self.decay_weight(age_days);
-            // Normalize 1-10 scale to 0-3 for backward compatibility with score calculation
-            let normalized_value = (row.value as f32 - 1.0) / 9.0 * 3.0;
-            total += normalized_value * weight;
+
+            let adjusted_value = match qtype.as_str() {
+                "stress" | "workload" => 11 - value,
+                _ => value,
+            } as f32;
+
+            // Normalize 1-10 scale to 0-3 and compute weighted average
+            let normalized_value = (adjusted_value - 1.0) / 9.0 * 3.0;
+            weighted_sum += normalized_value * weight;
+            weight_total += weight;
         }
+
+        let avg = if weight_total > 0.0 {
+            weighted_sum / weight_total
+        } else {
+            0.0
+        };
+        let total = (avg / 3.0 * 100.0).clamp(0.0, 100.0);
 
         Ok(RollingScore { window_days, total })
     }

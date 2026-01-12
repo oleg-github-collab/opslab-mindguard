@@ -1,0 +1,80 @@
+{
+  "metrics": {
+    "current": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    }
+  },
+  "monthly": {
+    "8": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    },
+    "9": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    },
+    "10": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    },
+    "11": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    },
+    "12": {
+      "wellbeingIndex": 65.5,
+      "depressionLevel": 8.25,
+      "anxietyLevel": 7.375,
+      "burnoutIndex": 44.8125,
+      "sleepDuration": 6.325,
+      "sleepQuality": 4.25,
+      "workLifeBalance": 4.875,
+      "stressLevel": 23.875,
+      "atRiskCount": 4,
+      "criticalCount": 1
+    }
+  },
+  "users": [],
+  "raw_responses": {}
+}

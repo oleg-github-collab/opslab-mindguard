@@ -1,0 +1,69 @@
+
+🚀 STARTING COMPREHENSIVE DATA EXTRACTION
+
+================================================================================
+🧱 EXTRACTING WALL OF TEARS DATA
+================================================================================
+
+🔐 Logging in as work.olegkaminskyi@gmail.com...
+✅ Logged in as Admin (admin)
+   User ID: 0b332710-0999-4a74-bd1e-52dc8d7fe433
+
+📊 Fetching stats...
+   Status: 200
+   Response length: 752
+   ⚠️ Empty or invalid JSON response
+
+📅 Fetching available months...
+   Status: 200
+   Response length: 44
+   ✅ Got 1 months: [{'label': 'грудень 2025', 'value': '2025-12'}]
+   💾 Saved to wall_months.json
+
+   📦 Fetching {'label': 'грудень 2025', 'value': '2025-12'}...
+      ⚠️ Invalid JSON
+
+💬 Fetching feedbacks...
+   Status: 200
+   Response length: 752
+   ⚠️ Invalid JSON
+
+🔍 Trying /feedback...
+   Status: 200
+
+🔍 Trying /api/wall...
+   Status: 200
+
+🔍 Trying /wall...
+   Status: 200
+
+================================================================================
+💓 EXTRACTING TEAMPULSE DATA
+================================================================================
+
+🔐 Logging in as work.olegkaminskyi@gmail.com...
+❌ Login failed (404): <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot POST /api/auth/login</pre>
+</body>
+</html>
+
+
+================================================================================
+✅ EXTRACTION COMPLETE
+================================================================================
+
+Extracted files:
+  📁 Wall of Tears:
+     - wall_stats.json
+     - wall_months.json
+     - wall_all_monthly.json
+     - wall_feedbacks.json
+  📁 TeamPulse:
+     - teampulse_*.json
+

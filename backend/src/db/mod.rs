@@ -6,7 +6,7 @@ use crate::domain::models::UserRole;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Row};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -509,33 +509,43 @@ pub struct TeamAverage {
 /// Get team average metrics (anonymized)
 /// FIXED: Use actual question types (focus, stress) instead of (concentration, anxiety)
 pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
-    let avg = sqlx::query!(
+    let row = sqlx::query(
         r#"
-        WITH recent_metrics AS (
+        WITH recent AS (
             SELECT
                 user_id,
-                AVG(CASE WHEN question_type = 'mood' THEN value * 20.0 ELSE 0 END) as who5,
-                AVG(CASE WHEN question_type IN ('mood', 'sleep', 'focus') THEN value * 3.0 ELSE 0 END) as phq9,
-                AVG(CASE WHEN question_type = 'stress' THEN value * 3.0 ELSE 0 END) as gad7
+                AVG(CASE WHEN question_type = 'mood' THEN value END) as mood_avg,
+                AVG(CASE WHEN question_type = 'energy' THEN value END) as energy_avg,
+                AVG(CASE WHEN question_type = 'wellbeing' THEN value END) as wellbeing_avg,
+                AVG(CASE WHEN question_type = 'motivation' THEN value END) as motivation_avg,
+                AVG(CASE WHEN question_type = 'focus' THEN value END) as focus_avg,
+                AVG(CASE WHEN question_type = 'stress' THEN value END) as stress_avg
             FROM checkin_answers
             WHERE created_at >= NOW() - INTERVAL '7 days'
             GROUP BY user_id
+        ),
+        per_user AS (
+            SELECT
+                ((COALESCE(mood_avg, 0) + COALESCE(energy_avg, 0) + COALESCE(wellbeing_avg, 0)) / 3.0 * 10.0) as who5,
+                (((10.0 - COALESCE(mood_avg, 0)) + (10.0 - COALESCE(energy_avg, 0)) + (10.0 - COALESCE(motivation_avg, 0))) / 3.0 * 2.7) as phq9,
+                ((COALESCE(stress_avg, 0) + (10.0 - COALESCE(focus_avg, 0))) / 2.0 * 2.1) as gad7
+            FROM recent
         )
         SELECT
-            CAST(COALESCE(AVG(who5), 0.0) AS DOUBLE PRECISION) as "avg_who5: f64",
-            CAST(COALESCE(AVG(phq9), 0.0) AS DOUBLE PRECISION) as "avg_phq9: f64",
-            CAST(COALESCE(AVG(gad7), 0.0) AS DOUBLE PRECISION) as "avg_gad7: f64"
-        FROM recent_metrics
+            CAST(COALESCE(AVG(who5), 0.0) AS DOUBLE PRECISION) as avg_who5,
+            CAST(COALESCE(AVG(phq9), 0.0) AS DOUBLE PRECISION) as avg_phq9,
+            CAST(COALESCE(AVG(gad7), 0.0) AS DOUBLE PRECISION) as avg_gad7
+        FROM per_user
         "#
     )
     .fetch_one(pool)
     .await?;
 
-    Ok(TeamAverage {
-        who5: avg.avg_who5.unwrap_or(0.0),
-        phq9: avg.avg_phq9.unwrap_or(0.0),
-        gad7: avg.avg_gad7.unwrap_or(0.0),
-    })
+    let who5: f64 = row.try_get("avg_who5")?;
+    let phq9: f64 = row.try_get("avg_phq9")?;
+    let gad7: f64 = row.try_get("avg_gad7")?;
+
+    Ok(TeamAverage { who5, phq9, gad7 })
 }
 
 // ---------- All Telegram Users (#6) ----------
@@ -714,41 +724,75 @@ pub async fn calculate_user_metrics_for_period(
     start: DateTime<Utc>,
     end: DateTime<Utc>,
 ) -> Result<Option<Metrics>> {
-    // FIXED: Use actual question types (focus, stress) instead of (concentration, anxiety)
-    let result = sqlx::query!(
+    let row = sqlx::query(
         r#"
         SELECT
-            CAST(COALESCE(AVG(CASE WHEN question_type = 'mood' THEN value * 20.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "who5: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type IN ('mood', 'sleep', 'focus') THEN value * 3.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "phq9: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type = 'stress' THEN value * 3.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "gad7: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type IN ('energy', 'stress', 'workload') THEN value * 10.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "mbi: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type = 'sleep' THEN value ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "sleep_duration: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type = 'workload' THEN 10.0 - value ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "work_life_balance: f64",
-            CAST(COALESCE(AVG(CASE WHEN question_type = 'stress' THEN value * 4.0 ELSE NULL END), 0.0) AS DOUBLE PRECISION) as "stress_level: f64"
+            AVG(CASE WHEN question_type = 'mood' THEN value END) as mood_avg,
+            AVG(CASE WHEN question_type = 'energy' THEN value END) as energy_avg,
+            AVG(CASE WHEN question_type = 'wellbeing' THEN value END) as wellbeing_avg,
+            AVG(CASE WHEN question_type = 'motivation' THEN value END) as motivation_avg,
+            AVG(CASE WHEN question_type = 'focus' THEN value END) as focus_avg,
+            AVG(CASE WHEN question_type = 'stress' THEN value END) as stress_avg,
+            AVG(CASE WHEN question_type = 'sleep' THEN value END) as sleep_avg,
+            AVG(CASE WHEN question_type = 'workload' THEN value END) as workload_avg
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= $2
           AND created_at < $3
-        "#,
-        user_id,
-        start,
-        end
+        "#
     )
+    .bind(user_id)
+    .bind(start)
+    .bind(end)
     .fetch_one(pool)
     .await?;
 
-    let who5 = result.who5.unwrap_or(0.0);
+    let mood = row
+        .try_get::<Option<f64>, _>("mood_avg")?
+        .unwrap_or(0.0);
+    let energy = row
+        .try_get::<Option<f64>, _>("energy_avg")?
+        .unwrap_or(0.0);
+    let wellbeing = row
+        .try_get::<Option<f64>, _>("wellbeing_avg")?
+        .unwrap_or(0.0);
+    let motivation = row
+        .try_get::<Option<f64>, _>("motivation_avg")?
+        .unwrap_or(0.0);
+    let focus = row
+        .try_get::<Option<f64>, _>("focus_avg")?
+        .unwrap_or(0.0);
+    let stress = row
+        .try_get::<Option<f64>, _>("stress_avg")?
+        .unwrap_or(0.0);
+    let sleep = row
+        .try_get::<Option<f64>, _>("sleep_avg")?
+        .unwrap_or(0.0);
+    let workload = row
+        .try_get::<Option<f64>, _>("workload_avg")?
+        .unwrap_or(0.0);
+
+    let who5 = ((mood + energy + wellbeing) / 3.0 * 10.0).clamp(0.0, 100.0);
     if who5 == 0.0 {
         return Ok(None);
     }
 
+    let phq9 = (((10.0 - mood) + (10.0 - energy) + (10.0 - motivation)) / 3.0 * 2.7)
+        .clamp(0.0, 27.0);
+    let gad7 = ((stress + (10.0 - focus)) / 2.0 * 2.1).clamp(0.0, 21.0);
+    let mbi = ((stress + workload + (10.0 - energy) + (10.0 - motivation)) / 4.0 * 10.0)
+        .clamp(0.0, 100.0);
+    let sleep_duration = sleep.clamp(0.0, 10.0);
+    let work_life_balance = (10.0 - workload).clamp(0.0, 10.0);
+    let stress_level = (stress * 4.0).clamp(0.0, 40.0);
+
     Ok(Some(Metrics {
         who5_score: who5,
-        phq9_score: result.phq9.unwrap_or(0.0),
-        gad7_score: result.gad7.unwrap_or(0.0),
-        mbi_score: result.mbi.unwrap_or(0.0),
-        sleep_duration: result.sleep_duration.unwrap_or(0.0),
-        work_life_balance: result.work_life_balance.unwrap_or(0.0),
-        stress_level: result.stress_level.unwrap_or(0.0),
+        phq9_score: phq9,
+        gad7_score: gad7,
+        mbi_score: mbi,
+        sleep_duration,
+        work_life_balance,
+        stress_level,
     }))
 }

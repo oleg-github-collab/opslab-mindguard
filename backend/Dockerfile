@@ -17,8 +17,8 @@ COPY . .
 # Show what we copied (for debugging)
 RUN ls -la index.html && head -7 index.html
 
-# Build application (expects DATABASE_URL at build time unless SQLX_OFFLINE + sqlx-data.json are provided)
-RUN cargo build --release
+# Build application (offline SQLx to avoid DB requirement in CI/build)
+RUN SQLX_OFFLINE=true cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates openssl && rm -rf /var/lib/apt/lists/*

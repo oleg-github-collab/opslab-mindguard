@@ -41,6 +41,26 @@ pub struct WallPost {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Serialize)]
+pub struct WallStatsPost {
+    pub id: Uuid,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub is_anonymous: bool,
+    pub sentiment: String,
+    pub summary: String,
+    pub tags: Vec<String>,
+    pub work_aspect: String,
+    pub emotional_intensity: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_name: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AvailableMonth {
+    pub label: String,
+    pub value: String,
+}
+
 // Internal struct for database query
 struct WallPostRow {
     id: Uuid,
@@ -56,6 +76,8 @@ pub fn router(state: SharedState) -> Router {
         .route("/anonymous", post(anonymous))
         .route("/wall", post(create_wall_post))
         .route("/wall", get(get_wall_posts))
+        .route("/stats", get(get_wall_stats))
+        .route("/stats/available-months", get(get_available_months))
         .with_state(state)
 }
 
@@ -218,4 +240,144 @@ async fn get_wall_posts(
         .collect();
 
     Ok(Json(posts))
+}
+
+async fn get_wall_stats(
+    State(state): State<SharedState>,
+) -> Result<Json<Vec<WallStatsPost>>, StatusCode> {
+    // Get all wall posts with user names
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            wp.id,
+            wp.user_id,
+            wp.enc_content,
+            wp.category as "category: PostCategory",
+            wp.created_at,
+            u.full_name as user_name
+        FROM wall_posts wp
+        LEFT JOIN users u ON wp.user_id = u.id
+        ORDER BY wp.created_at DESC
+        LIMIT 100
+        "#
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch wall stats: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Convert posts to stats format with AI-generated fields
+    let stats_posts: Vec<WallStatsPost> = rows
+        .into_iter()
+        .filter_map(|row| {
+            let enc_str = String::from_utf8_lossy(&row.enc_content);
+            match state.crypto.decrypt_str(&enc_str) {
+                Ok(content) => {
+                    // Determine sentiment based on category
+                    let sentiment = match row.category {
+                        PostCategory::Celebration => "positive",
+                        PostCategory::Complaint => "negative",
+                        PostCategory::SupportNeeded => "mixed",
+                        _ => "mixed",
+                    };
+
+                    // Determine work aspect
+                    let work_aspect = match row.category {
+                        PostCategory::Celebration => "team",
+                        PostCategory::Complaint => "management",
+                        PostCategory::SupportNeeded => "workload",
+                        PostCategory::Suggestion => "team",
+                        PostCategory::Question => "management",
+                    };
+
+                    // Extract simple tags from content (first 5 words as tags)
+                    let tags: Vec<String> = content
+                        .split_whitespace()
+                        .take(5)
+                        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+                        .filter(|w| w.len() > 3)
+                        .map(String::from)
+                        .collect();
+
+                    // Use content as summary (truncate if too long)
+                    let summary = if content.len() > 200 {
+                        format!("{}...", &content[..200])
+                    } else {
+                        content
+                    };
+
+                    // Emotional intensity based on content length and category
+                    let emotional_intensity = match row.category {
+                        PostCategory::Complaint | PostCategory::SupportNeeded => 4,
+                        PostCategory::Celebration => 3,
+                        _ => 2,
+                    };
+
+                    Some(WallStatsPost {
+                        id: row.id,
+                        created_at: row.created_at.unwrap_or_else(|| chrono::Utc::now()),
+                        is_anonymous: row.user_name.is_none(),
+                        sentiment: sentiment.to_string(),
+                        summary,
+                        tags,
+                        work_aspect: work_aspect.to_string(),
+                        emotional_intensity,
+                        user_name: row.user_name,
+                    })
+                }
+                Err(e) => {
+                    tracing::error!("Failed to decrypt wall post {}: {}", row.id, e);
+                    None
+                }
+            }
+        })
+        .collect();
+
+    Ok(Json(stats_posts))
+}
+
+async fn get_available_months(
+    State(state): State<SharedState>,
+) -> Result<Json<Vec<AvailableMonth>>, StatusCode> {
+    // Get unique months from wall posts
+    let rows = sqlx::query!(
+        r#"
+        SELECT DISTINCT
+            EXTRACT(YEAR FROM created_at) as year,
+            EXTRACT(MONTH FROM created_at) as month
+        FROM wall_posts
+        WHERE created_at IS NOT NULL
+        ORDER BY year DESC, month DESC
+        "#
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch available months: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Ukrainian month names
+    let month_names = [
+        "січень", "лютий", "березень", "квітень", "травень", "червень",
+        "липень", "серпень", "вересень", "жовтень", "листопад", "грудень"
+    ];
+
+    let months: Vec<AvailableMonth> = rows
+        .into_iter()
+        .filter_map(|row| {
+            if let (Some(year), Some(month)) = (row.year, row.month) {
+                let month_idx = (month as usize).saturating_sub(1);
+                let label = format!("{} {}", month_names.get(month_idx)?, year as i32);
+                let value = format!("{}-{:02}", year as i32, month as i32);
+                Some(AvailableMonth { label, value })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(Json(months))
 }
