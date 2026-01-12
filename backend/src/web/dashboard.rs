@@ -129,55 +129,75 @@ async fn user_history(
     State(state): State<SharedState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<HistoricalData>, StatusCode> {
-    let token = session::extract_token(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    tracing::info!("user_history called for user_id: {}", id);
+
+    let token = session::extract_token(&headers).ok_or_else(|| {
+        tracing::error!("No session token found in headers");
+        StatusCode::UNAUTHORIZED
+    })?;
+
     let claims = session::verify_session(&token, &state.session_key)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .map_err(|e| {
+            tracing::error!("Session verification failed: {}", e);
+            StatusCode::UNAUTHORIZED
+        })?;
+
+    tracing::info!("Session verified for user: {}, role: {:?}", claims.user_id, claims.role);
 
     // Users can only see their own history unless they're admin
     if claims.user_id != id && !matches!(claims.role, UserRole::Admin | UserRole::Founder) {
+        tracing::warn!("User {} attempted to access history of user {}", claims.user_id, id);
         return Err(StatusCode::FORBIDDEN);
     }
 
     // Query monthly aggregated check-in data
     #[derive(sqlx::FromRow)]
     struct MonthlyRow {
-        year: Option<i32>,
-        month: Option<i32>,
-        who5_score: Option<f64>,
-        phq9_score: Option<f64>,
-        gad7_score: Option<f64>,
-        burnout_percentage: Option<f64>,
-        stress_level: Option<f64>,
-        checkins_count: Option<i64>,
+        year: i32,
+        month: i32,
+        mood_avg: Option<f64>,
+        energy_avg: Option<f64>,
+        wellbeing_avg: Option<f64>,
+        motivation_avg: Option<f64>,
+        focus_avg: Option<f64>,
+        stress_avg: Option<f64>,
+        sleep_avg: Option<f64>,
+        workload_avg: Option<f64>,
+        checkins_count: i64,
     }
 
     let monthly_data: Vec<MonthlyRow> = sqlx::query_as(
         "SELECT
             EXTRACT(YEAR FROM created_at)::int AS year,
             EXTRACT(MONTH FROM created_at)::int AS month,
-            AVG(who5_score) AS who5_score,
-            AVG(phq9_score) AS phq9_score,
-            AVG(gad7_score) AS gad7_score,
-            AVG(burnout_percentage) AS burnout_percentage,
-            AVG(stress_level) AS stress_level,
-            COUNT(*)::bigint AS checkins_count
+            AVG(CASE WHEN question_type = 'mood' THEN value END) AS mood_avg,
+            AVG(CASE WHEN question_type = 'energy' THEN value END) AS energy_avg,
+            AVG(CASE WHEN question_type = 'wellbeing' THEN value END) AS wellbeing_avg,
+            AVG(CASE WHEN question_type = 'motivation' THEN value END) AS motivation_avg,
+            AVG(CASE WHEN question_type = 'focus' THEN value END) AS focus_avg,
+            AVG(CASE WHEN question_type = 'stress' THEN value END) AS stress_avg,
+            AVG(CASE WHEN question_type = 'sleep' THEN value END) AS sleep_avg,
+            AVG(CASE WHEN question_type = 'workload' THEN value END) AS workload_avg,
+            COUNT(DISTINCT DATE(created_at))::bigint AS checkins_count
         FROM checkin_answers
         WHERE user_id = $1
-        GROUP BY year, month
-        ORDER BY year DESC, month DESC",
+        GROUP BY 1, 2
+        ORDER BY 1 DESC, 2 DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| {
-        tracing::error!("Failed to fetch user history: {}", e);
+        tracing::error!("Failed to fetch user history for user {}: {}", id, e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    tracing::info!("Found {} months of data for user {}", monthly_data.len(), id);
 
     let months: Vec<MonthlyMetrics> = monthly_data
         .into_iter()
         .map(|row| {
-            let month_num = row.month.unwrap_or(1) as u32;
+            let month_num = row.month as u32;
             let month_name = match month_num {
                 1 => "Січень",
                 2 => "Лютий",
@@ -195,16 +215,34 @@ async fn user_history(
             }
             .to_string();
 
+            let mood = row.mood_avg.unwrap_or(0.0);
+            let energy = row.energy_avg.unwrap_or(0.0);
+            let wellbeing = row.wellbeing_avg.unwrap_or(0.0);
+            let motivation = row.motivation_avg.unwrap_or(0.0);
+            let focus = row.focus_avg.unwrap_or(0.0);
+            let stress = row.stress_avg.unwrap_or(0.0);
+            let _sleep = row.sleep_avg.unwrap_or(0.0);
+            let workload = row.workload_avg.unwrap_or(0.0);
+
+            let who5 = ((mood + energy + wellbeing) / 3.0 * 10.0).clamp(0.0, 100.0);
+            let phq9 = (((10.0 - mood) + (10.0 - energy) + (10.0 - motivation)) / 3.0 * 2.7)
+                .clamp(0.0, 27.0);
+            let gad7 = ((stress + (10.0 - focus)) / 2.0 * 2.1).clamp(0.0, 21.0);
+            let burnout = ((stress + workload + (10.0 - energy) + (10.0 - motivation)) / 4.0
+                * 10.0)
+                .clamp(0.0, 100.0);
+            let stress_level = (stress * 4.0).clamp(0.0, 40.0);
+
             MonthlyMetrics {
-                year: row.year.unwrap_or(2025),
+                year: row.year,
                 month: month_num,
                 month_name,
-                who5_score: row.who5_score,
-                phq9_score: row.phq9_score,
-                gad7_score: row.gad7_score,
-                burnout_percentage: row.burnout_percentage,
-                stress_level: row.stress_level,
-                checkins_count: row.checkins_count.unwrap_or(0),
+                who5_score: Some(who5),
+                phq9_score: Some(phq9),
+                gad7_score: Some(gad7),
+                burnout_percentage: Some(burnout),
+                stress_level: Some(stress_level),
+                checkins_count: row.checkins_count,
             }
         })
         .collect();
