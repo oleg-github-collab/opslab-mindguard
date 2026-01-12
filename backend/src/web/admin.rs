@@ -46,11 +46,21 @@ async fn get_team_heatmap(
     UserSession(user_id): UserSession,
     State(state): State<SharedState>,
 ) -> Result<Json<TeamHeatmapData>, StatusCode> {
+    tracing::info!("get_team_heatmap called by user_id: {}", user_id);
+
     // SECURITY: Only ADMIN and FOUNDER can access team heatmap
     let requesting_user = db::find_user_by_id(&state.pool, user_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+        .map_err(|e| {
+            tracing::error!("Failed to find requesting user {}: {}", user_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            tracing::error!("Requesting user {} not found in database", user_id);
+            StatusCode::UNAUTHORIZED
+        })?;
+
+    tracing::info!("Requesting user role: {:?}", requesting_user.role);
 
     if !matches!(requesting_user.role, UserRole::Admin | UserRole::Founder) {
         tracing::warn!(
@@ -66,6 +76,8 @@ async fn get_team_heatmap(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    tracing::info!("Processing heatmap for {} users", users.len());
+
     let mut heatmap_entries = Vec::new();
 
     for user in users {
@@ -74,16 +86,21 @@ async fn get_team_heatmap(
             .decrypt_str(&user.enc_name)
             .unwrap_or_else(|_| "Unknown".to_string());
 
-        let metrics = db::calculate_user_metrics(&state.pool, user.id)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to calculate metrics for user {}: {}", user.id, e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        // Gracefully handle metrics calculation failures - just mark as NoData
+        let metrics = match db::calculate_user_metrics(&state.pool, user.id).await {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("Failed to calculate metrics for user {} ({}): {}", user.id, name, e);
+                None
+            }
+        };
 
         let streak = db::get_user_current_streak(&state.pool, user.id)
             .await
-            .unwrap_or(0);
+            .unwrap_or_else(|e| {
+                tracing::warn!("Failed to get streak for user {} ({}): {}", user.id, name, e);
+                0
+            });
 
         let last_checkin = db::get_last_checkin_date(&state.pool, user.id)
             .await
