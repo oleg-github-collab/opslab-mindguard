@@ -17,6 +17,8 @@ pub enum QuestionType {
     Motivation,
     Focus,
     Wellbeing,
+    Reflection,
+    Support,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +154,24 @@ impl QuestionBank {
         ]
     }
 
+    /// Глибокі рефлексивні питання
+    pub fn reflection_questions() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Що сьогодні найбільше забрало енергію?", "🧭"),
+            ("Що було найскладнішим моментом дня?", "🧩"),
+            ("Яка одна річ зараз найбільше турбує?", "🫧"),
+        ]
+    }
+
+    /// Підтримуючі питання
+    pub fn support_questions() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Наскільки ти відчуваєш підтримку навколо?", "🤝"),
+            ("Чи є щось, що могло б полегшити твій день?", "💬"),
+            ("Наскільки ти відчуваєш безпеку говорити про труднощі?", "🛟"),
+        ]
+    }
+
     /// Отримати випадкове питання за типом
     pub fn get_random_question(qtype: QuestionType) -> (&'static str, &'static str) {
         let mut rng = rand::thread_rng();
@@ -164,6 +184,8 @@ impl QuestionBank {
             QuestionType::Motivation => Self::motivation_questions(),
             QuestionType::Focus => Self::focus_questions(),
             QuestionType::Wellbeing => Self::wellbeing_questions(),
+            QuestionType::Reflection => Self::reflection_questions(),
+            QuestionType::Support => Self::support_questions(),
         };
         let idx = rng.gen_range(0..questions.len());
         questions[idx]
@@ -234,6 +256,35 @@ impl AdaptiveQuestionEngine {
         Ok(priorities)
     }
 
+    pub async fn needs_support(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+    ) -> Result<bool, anyhow::Error> {
+        use crate::db;
+        let patterns = db::get_user_recent_pattern(pool, user_id).await?;
+        let mut stress = None;
+        let mut mood = None;
+        let mut energy = None;
+        let mut workload = None;
+
+        for (qtype, avg_value) in patterns {
+            match qtype.as_str() {
+                "stress" => stress = Some(avg_value),
+                "mood" => mood = Some(avg_value),
+                "energy" => energy = Some(avg_value),
+                "workload" => workload = Some(avg_value),
+                _ => {}
+            }
+        }
+
+        let high_stress = stress.map(|v| v >= 7.0).unwrap_or(false);
+        let low_mood = mood.map(|v| v <= 4.0).unwrap_or(false);
+        let low_energy = energy.map(|v| v <= 4.0).unwrap_or(false);
+        let high_workload = workload.map(|v| v >= 8.0).unwrap_or(false);
+
+        Ok(high_stress || low_mood || low_energy || high_workload)
+    }
+
     /// Генерує adaptive intro message на основі пріоритетів
     pub fn get_adaptive_intro(types: &[QuestionType]) -> String {
         if let Some(first) = types.first() {
@@ -247,6 +298,12 @@ impl AdaptiveQuestionEngine {
                 QuestionType::Energy => "Вітаю! ⚡ Як рівень енергії? Подбай про себе.".to_string(),
                 QuestionType::Mood => {
                     "Доброго ранку! 💙 Як настрій? Ти не один, ми поруч.".to_string()
+                }
+                QuestionType::Reflection => {
+                    "Бачу напруження останнім часом. Давай коротко звіримось.".to_string()
+                }
+                QuestionType::Support => {
+                    "Доброго дня! 🤝 Хочу зрозуміти як ти, щоб краще підтримати.".to_string()
                 }
                 _ => "Доброго ранку! Як справи сьогодні?".to_string(),
             }
@@ -291,6 +348,20 @@ impl CheckInGenerator {
                     break;
                 }
             }
+        }
+
+        // Якщо був складний період, додати глибоке + підтримуюче питання
+        let needs_support = AdaptiveQuestionEngine::needs_support(pool, user_id)
+            .await
+            .unwrap_or(false);
+        if needs_support {
+            let mut prioritized = vec![QuestionType::Reflection, QuestionType::Support];
+            for qt in question_types {
+                if !prioritized.contains(&qt) {
+                    prioritized.push(qt);
+                }
+            }
+            question_types = prioritized;
         }
 
         let mut questions = Vec::new();
@@ -406,6 +477,8 @@ impl CheckInGenerator {
             QuestionType::Motivation => "motivation",
             QuestionType::Focus => "focus",
             QuestionType::Wellbeing => "wellbeing",
+            QuestionType::Reflection => "reflection",
+            QuestionType::Support => "support",
         }
         .to_string()
     }

@@ -133,6 +133,11 @@ impl WallPostCategorizer {
 
     /// Fallback keyword-based classification якщо AI failed
     fn keyword_based_fallback(&self, content: &str) -> PostCategory {
+        Self::fallback_only(content)
+    }
+
+    /// Public fallback for offline/classic classification
+    pub fn fallback_only(content: &str) -> PostCategory {
         let content_lower = content.to_lowercase();
 
         // Support needed keywords

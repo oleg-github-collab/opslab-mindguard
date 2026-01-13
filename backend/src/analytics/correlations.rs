@@ -1,10 +1,11 @@
 ///! Correlation Insights (#7)
 ///! Аналізує кореляції між показниками (sleep→mood, stress→concentration, day patterns)
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorrelationInsight {
     pub correlation_type: String,
     pub strength: f64, // -1.0 to 1.0 (Pearson correlation coefficient)

@@ -3,10 +3,12 @@ pub mod seed;
 use crate::bot::daily_checkin::{CheckInAnswer, Metrics};
 use crate::crypto::Crypto;
 use crate::domain::models::UserRole;
+use crate::time_utils;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Row};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -19,6 +21,10 @@ pub struct DbUser {
     pub enc_name: String,
     pub note: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub is_active: bool,
+    pub offboarded_at: Option<DateTime<Utc>>,
+    pub offboarded_by: Option<Uuid>,
+    pub offboarded_reason: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -32,46 +38,179 @@ pub struct VoiceLog {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserPreferences {
+    pub reminder_hour: i16,
+    pub reminder_minute: i16,
+    pub timezone: String,
+    pub notification_enabled: bool,
+    pub last_reminder_date: Option<NaiveDate>,
+    pub last_plan_nudge_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReminderCandidate {
+    pub user_id: Uuid,
+    pub telegram_id: i64,
+    pub reminder_hour: i16,
+    pub reminder_minute: i16,
+    pub timezone: String,
+    pub notification_enabled: bool,
+    pub last_reminder_date: Option<NaiveDate>,
+    pub last_plan_nudge_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GoalSettings {
+    pub sleep_target: i16,
+    pub break_target: i16,
+    pub move_target: i16,
+    pub notifications_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WellnessPlan {
+    pub id: Uuid,
+    pub plan_date: NaiveDate,
+    pub items: serde_json::Value,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct PulseRoom {
+    pub id: Uuid,
+    pub slug: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub require_moderation: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PulseMessage {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub user_id: Uuid,
+    pub content: String,
+    pub is_anonymous: bool,
+    pub status: String,
+    pub moderation_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct PulseMessageRow {
+    pub id: Uuid,
+    pub room_id: Uuid,
+    pub user_id: Option<Uuid>,
+    pub enc_content: Vec<u8>,
+    pub is_anonymous: bool,
+    pub status: String,
+    pub moderation_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 pub async fn find_user_by_email(pool: &PgPool, email: &str) -> Result<Option<DbUser>> {
-    let user = sqlx::query_as!(
-        DbUser,
+    let user = sqlx::query_as::<_, DbUser>(
         r#"
-        SELECT id, email, hash, telegram_id, role as "role: UserRole", enc_name, note, created_at
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
+        FROM users
+        WHERE email = $1
+          AND is_active = true
+        "#,
+    )
+    .bind(email)
+    .fetch_optional(pool)
+    .await?;
+    Ok(user)
+}
+
+/// Find user by email including inactive (admin-only use)
+pub async fn find_user_by_email_any(pool: &PgPool, email: &str) -> Result<Option<DbUser>> {
+    let user = sqlx::query_as::<_, DbUser>(
+        r#"
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
         FROM users
         WHERE email = $1
         "#,
-        email
     )
+    .bind(email)
     .fetch_optional(pool)
     .await?;
     Ok(user)
 }
 
 pub async fn find_user_by_id(pool: &PgPool, id: Uuid) -> Result<Option<DbUser>> {
-    let user = sqlx::query_as!(
-        DbUser,
+    let user = sqlx::query_as::<_, DbUser>(
         r#"
-        SELECT id, email, hash, telegram_id, role as "role: UserRole", enc_name, note, created_at
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
         FROM users
         WHERE id = $1
         "#,
-        id
     )
+    .bind(id)
     .fetch_optional(pool)
     .await?;
     Ok(user)
 }
 
 pub async fn find_user_by_telegram(pool: &PgPool, telegram_id: i64) -> Result<Option<DbUser>> {
-    let user = sqlx::query_as!(
-        DbUser,
+    let user = sqlx::query_as::<_, DbUser>(
         r#"
-        SELECT id, email, hash, telegram_id, role as "role: UserRole", enc_name, note, created_at
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
         FROM users
         WHERE telegram_id = $1
         "#,
-        telegram_id
     )
+    .bind(telegram_id)
     .fetch_optional(pool)
     .await?;
     Ok(user)
@@ -376,74 +515,216 @@ pub async fn set_user_reminder_time(
     hour: i16,
     minute: i16,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO user_preferences (user_id, reminder_hour, reminder_minute)
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id) DO UPDATE
-        SET reminder_hour = $2, reminder_minute = $3, updated_at = NOW()
+        SET reminder_hour = $2,
+            reminder_minute = $3,
+            last_reminder_date = NULL,
+            updated_at = NOW()
         "#,
-        user_id,
-        hour,
-        minute
     )
+    .bind(user_id)
+    .bind(hour)
+    .bind(minute)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-/// Calculate best reminder time based on user's answer patterns
-pub async fn calculate_best_reminder_time(pool: &PgPool, user_id: Uuid) -> Result<(i16, i16)> {
-    let result = sqlx::query!(
+/// Update user's timezone (IANA or UTC offset)
+pub async fn set_user_timezone(pool: &PgPool, user_id: Uuid, timezone: &str) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, timezone)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET timezone = $2,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(timezone)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Toggle notification setting for reminders
+pub async fn set_user_notification_enabled(
+    pool: &PgPool,
+    user_id: Uuid,
+    enabled: bool,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, notification_enabled)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET notification_enabled = $2,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(enabled)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Get user preferences with defaults
+pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPreferences> {
+    let row = sqlx::query(
         r#"
         SELECT
-            EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC')::INT as hour,
-            COUNT(*) as count
-        FROM checkin_answers
+            COALESCE(reminder_hour, 10) as reminder_hour,
+            COALESCE(reminder_minute, 0) as reminder_minute,
+            COALESCE(timezone, 'Europe/Kyiv') as timezone,
+            COALESCE(notification_enabled, true) as notification_enabled,
+            last_reminder_date,
+            last_plan_nudge_date
+        FROM user_preferences
         WHERE user_id = $1
-        GROUP BY hour
-        ORDER BY count DESC
-        LIMIT 1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
-    if let Some(row) = result {
-        Ok((row.hour.unwrap_or(10) as i16, 0))
+    if let Some(row) = row {
+        Ok(UserPreferences {
+            reminder_hour: row.try_get::<i16, _>("reminder_hour")?,
+            reminder_minute: row.try_get::<i16, _>("reminder_minute")?,
+            timezone: row.try_get::<String, _>("timezone")?,
+            notification_enabled: row.try_get::<bool, _>("notification_enabled")?,
+            last_reminder_date: row.try_get::<Option<NaiveDate>, _>("last_reminder_date")?,
+            last_plan_nudge_date: row.try_get::<Option<NaiveDate>, _>("last_plan_nudge_date")?,
+        })
     } else {
-        Ok((10, 0)) // Default 10:00
+        Ok(UserPreferences {
+            reminder_hour: 10,
+            reminder_minute: 0,
+            timezone: "Europe/Kyiv".to_string(),
+            notification_enabled: true,
+            last_reminder_date: None,
+            last_plan_nudge_date: None,
+        })
     }
 }
 
-/// Get all users who should receive check-in at specific time
-pub async fn get_users_for_reminder_time(
+/// Mark reminder as sent for a local date (idempotent)
+pub async fn mark_reminder_sent(
     pool: &PgPool,
-    hour: i16,
-    minute: i16,
-) -> Result<Vec<(Uuid, i64)>> {
-    let users = sqlx::query!(
+    user_id: Uuid,
+    local_date: NaiveDate,
+) -> Result<bool> {
+    let result = sqlx::query(
         r#"
-        SELECT u.id, u.telegram_id
+        INSERT INTO user_preferences (user_id, last_reminder_date)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET last_reminder_date = EXCLUDED.last_reminder_date,
+            updated_at = NOW()
+        WHERE user_preferences.last_reminder_date IS NULL
+           OR user_preferences.last_reminder_date < EXCLUDED.last_reminder_date
+        "#,
+    )
+    .bind(user_id)
+    .bind(local_date)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+/// Get reminder candidates with preferences
+pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandidate>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            u.id as user_id,
+            u.telegram_id as telegram_id,
+            COALESCE(p.reminder_hour, 10) as reminder_hour,
+            COALESCE(p.reminder_minute, 0) as reminder_minute,
+            COALESCE(p.timezone, 'Europe/Kyiv') as timezone,
+            COALESCE(p.notification_enabled, true) as notification_enabled,
+            p.last_reminder_date as last_reminder_date,
+            p.last_plan_nudge_date as last_plan_nudge_date
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
           AND u.role != 'ADMIN'
-          AND COALESCE(p.reminder_hour, 10) = $1
-          AND COALESCE(p.reminder_minute, 0) = $2
-          AND COALESCE(p.notification_enabled, true) = true
+          AND u.is_active = true
         "#,
-        hour as i32,
-        minute as i32
     )
     .fetch_all(pool)
     .await?;
 
-    Ok(users
+    let mut out = Vec::new();
+    for row in rows {
+        let telegram_id: Option<i64> = row.try_get("telegram_id")?;
+        let Some(telegram_id) = telegram_id else {
+            continue;
+        };
+        out.push(ReminderCandidate {
+            user_id: row.try_get("user_id")?,
+            telegram_id,
+            reminder_hour: row.try_get("reminder_hour")?,
+            reminder_minute: row.try_get("reminder_minute")?,
+            timezone: row.try_get("timezone")?,
+            notification_enabled: row.try_get("notification_enabled")?,
+            last_reminder_date: row.try_get("last_reminder_date")?,
+            last_plan_nudge_date: row.try_get("last_plan_nudge_date")?,
+        });
+    }
+
+    Ok(out)
+}
+
+/// Calculate best reminder time based on user's local activity
+pub async fn calculate_best_reminder_time_local(
+    pool: &PgPool,
+    user_id: Uuid,
+    timezone: &str,
+) -> Result<(i16, i16)> {
+    let rows = sqlx::query(
+        r#"
+        SELECT created_at
+        FROM checkin_answers
+        WHERE user_id = $1
+          AND created_at >= NOW() - INTERVAL '60 days'
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    if rows.is_empty() {
+        return Ok((10, 0));
+    }
+
+    let mut counts: HashMap<(i16, i16), i32> = HashMap::new();
+    for row in rows {
+        let created_at: DateTime<Utc> = row.try_get("created_at")?;
+        let (_, hour, minute) = time_utils::local_components(timezone, created_at);
+        let mut rounded_minute = ((minute as i32 + 7) / 15) * 15;
+        let mut rounded_hour = hour as i32;
+        if rounded_minute == 60 {
+            rounded_minute = 0;
+            rounded_hour = (rounded_hour + 1) % 24;
+        }
+        let key = (rounded_hour as i16, rounded_minute as i16);
+        *counts.entry(key).or_insert(0) += 1;
+    }
+
+    let ((hour, minute), _) = counts
         .into_iter()
-        .filter_map(|u| u.telegram_id.map(|tid| (u.id, tid)))
-        .collect())
+        .max_by_key(|(_, count)| *count)
+        .unwrap_or(((10, 0), 0));
+
+    Ok((hour, minute))
 }
 
 // ---------- User Streaks (#6) ----------
@@ -520,9 +801,11 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
                 AVG(CASE WHEN question_type = 'motivation' THEN value END) as motivation_avg,
                 AVG(CASE WHEN question_type = 'focus' THEN value END) as focus_avg,
                 AVG(CASE WHEN question_type = 'stress' THEN value END) as stress_avg
-            FROM checkin_answers
-            WHERE created_at >= NOW() - INTERVAL '7 days'
-            GROUP BY user_id
+            FROM checkin_answers ca
+            JOIN users u ON u.id = ca.user_id
+            WHERE ca.created_at >= NOW() - INTERVAL '7 days'
+              AND u.is_active = true
+            GROUP BY ca.user_id
         ),
         per_user AS (
             SELECT
@@ -552,26 +835,33 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
 
 /// Get all users with Telegram ID (for broadcasting)
 pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
-    let users = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT id, telegram_id
         FROM users
         WHERE telegram_id IS NOT NULL
           AND role != 'ADMIN'
-        "#
+          AND is_active = true
+        "#,
     )
     .fetch_all(pool)
     .await?;
 
-    Ok(users
-        .into_iter()
-        .filter_map(|u| u.telegram_id.map(|tid| (u.id, tid)))
-        .collect())
+    let mut out = Vec::new();
+    for row in rows {
+        let user_id: Uuid = row.try_get("id")?;
+        let telegram_id: Option<i64> = row.try_get("telegram_id")?;
+        if let Some(telegram_id) = telegram_id {
+            out.push((user_id, telegram_id));
+        }
+    }
+
+    Ok(out)
 }
 
 // ---------- Kudos System (#17) ----------
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct KudosRecord {
     pub id: Uuid,
     pub from_user_id: Uuid,
@@ -579,6 +869,16 @@ pub struct KudosRecord {
     pub message: String,
     pub created_at: Option<DateTime<Utc>>,
     pub from_user_enc_name: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct KudosSentRecord {
+    pub id: Uuid,
+    pub from_user_id: Uuid,
+    pub to_user_id: Uuid,
+    pub message: String,
+    pub created_at: Option<DateTime<Utc>>,
+    pub to_user_enc_name: Vec<u8>,
 }
 
 /// Insert a new kudos
@@ -659,16 +959,55 @@ pub async fn get_user_by_telegram_id(pool: &PgPool, telegram_id: i64) -> Result<
 
 // ---------- All Users (#8) ----------
 
-/// Get all users (for admin/founder heatmap)
+/// Get all users (admin/founder scope, includes inactive)
 pub async fn get_all_users(pool: &PgPool) -> Result<Vec<DbUser>> {
-    let users = sqlx::query_as!(
-        DbUser,
+    let users = sqlx::query_as::<_, DbUser>(
         r#"
-        SELECT id, email, hash, telegram_id, role as "role: UserRole", enc_name, note, created_at
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
         FROM users
-        WHERE role != 'ADMIN'
         ORDER BY created_at ASC
-        "#
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(users)
+}
+
+/// Get active non-admin users (for team metrics/heatmap)
+pub async fn get_active_users(pool: &PgPool) -> Result<Vec<DbUser>> {
+    let users = sqlx::query_as::<_, DbUser>(
+        r#"
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
+        FROM users
+        WHERE is_active = true
+          AND role != 'ADMIN'
+        ORDER BY created_at ASC
+        "#,
     )
     .fetch_all(pool)
     .await?;
@@ -795,4 +1134,393 @@ pub async fn calculate_user_metrics_for_period(
         work_life_balance,
         stress_level,
     }))
+}
+
+// ---------- Pulse Rooms ----------
+
+pub async fn get_pulse_rooms(pool: &PgPool) -> Result<Vec<PulseRoom>> {
+    let rooms = sqlx::query_as::<_, PulseRoom>(
+        r#"
+        SELECT id, slug, title, description, require_moderation, created_at
+        FROM pulse_rooms
+        WHERE is_active = true
+        ORDER BY created_at ASC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rooms)
+}
+
+pub async fn get_pulse_room_by_slug(pool: &PgPool, slug: &str) -> Result<Option<PulseRoom>> {
+    let room = sqlx::query_as::<_, PulseRoom>(
+        r#"
+        SELECT id, slug, title, description, require_moderation, created_at
+        FROM pulse_rooms
+        WHERE slug = $1
+          AND is_active = true
+        "#,
+    )
+    .bind(slug)
+    .fetch_optional(pool)
+    .await?;
+    Ok(room)
+}
+
+pub async fn get_pulse_messages(
+    pool: &PgPool,
+    room_id: Uuid,
+    include_pending: bool,
+    limit: i64,
+) -> Result<Vec<PulseMessageRow>> {
+    let rows = if include_pending {
+        sqlx::query_as::<_, PulseMessageRow>(
+            r#"
+            SELECT id, room_id, user_id, enc_content, is_anonymous, status, moderation_reason, created_at
+            FROM pulse_messages
+            WHERE room_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(room_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as::<_, PulseMessageRow>(
+            r#"
+            SELECT id, room_id, user_id, enc_content, is_anonymous, status, moderation_reason, created_at
+            FROM pulse_messages
+            WHERE room_id = $1
+              AND status = 'APPROVED'
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(room_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?
+    };
+    Ok(rows)
+}
+
+pub async fn insert_pulse_message(
+    pool: &PgPool,
+    room_id: Uuid,
+    user_id: Uuid,
+    enc_content: &[u8],
+    is_anonymous: bool,
+    status: &str,
+    moderation_reason: Option<&str>,
+) -> Result<Uuid> {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO pulse_messages (id, room_id, user_id, enc_content, is_anonymous, status, moderation_reason)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "#,
+    )
+    .bind(id)
+    .bind(room_id)
+    .bind(user_id)
+    .bind(enc_content)
+    .bind(is_anonymous)
+    .bind(status)
+    .bind(moderation_reason)
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
+
+pub async fn update_pulse_message_status(
+    pool: &PgPool,
+    message_id: Uuid,
+    status: &str,
+    moderator_id: Uuid,
+    moderation_reason: Option<&str>,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        UPDATE pulse_messages
+        SET status = $1,
+            moderated_by = $2,
+            moderated_at = NOW(),
+            moderation_reason = $3
+        WHERE id = $4
+        "#,
+    )
+    .bind(status)
+    .bind(moderator_id)
+    .bind(moderation_reason)
+    .bind(message_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_pending_pulse_messages(
+    pool: &PgPool,
+    limit: i64,
+) -> Result<Vec<PulseMessageRow>> {
+    let rows = sqlx::query_as::<_, PulseMessageRow>(
+        r#"
+        SELECT id, room_id, user_id, enc_content, is_anonymous, status, moderation_reason, created_at
+        FROM pulse_messages
+        WHERE status = 'PENDING'
+        ORDER BY created_at DESC
+        LIMIT $1
+        "#,
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+// ---------- Wellness Goals + Plans ----------
+
+pub async fn get_user_goal_settings(pool: &PgPool, user_id: Uuid) -> Result<GoalSettings> {
+    let row = sqlx::query(
+        r#"
+        SELECT sleep_target, break_target, move_target, notifications_enabled
+        FROM user_goal_settings
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(row) = row {
+        Ok(GoalSettings {
+            sleep_target: row.try_get::<i16, _>("sleep_target")?,
+            break_target: row.try_get::<i16, _>("break_target")?,
+            move_target: row.try_get::<i16, _>("move_target")?,
+            notifications_enabled: row.try_get::<bool, _>("notifications_enabled")?,
+        })
+    } else {
+        Ok(GoalSettings {
+            sleep_target: 7,
+            break_target: 3,
+            move_target: 20,
+            notifications_enabled: true,
+        })
+    }
+}
+
+pub async fn upsert_user_goal_settings(
+    pool: &PgPool,
+    user_id: Uuid,
+    settings: &GoalSettings,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_goal_settings (user_id, sleep_target, break_target, move_target, notifications_enabled)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id) DO UPDATE
+        SET sleep_target = $2,
+            break_target = $3,
+            move_target = $4,
+            notifications_enabled = $5,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(settings.sleep_target)
+    .bind(settings.break_target)
+    .bind(settings.move_target)
+    .bind(settings.notifications_enabled)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_wellness_plan(
+    pool: &PgPool,
+    user_id: Uuid,
+    plan_date: NaiveDate,
+) -> Result<Option<WellnessPlan>> {
+    let row = sqlx::query(
+        r#"
+        SELECT id, plan_date, items, completed_at
+        FROM wellness_plans
+        WHERE user_id = $1
+          AND plan_date = $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(plan_date)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(row) = row {
+        Ok(Some(WellnessPlan {
+            id: row.try_get("id")?,
+            plan_date: row.try_get("plan_date")?,
+            items: row.try_get("items")?,
+            completed_at: row.try_get("completed_at")?,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub async fn upsert_wellness_plan(
+    pool: &PgPool,
+    user_id: Uuid,
+    plan_date: NaiveDate,
+    items: &serde_json::Value,
+) -> Result<WellnessPlan> {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO wellness_plans (user_id, plan_date, items)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, plan_date) DO UPDATE
+        SET items = EXCLUDED.items,
+            updated_at = NOW()
+        RETURNING id, plan_date, items, completed_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(plan_date)
+    .bind(items)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(WellnessPlan {
+        id: row.try_get("id")?,
+        plan_date: row.try_get("plan_date")?,
+        items: row.try_get("items")?,
+        completed_at: row.try_get("completed_at")?,
+    })
+}
+
+pub async fn mark_wellness_plan_completed(
+    pool: &PgPool,
+    user_id: Uuid,
+    plan_date: NaiveDate,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        UPDATE wellness_plans
+        SET completed_at = NOW(),
+            updated_at = NOW()
+        WHERE user_id = $1
+          AND plan_date = $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(plan_date)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn mark_plan_nudge_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    local_date: NaiveDate,
+) -> Result<bool> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, last_plan_nudge_date)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET last_plan_nudge_date = EXCLUDED.last_plan_nudge_date,
+            updated_at = NOW()
+        WHERE user_preferences.last_plan_nudge_date IS NULL
+           OR user_preferences.last_plan_nudge_date < EXCLUDED.last_plan_nudge_date
+        "#,
+    )
+    .bind(user_id)
+    .bind(local_date)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+// ---------- Kudos Insights ----------
+
+pub async fn get_recent_kudos_received(
+    pool: &PgPool,
+    user_id: Uuid,
+    days: i64,
+    limit: i64,
+) -> Result<Vec<KudosRecord>> {
+    let records = sqlx::query_as::<_, KudosRecord>(
+        r#"
+        SELECT k.id, k.from_user_id, k.to_user_id, k.message, k.created_at,
+               u.enc_name as from_user_enc_name
+        FROM kudos k
+        JOIN users u ON k.from_user_id = u.id
+        WHERE k.to_user_id = $1
+          AND k.created_at >= NOW() - ($2 || ' days')::INTERVAL
+        ORDER BY k.created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(user_id)
+    .bind(days.to_string())
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(records)
+}
+
+pub async fn get_recent_kudos_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    days: i64,
+    limit: i64,
+) -> Result<Vec<KudosSentRecord>> {
+    let records = sqlx::query_as::<_, KudosSentRecord>(
+        r#"
+        SELECT k.id, k.from_user_id, k.to_user_id, k.message, k.created_at,
+               u.enc_name as to_user_enc_name
+        FROM kudos k
+        JOIN users u ON k.to_user_id = u.id
+        WHERE k.from_user_id = $1
+          AND k.created_at >= NOW() - ($2 || ' days')::INTERVAL
+        ORDER BY k.created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(user_id)
+    .bind(days.to_string())
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(records)
+}
+
+// ---------- Wall Toxicity Signals ----------
+
+pub async fn insert_wall_toxic_signal(
+    pool: &PgPool,
+    post_id: Uuid,
+    severity: i16,
+    flagged: bool,
+    themes: &serde_json::Value,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO wall_toxic_signals (post_id, severity, flagged, themes)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (post_id) DO UPDATE
+        SET severity = EXCLUDED.severity,
+            flagged = EXCLUDED.flagged,
+            themes = EXCLUDED.themes,
+            created_at = NOW()
+        "#,
+    )
+    .bind(post_id)
+    .bind(severity)
+    .bind(flagged)
+    .bind(themes)
+    .execute(pool)
+    .await?;
+    Ok(())
 }

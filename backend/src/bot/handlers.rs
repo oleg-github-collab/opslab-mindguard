@@ -57,6 +57,14 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         .await?;
         return Ok(());
     };
+    if !user.is_active {
+        bot.send_message(
+            msg.chat.id,
+            "⛔ Ваш доступ до платформи призупинено. Зверніться до адміністратора.",
+        )
+        .await?;
+        return Ok(());
+    }
 
     if let Some(voice) = msg.voice() {
         let file_id = voice.file.id.clone();
@@ -126,7 +134,14 @@ async fn handle_voice(
 
     let transcript = state.ai.transcribe_voice(bytes).await?;
     let context = recent_context(&state, user_id).await.unwrap_or_default();
-    let outcome: AiOutcome = state.ai.analyze_transcript(&transcript, &context).await?;
+    let metrics = db::calculate_user_metrics(&state.pool, user_id)
+        .await
+        .ok()
+        .flatten();
+    let outcome: AiOutcome = state
+        .ai
+        .analyze_transcript(&transcript, &context, metrics.as_ref())
+        .await?;
     db::insert_voice_log(
         &state.pool,
         &state.crypto,

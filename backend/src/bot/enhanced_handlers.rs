@@ -1,8 +1,12 @@
 ///! Розширені handlers для Telegram бота з щоденними чекінами
+use crate::analytics::correlations;
 use crate::bot::daily_checkin::{CheckInGenerator, Metrics, MetricsCalculator};
+use crate::bot::markdown::mdv2;
 use crate::db;
 use crate::services::ai::AiOutcome;
+use crate::services::wellness;
 use crate::state::SharedState;
+use crate::time_utils;
 use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use chrono::{Datelike, Utc};
@@ -23,6 +27,61 @@ fn app_base_url() -> String {
         .or_else(|_| env::var("PUBLIC_BASE_URL"))
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
     raw.trim_end_matches('/').to_string()
+}
+
+fn env_chat_id(keys: &[&str]) -> Option<i64> {
+    for key in keys {
+        if let Ok(val) = env::var(key) {
+            if let Ok(id) = val.parse::<i64>() {
+                return Some(id);
+            }
+        }
+    }
+    None
+}
+
+fn bot_username() -> Option<String> {
+    env::var("BOT_USERNAME")
+        .ok()
+        .map(|raw| raw.trim().trim_start_matches('@').to_string())
+        .filter(|val| !val.is_empty())
+}
+
+fn is_group_command(text: &str, bot_name: Option<&str>) -> bool {
+    let trimmed = text.trim();
+    let commands = ["/mindguard", "/help", "/support"];
+    if commands.iter().any(|cmd| trimmed.starts_with(cmd)) {
+        return true;
+    }
+    if let Some(name) = bot_name {
+        return commands
+            .iter()
+            .any(|cmd| trimmed.starts_with(&format!("{cmd}@{name}")));
+    }
+    false
+}
+
+fn is_personal_request(text: &str) -> bool {
+    let lowered = text.to_lowercase();
+    let keywords = [
+        "/status",
+        "/checkin",
+        "/weblogin",
+        "мій",
+        "мої",
+        "моє",
+        "статист",
+        "метрик",
+        "дані",
+        "ризик",
+        "streak",
+        "status",
+        "checkin",
+        "my stats",
+        "my data",
+    ];
+
+    keywords.iter().any(|k| lowered.contains(k))
 }
 
 /// #5 Quick Actions after check-in
@@ -75,9 +134,9 @@ async fn send_quick_actions(
 
     bot.send_message(
         chat_id,
-        "💡 *На основі твоїх відповідей:*\n\nРекомендовані дії:",
+        mdv2("💡 На основі твоїх відповідей:\n\nРекомендовані дії:"),
     )
-    .parse_mode(ParseMode::Markdown)
+    .parse_mode(ParseMode::MarkdownV2)
     .reply_markup(keyboard)
     .await?;
 
@@ -96,94 +155,105 @@ async fn handle_action_callback(
         "meditation" => {
             bot.send_message(
                 msg.chat.id,
-                "🎵 *Meditation 5 min*\n\n\
-                1. Знайди тихе місце\n\
-                2. Заплющ очі\n\
-                3. Дихай 4-7-8:\n\
-                   • 4 сек вдих\n\
-                   • 7 сек затримка\n\
-                   • 8 сек видих\n\
-                4. Повтори 5 циклів\n\n\
-                _Це допоможе знизити стрес і заспокоїтись_ 🧘",
+                mdv2(
+                    "🎵 Meditation 5 min\n\n\
+                    1. Знайди тихе місце\n\
+                    2. Заплющ очі\n\
+                    3. Дихай 4-7-8:\n\
+                       • 4 сек вдих\n\
+                       • 7 сек затримка\n\
+                       • 8 сек видих\n\
+                    4. Повтори 5 циклів\n\n\
+                    Це допоможе знизити стрес і заспокоїтись 🧘",
+                ),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "walk" => {
             bot.send_message(
                 msg.chat.id,
-                "🚶 *10-хвилинна прогулянка*\n\n\
-                ✅ Покращує настрій на 20%\n\
-                ✅ Знижує stress\n\
-                ✅ Очищує голову\n\n\
-                Встав і йди ЗАРАЗ! Я нагадаю через 10 хв ⏰",
+                mdv2(
+                    "🚶 10-хвилинна прогулянка\n\n\
+                    ✅ Покращує настрій на 20%\n\
+                    ✅ Знижує stress\n\
+                    ✅ Очищує голову\n\n\
+                    Встав і йди ЗАРАЗ! Я нагадаю через 10 хв ⏰",
+                ),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "wall_post" => {
             let base_url = app_base_url();
             bot.send_message(
                 msg.chat.id,
-                format!(
-                    "📝 *Стіна плачу*\n\n\
-                    Поділись своїми думками анонімно:\n\
+                mdv2(format!(
+                    "📝 Стіна плачу\n\n\
+                    Поділись своїми думками анонімно або публічно:\n\
                     {}\n\n\
                     Написати голосовим сюди - також працює!",
                     base_url
-                ),
+                )),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "talk" => {
             bot.send_message(
                 msg.chat.id,
-                "💬 *Поговорити з кимось*\n\n\
-                Іноді розмова - найкраще рішення.\n\n\
-                Кому написати:\n\
-                • Твоєму керівнику\n\
-                • HR/Jane\n\
-                • Колезі, якому довіряєш\n\n\
-                Твоє здоров'я важливіше за все! 💚",
+                mdv2(
+                    "💬 Поговорити з кимось\n\n\
+                    Іноді розмова - найкраще рішення.\n\n\
+                    Кому написати:\n\
+                    • Твоєму керівнику\n\
+                    • HR/Jane\n\
+                    • Колезі, якому довіряєш\n\n\
+                    Твоє здоров'я важливіше за все! 💚",
+                ),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "sleep_tips" => {
             bot.send_message(
                 msg.chat.id,
-                "😴 *Поради для якісного сну:*\n\n\
-                1. Лягай в один час (10-11 PM)\n\
-                2. Вимкни екрани за 1 годину\n\
-                3. Температура 18-20°C\n\
-                4. Темрява повна\n\
-                5. Без кави після 14:00\n\
-                6. Легка вечеря за 2-3 години\n\n\
-                💡 Спробуй сьогодні!",
+                mdv2(
+                    "😴 Поради для якісного сну:\n\n\
+                    1. Лягай в один час (10-11 PM)\n\
+                    2. Вимкни екрани за 1 годину\n\
+                    3. Температура 18-20°C\n\
+                    4. Темрява повна\n\
+                    5. Без кави після 14:00\n\
+                    6. Легка вечеря за 2-3 години\n\n\
+                    💡 Спробуй сьогодні!",
+                ),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "vacation" => {
             bot.send_message(
                 msg.chat.id,
-                "🌴 *Час відпочити!*\n\n\
-                Твої показники вказують на burnout.\n\n\
-                Рекомендації:\n\
-                • Візьми 2-3 дні off\n\
-                • Повністю відключись від роботи\n\
-                • Займи улюбленою справою\n\n\
-                Поговори з Jane про відпустку! 💙",
+                mdv2(
+                    "🌴 Час відпочити!\n\n\
+                    Твої показники вказують на burnout.\n\n\
+                    Рекомендації:\n\
+                    • Візьми 2-3 дні off\n\
+                    • Повністю відключись від роботи\n\
+                    • Займи улюбленою справою\n\n\
+                    Поговори з Jane про відпустку! 💙",
+                ),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         "status" => {
             bot.send_message(
                 msg.chat.id,
-                "Використай команду /status щоб побачити детальну статистику! 📊",
+                mdv2("Використай команду /status щоб побачити детальну статистику! 📊"),
             )
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
         _ => {}
@@ -263,6 +333,22 @@ fn get_emoji_reaction(qtype: &str, value: i16) -> String {
             1..=2 => "🤗 Важко зараз... Ти не один",
             _ => "✅ Дякую",
         },
+        "reflection" => match value {
+            9..=10 => "🧭 Дякую за глибину. Це важливо.",
+            7..=8 => "💬 Ціную відкритість, це допомагає.",
+            5..=6 => "🫶 Дякую, що поділився.",
+            3..=4 => "💙 Звучить непросто. Ми поруч.",
+            1..=2 => "🤝 Тримайся. Якщо потрібно — напиши /support.",
+            _ => "✅ Дякую",
+        },
+        "support" => match value {
+            9..=10 => "🤝 Супер, є опора.",
+            7..=8 => "💙 Добре, що підтримка відчувається.",
+            5..=6 => "🫶 Якщо потрібно більше підтримки — скажи.",
+            3..=4 => "💬 Можемо подумати як додати підтримку.",
+            1..=2 => "🛟 Дуже важливо не залишатись одному. Ми поруч.",
+            _ => "✅ Дякую",
+        },
         _ => "✅ Відповідь збережена",
     }
     .to_string()
@@ -328,29 +414,39 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         let base_url = app_base_url();
         bot.send_message(
             msg.chat.id,
-            format!(
-                "👋 *Привіт! Ласкаво просимо до OpsLab Mindguard!*\n\n\
-                🧠 *Що це за платформа?*\n\
+            mdv2(format!(
+                "👋 Привіт! Ласкаво просимо до OpsLab Mindguard!\n\n\
+                🧠 Що це за платформа?\n\
                 OpsLab Mindguard - це платформа для моніторингу та підтримки ментального здоров'я команди.\n\n\
-                🔐 *Як почати?*\n\
+                🔐 Як почати?\n\
                 1. Перейдіть на платформу: {}\n\
-                2. Увійдіть за допомогою вашої *корпоративної пошти* та *унікального 4-значного коду*\n\
+                2. Увійдіть за допомогою вашої корпоративної пошти та унікального 4-значного коду\n\
                 3. Після входу ваш Telegram автоматично зв'яжеться з акаунтом!\n\n\
-                💡 *Підказка:* Ваш унікальний код ви отримали при реєстрації в команді.\n\n\
-                📋 *Доступні команди:*\n\
+                💡 Підказка: ваш унікальний код ви отримали при реєстрації в команді.\n\n\
+                📋 Доступні команди:\n\
                 /help - Показати всі команди\n\
                 /checkin - Пройти щоденний чекін\n\
                 /status - Подивитись свій стан\n\
                 /weblogin - Отримати посилання для входу\n\
-                /wall - Стіна плачу (анонімний фідбек)\n\n\
-                _Якщо ви не знаєте свій код - зверніться до адміністратора команди._",
+                /wall - Стіна плачу (анонімно або публічно)\n\n\
+                Якщо ви не знаєте свій код - зверніться до адміністратора команди.",
                 base_url
-            ),
+            )),
         )
-        .parse_mode(teloxide::types::ParseMode::Markdown)
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     };
+
+    if !user.is_active {
+        bot.send_message(
+            msg.chat.id,
+            "⛔ Ваш доступ до платформи призупинено.\n\
+            Якщо це помилка — зверніться до адміністратора або HR.",
+        )
+        .await?;
+        return Ok(());
+    }
 
     // Handle voice messages
     if let Some(voice) = msg.voice() {
@@ -393,6 +489,23 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             return Ok(());
         }
 
+        if text.starts_with("/timezone") {
+            let args = text.trim_start_matches("/timezone").trim();
+            handle_timezone_command(bot, &state, msg.chat.id, user.id, args).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/notify") {
+            let args = text.trim_start_matches("/notify").trim();
+            handle_notify_command(bot, &state, msg.chat.id, user.id, args).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/settings") {
+            send_settings(bot, &state, msg.chat.id, user.id).await?;
+            return Ok(());
+        }
+
         // #17 WOW Feature: Kudos System
         if text.starts_with("/kudos") {
             let args = text.trim_start_matches("/kudos").trim();
@@ -400,20 +513,55 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             return Ok(());
         }
 
+        if text.starts_with("/plan") {
+            send_wellness_plan(bot, &state, msg.chat.id, user.id).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/goals") {
+            let args = text.trim_start_matches("/goals").trim();
+            handle_goals_command(bot, &state, msg.chat.id, user.id, args).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/pulse") {
+            send_pulse_info(bot, msg.chat.id).await?;
+            return Ok(());
+        }
+
+        if text.starts_with("/insight") {
+            send_personal_insight(bot, &state, msg.chat.id, user.id).await?;
+            return Ok(());
+        }
+
         if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка")
         {
             bot.send_message(
                 msg.chat.id,
-                "💆 *Миттєва підтримка*\n\n\
-                Спробуйте дихання 4-7-8:\n\
-                • 4 секунди вдих\n\
-                • 7 секунд затримка\n\
-                • 8 секунд видих\n\
-                • Повторити 4 цикли\n\n\
-                Потім запишіть коротке голосове про те, як почуваєтесь.\n\n\
-                Якщо потрібна термінова допомога - зверніться до психолога або вашого керівника.",
+                mdv2(
+                    "📱 Команди бота:\n\n\
+                    /checkin - Щоденний чекін\n\
+                    /status - Поточний стан\n\
+                    /wall - Стіна плачу\n\
+                    /weblogin - Вхід у web dashboard\n\
+                    /settime - Час нагадувань\n\
+                    /timezone - Часовий пояс\n\
+                    /notify - Нагадування on/off\n\
+                    /settings - Налаштування\n\
+                    /kudos - Подяка колезі\n\
+                    /plan - План Wellness OS\n\
+                    /goals - Персональні цілі\n\
+                    /pulse - Pulse rooms\n\
+                    /insight - Персональний інсайт\n\n\
+                    🧑‍🤝‍🧑 У груповому чаті:\n\
+                    Звертайтесь до бота через /mindguard або @mention для загальних порад.\n\
+                    Персональні дані доступні лише в приваті.\n\n\
+                    💆 Миттєва підтримка\n\
+                    Дихання 4-7-8: 4с вдих → 7с затримка → 8с видих (4 цикли).\n\n\
+                    Якщо потрібна термінова допомога — зверніться до психолога або керівника.",
+                ),
             )
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
             return Ok(());
         }
@@ -421,15 +569,24 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         // Fallback
         bot.send_message(
             msg.chat.id,
-            "📱 *Команди бота:*\n\n\
-            /checkin - Щоденний чекін (2-3 хв)\n\
-            /status - Ваш поточний стан\n\
-            /wall - Стіна плачу\n\
-            /settime - Встановити час чекіну ⏰\n\
-            /kudos - Подякувати колезі 🎉\n\
-            /help - Допомога",
+            mdv2(
+                "📱 Команди бота:\n\n\
+                /checkin - Щоденний чекін (2-3 хв)\n\
+                /status - Ваш поточний стан\n\
+                /wall - Стіна плачу\n\
+                /settings - Налаштування\n\
+                /settime - Встановити час чекіну ⏰\n\
+                /timezone - Часовий пояс\n\
+                /notify - Нагадування on/off\n\
+                /kudos - Подякувати колезі 🎉\n\
+                /plan - План Wellness OS\n\
+                /goals - Персональні цілі\n\
+                /pulse - Pulse rooms\n\
+                /insight - Персональний інсайт\n\
+                /help - Допомога",
+            ),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
     }
 
@@ -460,37 +617,40 @@ async fn handle_pin_verification(
 
             bot.send_message(
                 chat_id,
-                format!(
-                    "✅ *Вітаємо, {}!*\n\n\
+                mdv2(format!(
+                    "✅ Вітаємо, {}!\n\n\
                     Telegram успішно підключено до вашого акаунту!\n\n\
                     🎉 Тепер ви будете отримувати:\n\
-                    • Щоденні чекіни о 10:00 AM\n\
+                    • Щоденні чекіни у вибраний час (за локальним часом)\n\
                     • Критичні сповіщення\n\
                     • Можливість відправляти голосові для AI аналізу\n\n\
-                    *Доступні команди:*\n\
+                    ⚙️ Налаштування часу та поясу: /settings\n\n\
+                    Доступні команди:\n\
                     /checkin - Пройти чекін зараз\n\
                     /status - Переглянути свої метрики\n\
                     /wall - Стіна плачу\n\
                     /help - Допомога\n\n\
-                    Побачимось завтра о 10:00! 👋",
+                    Побачимось у твій обраний час! 👋",
                     name
-                ),
+                )),
             )
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
         }
         Ok(None) => {
             // Invalid or expired PIN
             bot.send_message(
                 chat_id,
-                "❌ *Невірний або прострочений PIN-код*\n\n\
-                PIN-код дійсний тільки 5 хвилин.\n\n\
-                Будь ласка:\n\
-                1️⃣ Увійдіть на платформу знову\n\
-                2️⃣ Згенеруйте новий PIN-код\n\
-                3️⃣ Напишіть: `/start НОВИЙ-PIN`",
+                mdv2(
+                    "❌ Невірний або прострочений PIN-код\n\n\
+                    PIN-код дійсний тільки 5 хвилин.\n\n\
+                    Будь ласка:\n\
+                    1️⃣ Увійдіть на платформу знову\n\
+                    2️⃣ Згенеруйте новий PIN-код\n\
+                    3️⃣ Напишіть: /start НОВИЙ-PIN",
+                ),
             )
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
         }
         Err(e) => {
@@ -511,25 +671,32 @@ async fn handle_pin_verification(
 async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
     bot.send_message(
         chat_id,
-        "👋 *Привіт! Я OpsLab Mindguard Bot*\n\n\
-        Допомагаю відстежувати твоє ментальне здоров'я:\n\n\
-        🔹 *Щоденні чекіни* (2-3 хв) - автоматична розсилка о 10:00\n\
-        🔹 *Голосова підтримка* - запиши голосове і отримай аналіз\n\
-        🔹 *Стіна плачу* - анонімний зворотній зв'язок\n\
-        🔹 *Web dashboard* - детальна статистика\n\n\
-        *Головні команди:*\n\
-        /checkin - Пройти чекін зараз\n\
-        /status - Мій поточний стан\n\
-        /weblogin - Отримати посилання для входу в dashboard\n\
-        /wall - Стіна плачу\n\
-        /help - Допомога\n\n\
-        💡 *Швидкий старт:*\n\
-        1. Надішліть /weblogin для входу в web dashboard\n\
-        2. Отримайте персональне посилання (дійсне 5 хв)\n\
-        3. Переглядайте свої метрики та тренди!\n\n\
-        _Щоденні чекіни надсилаються автоматично о 10:00_",
+        mdv2(
+            "👋 Привіт! Я OpsLab Mindguard Bot\n\n\
+            Допомагаю відстежувати твоє ментальне здоров'я:\n\n\
+            🔹 Щоденні чекіни (2-3 хв) - автоматична розсилка у твій час\n\
+            🔹 Голосова підтримка - запиши голосове і отримай аналіз\n\
+            🔹 Стіна плачу - фідбек анонімно або публічно\n\
+            🔹 Web dashboard - детальна статистика\n\n\
+            Головні команди:\n\
+            /checkin - Пройти чекін зараз\n\
+            /status - Мій поточний стан\n\
+            /weblogin - Отримати посилання для входу в dashboard\n\
+            /wall - Стіна плачу\n\
+            /plan - План Wellness OS\n\
+            /goals - Персональні цілі\n\
+            /pulse - Pulse rooms\n\
+            /insight - Персональний інсайт\n\
+            /settings - Налаштування та час нагадувань\n\
+            /help - Допомога\n\n\
+            💡 Швидкий старт:\n\
+            1. Надішліть /weblogin для входу в web dashboard\n\
+            2. Отримайте персональне посилання (дійсне 5 хв)\n\
+            3. Переглядайте свої метрики та тренди!\n\n\
+            Час нагадувань можна змінити в /settings або /settime",
+        ),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
     Ok(())
 }
@@ -560,12 +727,12 @@ pub async fn start_daily_checkin(
     // Відправка привітання
     bot.send_message(
         chat_id,
-        format!(
-            "📋 *Щоденний чекін*\n\n{}\n\n⏱️ Займе {}",
+        mdv2(format!(
+            "📋 Щоденний чекін\n\n{}\n\n⏱️ Займе {}",
             checkin.intro_message, checkin.estimated_time
-        ),
+        )),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
 
     // Відправка першого питання
@@ -616,15 +783,15 @@ async fn send_checkin_question(
 
     bot.send_message(
         chat_id,
-        format!(
-            "{} *Питання {}/{}*\n\n{}\n\n_Оцініть від 1 до 10_",
+        mdv2(format!(
+            "{} Питання {}/{}\n\n{}\n\nОцініть від 1 до 10",
             question.emoji,
             question_index + 1,
             checkin.questions.len(),
             question.text
-        ),
+        )),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .reply_markup(keyboard)
     .await?;
 
@@ -665,6 +832,12 @@ async fn handle_callback(
                 };
 
                 if let Ok(Some(user)) = db::find_user_by_telegram(&state.pool, telegram_id).await {
+                    if !user.is_active {
+                        bot.answer_callback_query(&callback.id)
+                            .text("⛔ Доступ призупинено. Зверніться до адміністратора.")
+                            .await?;
+                        return Ok(());
+                    }
                     // Знайти питання за ID в поточному чекіні
                     if let Some(question) = checkin.questions.iter().find(|q| q.id == question_id) {
                         // Зберегти відповідь в БД
@@ -707,18 +880,25 @@ async fn handle_callback(
 
                             bot.send_message(
                                 msg.chat.id,
-                                "✅ *Чекін завершено! Дякую!* 🙏\n\n\
+                                mdv2(
+                                    "✅ Чекін завершено! Дякую! 🙏\n\n\
                                 Твої дані збережені та будуть використані для аналізу.\n\
                                 Продовжуй проходити щоденні чекіни для повної картини.\n\n\
                                 Побачимось завтра! 👋",
+                                ),
                             )
-                            .parse_mode(teloxide::types::ParseMode::Markdown)
+                            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                             .await?;
 
                             // #5 WOW Feature: Quick Actions after check-in
                             send_quick_actions(bot, &state, msg.chat.id, user.id)
                                 .await
                                 .ok();
+
+                            // Gentle nudge for Wellness OS plan
+                            if let Err(e) = maybe_send_plan_nudge(bot, &state, msg.chat.id, user.id).await {
+                                tracing::warn!("Failed to send plan nudge: {}", e);
+                            }
 
                             // Перевірити чи потрібно надіслати критичний алерт
                             let count =
@@ -733,15 +913,17 @@ async fn handle_callback(
                                         // Сповістити користувача
                                         bot.send_message(
                                             msg.chat.id,
-                                            "⚠️ *Важливе повідомлення*\n\n\
+                                            mdv2(
+                                                "⚠️ Важливе повідомлення\n\n\
                                             Твої показники вказують на необхідність звернення до фахівця.\n\n\
                                             Рекомендуємо:\n\
                                             • Поговорити з керівником\n\
                                             • Звернутися до психолога\n\
                                             • Взяти відпочинок\n\n\
-                                            Твоє здоров'я - найважливіше! 💚"
+                                            Твоє здоров'я - найважливіше! 💚",
+                                            )
                                         )
-                                        .parse_mode(teloxide::types::ParseMode::Markdown)
+                                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                                         .await?;
                                     }
                                 }
@@ -802,15 +984,15 @@ async fn send_user_status(
     let Some(metrics) = metrics else {
         bot.send_message(
             chat_id,
-            format!(
-                "📊 *Твій статус*\n\n\
+            mdv2(format!(
+                "📊 Твій статус\n\n\
                 Чекінів пройдено: {}\n\
                 Потрібно мінімум 7 днів (21 відповідь) для повної картини.\n\n\
                 Продовжуй проходити щоденні чекіни! 💪",
                 answer_count
-            ),
+            )),
         )
-        .parse_mode(teloxide::types::ParseMode::Markdown)
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     };
@@ -825,9 +1007,9 @@ async fn send_user_status(
 
     bot.send_message(
         chat_id,
-        format!(
-            "📊 *Твій статус за останній тиждень*\n\n\
-            {} Рівень ризику: *{}*\n\n\
+        mdv2(format!(
+            "📊 Твій статус за останній тиждень\n\n\
+            {} Рівень ризику: {}\n\n\
             🌟 Благополуччя (WHO-5): {}/100\n\
             😔 Депресія (PHQ-9): {}/27\n\
             😰 Тривожність (GAD-7): {}/21\n\
@@ -835,7 +1017,7 @@ async fn send_user_status(
             😴 Сон: {:.1}h (якість {:.1}/10)\n\
             ⚖️ Work-Life Balance: {:.1}/10\n\
             ⚠️ Рівень стресу: {:.1}/40\n\n\
-            _Дані за {} відповідей_",
+            Дані за {} відповідей",
             risk_emoji,
             risk,
             metrics.who5_score,
@@ -847,9 +1029,9 @@ async fn send_user_status(
             metrics.work_life_balance,
             metrics.stress_level,
             answer_count
-        ),
+        )),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
 
     // Якщо критичні показники - надіслати алерт
@@ -865,16 +1047,16 @@ async fn send_wall_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
     let base_url = app_base_url();
     bot.send_message(
         chat_id,
-        format!(
-            "📝 *Стіна плачу*\n\n\
-            Місце для анонімного зворотного зв'язку.\n\
+        mdv2(format!(
+            "📝 Стіна плачу\n\n\
+            Простір для чесного зворотного зв'язку.\n\
             Поділися своїми думками, ідеями або переживаннями.\n\n\
-            Всі пости анонімні та конфіденційні.\n\n\
+            Можна публікувати анонімно або публічно (з ім'ям) у web.\n\n\
             🔗 {}",
             base_url
-        ),
+        )),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
     Ok(())
 }
@@ -905,16 +1087,16 @@ async fn send_web_login_link(
 
     bot.send_message(
         chat_id,
-        format!(
-            "🔐 *Ваше персональне посилання для входу:*\n\n\
+        mdv2(format!(
+            "🔐 Ваше персональне посилання для входу:\n\n\
             {}\n\n\
             ⏱ Посилання дійсне 5 хвилин\n\
             🔒 Одноразове використання\n\n\
             Просто перейдіть за посиланням - вхід виконається автоматично!",
             login_url
-        ),
+        )),
     )
-    .parse_mode(teloxide::types::ParseMode::Markdown)
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
 
     Ok(())
@@ -927,23 +1109,19 @@ async fn send_critical_alert(
     user_id: Uuid,
     metrics: &Metrics,
 ) -> Result<()> {
-    let admin_id = env::var("ADMIN_TELEGRAM_ID")
-        .ok()
-        .and_then(|v| v.parse::<i64>().ok());
-    let jane_id = env::var("JANE_TELEGRAM_ID")
-        .ok()
-        .and_then(|v| v.parse::<i64>().ok());
+    let admin_id = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]);
+    let jane_id = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]);
 
-    let alert_message = format!(
-        "🚨 *КРИТИЧНИЙ АЛЕРТ!*\n\n\
+    let alert_message = mdv2(format!(
+        "🚨 КРИТИЧНИЙ АЛЕРТ!\n\n\
         Користувач: {}\n\n\
-        📊 *Критичні показники:*\n\
+        📊 Критичні показники:\n\
         • WHO-5 (благополуччя): {}/100\n\
         • PHQ-9 (депресія): {}/27\n\
         • GAD-7 (тривожність): {}/21\n\
         • MBI (вигорання): {:.1}%\n\
         • Стрес: {:.1}/40\n\n\
-        ⚠️ *ТЕРМІНОВА ДІЯ НЕОБХІДНА!*\n\n\
+        ⚠️ ТЕРМІНОВА ДІЯ НЕОБХІДНА!\n\n\
         Рекомендації:\n\
         1. Негайна консультація з психологом\n\
         2. Зменшення робочого навантаження\n\
@@ -954,20 +1132,20 @@ async fn send_critical_alert(
         metrics.gad7_score,
         metrics.mbi_score,
         metrics.stress_level
-    );
+    ));
 
     // Відправка Олегу (admin)
     if let Some(admin) = admin_id {
-        bot.send_message(ChatId(admin), &alert_message)
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+        bot.send_message(ChatId(admin), alert_message.clone())
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await
             .ok();
     }
 
     // Відправка Джейн (manager)
     if let Some(jane) = jane_id {
-        bot.send_message(ChatId(jane), &alert_message)
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+        bot.send_message(ChatId(jane), alert_message.clone())
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await
             .ok();
     }
@@ -983,13 +1161,56 @@ async fn handle_voice(
     user_id: Uuid,
     file_id: String,
 ) -> Result<()> {
+    bot.send_message(
+        msg.chat.id,
+        "🎧 Отримав голосове. Аналізую, це займе до 30 секунд...",
+    )
+    .await?;
+
     let file = bot.get_file(file_id).await?;
     let mut bytes: Vec<u8> = Vec::new();
     bot.download_file(&file.path, &mut bytes).await?;
 
-    let transcript = state.ai.transcribe_voice(bytes).await?;
+    let transcript = match state.ai.transcribe_voice(bytes).await {
+        Ok(text) => text,
+        Err(e) => {
+            tracing::error!("Voice transcription failed: {}", e);
+            bot.send_message(
+                msg.chat.id,
+                "Не вдалося розпізнати голосове. Спробуй ще раз або напиши текстом.",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
     let context = recent_context(&state, user_id).await.unwrap_or_default();
-    let outcome: AiOutcome = state.ai.analyze_transcript(&transcript, &context).await?;
+    let metrics = db::calculate_user_metrics(&state.pool, user_id)
+        .await
+        .ok()
+        .flatten();
+
+    let outcome: AiOutcome = match state
+        .ai
+        .analyze_transcript(&transcript, &context, metrics.as_ref())
+        .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            tracing::error!("Voice analysis failed: {}", e);
+            AiOutcome {
+                transcript: transcript.clone(),
+                ai_json: json!({
+                    "sentiment": "unknown",
+                    "emotion_tags": [],
+                    "risk_score": 1,
+                    "topics": [],
+                    "advice": "Дякую, що поділився. Зроби коротку паузу, попий води та обери одну маленьку дію на зараз."
+                }),
+                risk_score: 1,
+                urgent: false,
+            }
+        }
+    };
     db::insert_voice_log(
         &state.pool,
         &state.crypto,
@@ -1001,16 +1222,51 @@ async fn handle_voice(
     )
     .await?;
 
+    let advice = outcome
+        .ai_json
+        .get("advice")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Зроби коротку паузу та подбай про себе.");
+    let sentiment = outcome
+        .ai_json
+        .get("sentiment")
+        .and_then(|v| v.as_str())
+        .unwrap_or("невідомо");
+    let emotion_tags = outcome
+        .ai_json
+        .get("emotion_tags")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "—".to_string());
+    let topics = outcome
+        .ai_json
+        .get("topics")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "—".to_string());
+
     bot.send_message(
         msg.chat.id,
         format!(
-            "Дякуємо! Аналіз виконано. Ризик: {}/10. Порада: {}",
-            outcome.risk_score,
-            outcome
-                .ai_json
-                .get("advice")
-                .and_then(|v| v.as_str())
-                .unwrap_or("залишайтесь на зв'язку")
+            "🎧 Голосовий аналіз готовий.\n\n\
+            Стан: {sentiment}\n\
+            Емоції: {emotion_tags}\n\
+            Теми: {topics}\n\
+            Ризик: {}/10\n\n\
+            Порада на сьогодні: {advice}",
+            outcome.risk_score
         ),
     )
     .await?;
@@ -1021,12 +1277,16 @@ async fn handle_voice(
             "⚠️ Високий ризик: зробіть паузу 5 хв. Практика: 4-7-8 дихання + складіть 3 пункти плану на найближчу годину. Якщо потрібно — напишіть \"паніка\" щоб отримати швидку підтримку.",
         )
         .await?;
-        if let Some(admin_id) = env::var("ADMIN_TELEGRAM_ID")
-            .ok()
-            .and_then(|v| v.parse::<i64>().ok())
-        {
+        if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
             bot.send_message(
                 ChatId(admin_id),
+                format!("⚠️ URGENT | User {user_id} flagged risk_score=10"),
+            )
+            .await?;
+        }
+        if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
+            bot.send_message(
+                ChatId(jane_id),
                 format!("⚠️ URGENT | User {user_id} flagged risk_score=10"),
             )
             .await?;
@@ -1038,14 +1298,53 @@ async fn handle_voice(
 
 async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> Result<()> {
     if let Some(text) = msg.text() {
-        let bot_name = env::var("BOT_USERNAME").unwrap_or_default();
-        if !bot_name.is_empty() && !text.contains(&bot_name) {
-            return Ok(()); // ignore messages without mention
+        let bot_name = bot_username();
+        let mention = bot_name
+            .as_ref()
+            .map(|name| format!("@{name}"))
+            .unwrap_or_default();
+        let is_reply_to_bot = msg
+            .reply_to_message()
+            .and_then(|m| m.from())
+            .map(|u| u.is_bot)
+            .unwrap_or(false);
+        let has_mention = !mention.is_empty() && text.contains(&mention);
+        let is_command = is_group_command(text, bot_name.as_deref());
+
+        if !is_reply_to_bot && !has_mention && !is_command {
+            return Ok(());
+        }
+
+        if is_personal_request(text) {
+            bot.send_message(
+                msg.chat.id,
+                "🔒 Персональні метрики та чекіни доступні лише у приватному чаті.\n\
+                Напиши мені в особисті повідомлення: /start",
+            )
+            .await?;
+            return Ok(());
+        }
+
+        let trimmed = text.trim();
+        if is_command
+            && (trimmed == "/mindguard"
+                || trimmed.starts_with("/mindguard@")
+                || trimmed == "/help"
+                || trimmed.starts_with("/help@"))
+        {
+            bot.send_message(
+                msg.chat.id,
+                "💬 Я можу допомогти з загальними порадами у групі.\n\
+                Напиши питання після /mindguard або з @mention.\n\
+                Наприклад: /mindguard як зняти стрес?",
+            )
+            .await?;
+            return Ok(());
         }
 
         // Проста логіка відповідей
         let response = if text.contains("стрес") || text.contains("тривога") {
-            "💆 *Поради при стресі:*\n\n\
+            "💆 Поради при стресі:\n\n\
             1. Зроби глибокий вдих (4-7-8)\n\
             2. Вийди на прогулянку\n\
             3. Поговори з колегою\n\
@@ -1053,7 +1352,7 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
             Пам'ятай: /checkin для відстеження стану"
                 .to_string()
         } else if text.contains("втома") || text.contains("вигорання") {
-            "🔥 *При вигоранні:*\n\n\
+            "🔥 При вигоранні:\n\n\
             1. Візьми відпочинок\n\
             2. Встанови межі\n\
             3. Делегуй задачі\n\
@@ -1072,8 +1371,8 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
                 })
         };
 
-        bot.send_message(msg.chat.id, response)
-            .parse_mode(teloxide::types::ParseMode::Markdown)
+        bot.send_message(msg.chat.id, mdv2(response))
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
     }
     Ok(())
@@ -1117,37 +1416,63 @@ async fn handle_settime_command(
     args: &str,
 ) -> Result<()> {
     if args.is_empty() {
+        let prefs = db::get_user_preferences(&state.pool, user_id)
+            .await
+            .unwrap_or(crate::db::UserPreferences {
+                reminder_hour: 10,
+                reminder_minute: 0,
+                timezone: "Europe/Kyiv".to_string(),
+                notification_enabled: true,
+                last_reminder_date: None,
+                last_plan_nudge_date: None,
+            });
         bot.send_message(
             chat_id,
-            "⏰ *Встановити час чекіну*\n\n\
-            Формат: `/settime ГГ:ХХ` або `/settime auto`\n\n\
-            Приклади:\n\
-            • `/settime 09:00` - щодня о 9:00\n\
-            • `/settime 14:30` - щодня о 14:30\n\
-            • `/settime auto` - автоматично визначити найкращий час\n\n\
-            Поточний час: 10:00 (за замовчуванням)",
+            mdv2(format!(
+                "⏰ Встановити час чекіну\n\n\
+                Формат: /settime ГГ:ХХ або /settime auto\n\n\
+                Приклади:\n\
+                • /settime 09:00 - щодня о 9:00\n\
+                • /settime 14:30 - щодня о 14:30\n\
+                • /settime auto - автоматично визначити найкращий час\n\n\
+                Поточний час: {:02}:{:02} ({})",
+                prefs.reminder_hour,
+                prefs.reminder_minute,
+                prefs.timezone
+            )),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     }
 
     if args == "auto" {
         // Автоматичний вибір часу на основі активності
-        let (hour, minute) = db::calculate_best_reminder_time(&state.pool, user_id).await?;
+        let prefs = db::get_user_preferences(&state.pool, user_id)
+            .await
+            .unwrap_or(crate::db::UserPreferences {
+                reminder_hour: 10,
+                reminder_minute: 0,
+                timezone: "Europe/Kyiv".to_string(),
+                notification_enabled: true,
+                last_reminder_date: None,
+                last_plan_nudge_date: None,
+            });
+        let (hour, minute) =
+            db::calculate_best_reminder_time_local(&state.pool, user_id, &prefs.timezone).await?;
 
         db::set_user_reminder_time(&state.pool, user_id, hour, minute).await?;
 
         bot.send_message(
             chat_id,
-            format!(
-                "✅ *Встановлено автоматичний час!*\n\n\
-                На основі твоєї активності найкращий час: *{:02}:{:02}*\n\n\
+            mdv2(format!(
+                "✅ Встановлено автоматичний час!\n\n\
+                На основі твоєї активності найкращий час: {:02}:{:02} ({})\n\n\
                 Завтра отримаєш чекін саме тоді! ⏰",
-                hour, minute
-            ),
+                hour, minute, prefs.timezone
+            )),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
 
         return Ok(());
@@ -1158,9 +1483,9 @@ async fn handle_settime_command(
     if parts.len() != 2 {
         bot.send_message(
             chat_id,
-            "❌ Неправильний формат.\n\nВикористай: `/settime 09:00` або `/settime auto`",
+            mdv2("❌ Неправильний формат.\n\nВикористай: /settime 09:00 або /settime auto"),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     }
@@ -1191,16 +1516,27 @@ async fn handle_settime_command(
 
     db::set_user_reminder_time(&state.pool, user_id, hour, minute).await?;
 
+    let prefs = db::get_user_preferences(&state.pool, user_id)
+        .await
+        .unwrap_or(crate::db::UserPreferences {
+            reminder_hour: hour,
+            reminder_minute: minute,
+            timezone: "Europe/Kyiv".to_string(),
+            notification_enabled: true,
+            last_reminder_date: None,
+            last_plan_nudge_date: None,
+        });
+
     bot.send_message(
         chat_id,
-        format!(
-            "✅ *Час чекіну оновлено!*\n\n\
-            Новий час: *{:02}:{:02}*\n\
+        mdv2(format!(
+            "✅ Час чекіну оновлено!\n\n\
+            Новий час: {:02}:{:02} ({})\n\
             Завтра отримаєш чекін саме тоді! ⏰",
-            hour, minute
-        ),
+            hour, minute, prefs.timezone
+        )),
     )
-    .parse_mode(ParseMode::Markdown)
+    .parse_mode(ParseMode::MarkdownV2)
     .await?;
 
     Ok(())
@@ -1217,13 +1553,15 @@ async fn handle_kudos_command(
     if args.is_empty() {
         bot.send_message(
             chat_id,
-            "🎉 *Kudos - подяка колезі!*\n\n\
-            Формат: `/kudos @email повідомлення`\n\n\
+            mdv2(
+                "🎉 Kudos - подяка колезі!\n\n\
+            Формат: /kudos @email повідомлення\n\n\
             Приклад:\n\
-            `/kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙`\n\n\
+            /kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙\n\n\
             Колега отримає твоє повідомлення в Telegram!",
+            ),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     }
@@ -1233,11 +1571,13 @@ async fn handle_kudos_command(
     if parts.len() < 2 {
         bot.send_message(
             chat_id,
-            "❌ Неправильний формат.\n\n\
-            Використай: `/kudos @email повідомлення`\n\n\
-            Приклад: `/kudos @jane.davydiuk@opslab.uk дякую! 💙`",
+            mdv2(
+                "❌ Неправильний формат.\n\n\
+            Використай: /kudos @email повідомлення\n\n\
+            Приклад: /kudos @jane.davydiuk@opslab.uk дякую! 💙",
+            ),
         )
-        .parse_mode(ParseMode::Markdown)
+        .parse_mode(ParseMode::MarkdownV2)
         .await?;
         return Ok(());
     }
@@ -1273,9 +1613,9 @@ async fn handle_kudos_command(
     // Notify sender
     bot.send_message(
         chat_id,
-        format!("✅ Kudos відправлено *{}*! 🎉", recipient_email),
+        mdv2(format!("✅ Kudos відправлено {}! 🎉", recipient_email)),
     )
-    .parse_mode(ParseMode::Markdown)
+    .parse_mode(ParseMode::MarkdownV2)
     .await?;
 
     // Notify recipient (if has Telegram)
@@ -1289,17 +1629,452 @@ async fn handle_kudos_command(
 
             bot.send_message(
                 ChatId(recipient_tg_id),
-                format!(
-                    "🎉 *Kudos від {}!*\n\n\
+                mdv2(format!(
+                    "🎉 Kudos від {}!\n\n\
                     {}\n\n\
-                    _Продовжуй в тому ж дусі!_ 💪",
+                    Продовжуй в тому ж дусі! 💪",
                     sender_name, kudos_message
-                ),
+                )),
             )
-            .parse_mode(ParseMode::Markdown)
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
     }
+
+    Ok(())
+}
+
+async fn send_wellness_plan(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    let prefs = db::get_user_preferences(&state.pool, user_id)
+        .await
+        .unwrap_or(crate::db::UserPreferences {
+            reminder_hour: 10,
+            reminder_minute: 0,
+            timezone: "Europe/Kyiv".to_string(),
+            notification_enabled: true,
+            last_reminder_date: None,
+            last_plan_nudge_date: None,
+        });
+    let (local_date, _, _) = time_utils::local_components(&prefs.timezone, Utc::now());
+
+    let mut plan = db::get_wellness_plan(&state.pool, user_id, local_date).await?;
+    let goals = db::get_user_goal_settings(&state.pool, user_id).await?;
+    let metrics = db::calculate_user_metrics(&state.pool, user_id)
+        .await
+        .ok()
+        .flatten();
+
+    if plan.is_none() {
+        let items = wellness::generate_daily_plan(metrics.as_ref(), &goals);
+        let items_json = serde_json::to_value(&items).unwrap_or_else(|_| serde_json::json!([]));
+        plan = Some(db::upsert_wellness_plan(&state.pool, user_id, local_date, &items_json).await?);
+    }
+
+    let plan = plan.unwrap();
+    let items: Vec<wellness::PlanItem> =
+        serde_json::from_value(plan.items).unwrap_or_else(|_| Vec::new());
+    let plan_text = wellness::plan_to_text(&items);
+    let completed = if plan.completed_at.is_some() {
+        "✅ План відмічено виконаним."
+    } else {
+        "Позначити виконання можна у web або командою /plan після завершення."
+    };
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "🌿 Wellness OS · План на сьогодні\n\n{}\n\n{}",
+            plan_text, completed
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+
+    db::mark_plan_nudge_sent(&state.pool, user_id, local_date)
+        .await
+        .ok();
+
+    Ok(())
+}
+
+async fn handle_goals_command(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+    args: &str,
+) -> Result<()> {
+    let mut current = db::get_user_goal_settings(&state.pool, user_id).await?;
+
+    if args.is_empty() {
+        bot.send_message(
+            chat_id,
+            mdv2(format!(
+                "🎯 Твої цілі\n\n\
+                Сон: {} год/ніч\n\
+                Пауза: {} раз/день\n\
+                Рух: {} хв/день\n\
+                Gentle nudges: {}\n\n\
+                Оновити:\n\
+                /goals sleep=7 breaks=3 move=20 nudges=on\n\
+                або /goals 7 3 20",
+                current.sleep_target,
+                current.break_target,
+                current.move_target,
+                if current.notifications_enabled { "on" } else { "off" }
+            )),
+        )
+        .parse_mode(ParseMode::MarkdownV2)
+        .await?;
+        return Ok(());
+    }
+
+    let mut sleep = None;
+    let mut breaks = None;
+    let mut move_target = None;
+    let mut nudges = None;
+
+    let parts: Vec<&str> = args.split_whitespace().collect();
+    let mut numeric_parts = Vec::new();
+    for part in parts {
+        if let Some((key, val)) = part.split_once('=') {
+            match key {
+                "sleep" => sleep = val.parse::<i16>().ok(),
+                "breaks" => breaks = val.parse::<i16>().ok(),
+                "move" => move_target = val.parse::<i16>().ok(),
+                "nudges" | "notify" => {
+                    nudges = Some(matches!(val, "on" | "true" | "yes"))
+                }
+                _ => {}
+            }
+        } else {
+            numeric_parts.push(part);
+        }
+    }
+
+    if sleep.is_none() && breaks.is_none() && move_target.is_none() && !numeric_parts.is_empty() {
+        if numeric_parts.len() >= 1 {
+            sleep = numeric_parts[0].parse::<i16>().ok();
+        }
+        if numeric_parts.len() >= 2 {
+            breaks = numeric_parts[1].parse::<i16>().ok();
+        }
+        if numeric_parts.len() >= 3 {
+            move_target = numeric_parts[2].parse::<i16>().ok();
+        }
+    }
+
+    if let Some(val) = sleep {
+        current.sleep_target = val.clamp(4, 10);
+    }
+    if let Some(val) = breaks {
+        current.break_target = val.clamp(1, 10);
+    }
+    if let Some(val) = move_target {
+        current.move_target = val.clamp(5, 120);
+    }
+    if let Some(val) = nudges {
+        current.notifications_enabled = val;
+    }
+
+    db::upsert_user_goal_settings(&state.pool, user_id, &current).await?;
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "✅ Цілі оновлено\n\n\
+            Сон: {} год\n\
+            Пауза: {} раз\n\
+            Рух: {} хв\n\
+            Gentle nudges: {}",
+            current.sleep_target,
+            current.break_target,
+            current.move_target,
+            if current.notifications_enabled { "on" } else { "off" }
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+
+    Ok(())
+}
+
+async fn send_pulse_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
+    let base_url = app_base_url();
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "🗣 Pulse rooms\n\n\
+            Анонімні командні обговорення з модерацією.\n\
+            Перейди у web та відкрий Pulse Rooms.\n\n\
+            🔗 {base_url}"
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+    Ok(())
+}
+
+async fn send_personal_insight(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    let metrics = db::calculate_user_metrics(&state.pool, user_id)
+        .await
+        .ok()
+        .flatten();
+
+    let Some(metrics) = metrics else {
+        bot.send_message(
+            chat_id,
+            "Потрібно більше чекінів для персонального інсайту. Спробуй /checkin кілька днів.",
+        )
+        .await?;
+        return Ok(());
+    };
+
+    let correlations = correlations::analyze_correlations(&state.pool, user_id)
+        .await
+        .unwrap_or_default();
+
+    let insight = state
+        .ai
+        .generate_personal_insight(&metrics, &correlations)
+        .await
+        .unwrap_or_else(|_| {
+            "Оціни сьогоднішній стрес, додай коротку паузу та одну маленьку перемогу."
+                .to_string()
+        });
+
+    bot.send_message(chat_id, mdv2(format!("✨ Персональний інсайт\n\n{insight}")))
+        .parse_mode(ParseMode::MarkdownV2)
+        .await?;
+
+    Ok(())
+}
+
+async fn maybe_send_plan_nudge(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    let goals = db::get_user_goal_settings(&state.pool, user_id).await?;
+    if !goals.notifications_enabled {
+        return Ok(());
+    }
+
+    let prefs = db::get_user_preferences(&state.pool, user_id).await?;
+    let (local_date, _, _) = time_utils::local_components(&prefs.timezone, Utc::now());
+    if prefs.last_plan_nudge_date == Some(local_date) {
+        return Ok(());
+    }
+
+    let mut plan = db::get_wellness_plan(&state.pool, user_id, local_date).await?;
+    let metrics = db::calculate_user_metrics(&state.pool, user_id)
+        .await
+        .ok()
+        .flatten();
+
+    if plan.is_none() {
+        let items = wellness::generate_daily_plan(metrics.as_ref(), &goals);
+        let items_json = serde_json::to_value(&items).unwrap_or_else(|_| serde_json::json!([]));
+        plan = Some(db::upsert_wellness_plan(&state.pool, user_id, local_date, &items_json).await?);
+    }
+
+    let plan = plan.unwrap();
+    if plan.completed_at.is_some() {
+        return Ok(());
+    }
+
+    let items: Vec<wellness::PlanItem> =
+        serde_json::from_value(plan.items).unwrap_or_else(|_| Vec::new());
+    if items.is_empty() {
+        return Ok(());
+    }
+
+    let preview = items
+        .iter()
+        .take(3)
+        .enumerate()
+        .map(|(idx, item)| format!("{}. {}", idx + 1, item.title))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "🌿 Wellness OS\n\n\
+            Твій план на сьогодні вже готовий:\n\
+            {}\n\n\
+            Деталі: /plan",
+            preview
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+
+    db::mark_plan_nudge_sent(&state.pool, user_id, local_date)
+        .await
+        .ok();
+
+    Ok(())
+}
+
+/// /timezone command - set user's timezone
+async fn handle_timezone_command(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+    args: &str,
+) -> Result<()> {
+    if args.is_empty() {
+        bot.send_message(
+            chat_id,
+            mdv2(
+                "🌍 Часовий пояс\n\n\
+            Формат: /timezone Europe/Kyiv або /timezone UTC+2\n\n\
+            Приклади:\n\
+            • /timezone Europe/Kyiv\n\
+            • /timezone Europe/Warsaw\n\
+            • /timezone UTC+2\n\n\
+            Підказка: список IANA таймзон https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+            ),
+        )
+        .parse_mode(ParseMode::MarkdownV2)
+        .await?;
+        return Ok(());
+    }
+
+    let normalized = match time_utils::normalize_timezone(args) {
+        Some(value) => value,
+        None => {
+            bot.send_message(
+                chat_id,
+                mdv2("❌ Невірний часовий пояс. Спробуй Europe/Kyiv або UTC+2."),
+            )
+            .parse_mode(ParseMode::MarkdownV2)
+            .await?;
+            return Ok(());
+        }
+    };
+
+    db::set_user_timezone(&state.pool, user_id, &normalized).await?;
+
+    let now_local = time_utils::format_local_time(&normalized, chrono::Utc::now());
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "✅ Часовий пояс оновлено: {}\n\
+            Поточний локальний час: {}",
+            normalized, now_local
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+
+    Ok(())
+}
+
+/// /notify command - enable/disable reminders
+async fn handle_notify_command(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+    args: &str,
+) -> Result<()> {
+    if args.is_empty() {
+        let prefs = db::get_user_preferences(&state.pool, user_id).await?;
+        let status = if prefs.notification_enabled {
+            "увімкнено ✅"
+        } else {
+            "вимкнено ⛔"
+        };
+        bot.send_message(
+            chat_id,
+            mdv2(format!(
+                "🔔 Нагадування зараз {}.\n\
+                Використай /notify on або /notify off.",
+                status
+            )),
+        )
+        .parse_mode(ParseMode::MarkdownV2)
+        .await?;
+        return Ok(());
+    }
+
+    let arg = args.to_lowercase();
+    let enabled = match arg.as_str() {
+        "on" | "true" | "yes" | "1" | "увімкнути" | "увімкнено" => true,
+        "off" | "false" | "no" | "0" | "вимкнути" | "вимкнено" => false,
+        _ => {
+            bot.send_message(
+                chat_id,
+                mdv2("❌ Невірна команда. Використай /notify on або /notify off."),
+            )
+            .parse_mode(ParseMode::MarkdownV2)
+            .await?;
+            return Ok(());
+        }
+    };
+
+    db::set_user_notification_enabled(&state.pool, user_id, enabled).await?;
+
+    let msg = if enabled {
+        "✅ Нагадування увімкнено. Я напишу в заданий час."
+    } else {
+        "⛔ Нагадування вимкнено. Можеш повернути через /notify on."
+    };
+
+    bot.send_message(chat_id, msg).await?;
+    Ok(())
+}
+
+/// /settings - show reminder settings
+async fn send_settings(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    let prefs = db::get_user_preferences(&state.pool, user_id).await?;
+    let now_local = time_utils::format_local_time(&prefs.timezone, chrono::Utc::now());
+    let status = if prefs.notification_enabled {
+        "увімкнено ✅"
+    } else {
+        "вимкнено ⛔"
+    };
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "⚙️ Налаштування\n\n\
+            ⏰ Час нагадувань: {:02}:{:02}\n\
+            🌍 Часовий пояс: {}\n\
+            🕒 Локальний час: {}\n\
+            🔔 Нагадування: {}\n\n\
+            Команди:\n\
+            • /settime – змінити час\n\
+            • /timezone – змінити часовий пояс\n\
+            • /notify on|off – нагадування",
+            prefs.reminder_hour,
+            prefs.reminder_minute,
+            prefs.timezone,
+            now_local,
+            status
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
 
     Ok(())
 }

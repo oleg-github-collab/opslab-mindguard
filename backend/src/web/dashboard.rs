@@ -10,6 +10,7 @@ use axum::{
 };
 use serde::Serialize;
 use uuid::Uuid;
+use crate::bot::daily_checkin::Metrics;
 
 #[derive(Serialize)]
 pub struct CurrentUser {
@@ -42,13 +43,48 @@ pub struct HistoricalData {
     pub months: Vec<MonthlyMetrics>,
 }
 
+#[derive(Serialize)]
+pub struct UserMetricsResponse {
+    pub metrics: Option<Metrics>,
+    pub checkins_last_week: i32,
+    pub streak: i32,
+}
+
 pub fn router(state: SharedState) -> Router {
     Router::new()
         .route("/me", get(get_current_user))
+        .route("/metrics", get(get_user_metrics))
         .route("/user/:id", get(user_view))
         .route("/user/:id/history", get(user_history))
         .route("/team", get(team_view))
         .with_state(state)
+}
+
+async fn get_user_metrics(
+    headers: HeaderMap,
+    State(state): State<SharedState>,
+) -> Result<Json<UserMetricsResponse>, StatusCode> {
+    let token = session::extract_token(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    let claims = session::verify_session(&token, &state.session_key)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let metrics = db::calculate_user_metrics(&state.pool, claims.user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let checkins_last_week = db::get_checkin_count_for_week(&state.pool, claims.user_id)
+        .await
+        .unwrap_or(0);
+
+    let streak = db::get_user_current_streak(&state.pool, claims.user_id)
+        .await
+        .unwrap_or(0);
+
+    Ok(Json(UserMetricsResponse {
+        metrics,
+        checkins_last_week,
+        streak,
+    }))
 }
 
 async fn get_current_user(
@@ -261,13 +297,25 @@ async fn team_view(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let users = sqlx::query_as!(
-        DbUser,
+    let users = sqlx::query_as::<_, DbUser>(
         r#"
-        SELECT id, email, hash, telegram_id, role as "role: UserRole", enc_name, note, created_at
+        SELECT
+            id,
+            email,
+            hash,
+            telegram_id,
+            role,
+            enc_name,
+            note,
+            created_at,
+            is_active,
+            offboarded_at,
+            offboarded_by,
+            offboarded_reason
         FROM users
+        WHERE is_active = true
         ORDER BY created_at ASC
-        "#
+        "#,
     )
     .fetch_all(&state.pool)
     .await

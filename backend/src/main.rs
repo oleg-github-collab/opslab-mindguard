@@ -8,6 +8,7 @@ mod middleware;
 mod services;
 mod state;
 mod web;
+mod time_utils;
 
 use crate::db::seed;
 use crate::state::SharedState;
@@ -19,10 +20,10 @@ use axum::{
     Router,
 };
 use base64::{engine::general_purpose, Engine as _};
-use chrono::Timelike;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgPoolOptions, Row};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use uuid::Uuid;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -129,52 +130,57 @@ async fn run() -> anyhow::Result<()> {
     // Setup scheduler for daily check-ins and weekly summaries
     let scheduler = JobScheduler::new().await?;
 
-    // #2 WOW Feature: Smart Reminders - every minute check for users
+    // #2 WOW Feature: Smart Reminders - timezone-aware reminders
     let shared_for_reminders = shared.clone();
     scheduler
         .add(Job::new_async("0 * * * * *", move |_uuid, _l| {
             let state = shared_for_reminders.clone();
             Box::pin(async move {
                 let now = chrono::Utc::now();
-                let hour = now.hour() as i16;
-                let minute = (now.minute() as i16 / 15) * 15; // Round to 0, 15, 30, 45
+                let candidates = match db::get_reminder_candidates(&state.pool).await {
+                    Ok(list) => list,
+                    Err(e) => {
+                        tracing::error!("Failed to get reminder candidates: {}", e);
+                        return;
+                    }
+                };
 
-                // Тільки на початку кожної 15-хвилинки
-                if now.minute() as i16 % 15 == 0 {
-                    match db::get_users_for_reminder_time(&state.pool, hour, minute).await {
-                        Ok(users) => {
-                            if !users.is_empty() {
-                                tracing::info!(
-                                    "Sending smart reminders to {} users at {:02}:{:02}",
-                                    users.len(),
-                                    hour,
-                                    minute
-                                );
-                                if let Err(e) = send_smart_reminders(&state, users).await {
-                                    tracing::error!("Failed to send smart reminders: {}", e);
-                                }
+                let mut due_users: Vec<(uuid::Uuid, i64)> = Vec::new();
+
+                for candidate in candidates {
+                    if !candidate.notification_enabled {
+                        continue;
+                    }
+
+                    let (local_date, local_hour, local_minute) =
+                        time_utils::local_components(&candidate.timezone, now);
+
+                    if local_hour == candidate.reminder_hour
+                        && local_minute == candidate.reminder_minute
+                    {
+                        match db::mark_reminder_sent(&state.pool, candidate.user_id, local_date)
+                            .await
+                        {
+                            Ok(true) => {
+                                due_users.push((candidate.user_id, candidate.telegram_id));
                             }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to get users for reminder time: {}", e);
+                            Ok(false) => {}
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to mark reminder sent for {}: {}",
+                                    candidate.user_id,
+                                    e
+                                );
+                            }
                         }
                     }
                 }
-            })
-        })?)
-        .await?;
 
-    // Legacy: Daily check-ins at 10:00 AM for users without custom time (fallback)
-    let shared_for_scheduler = shared.clone();
-    scheduler
-        .add(Job::new_async("0 0 10 * * *", move |_uuid, _l| {
-            let state = shared_for_scheduler.clone();
-            Box::pin(async move {
-                tracing::info!("Starting default 10:00 AM check-in broadcast...");
-                if let Err(e) = send_daily_checkins_to_all(&state).await {
-                    tracing::error!("Failed to send daily check-ins: {}", e);
-                } else {
-                    tracing::info!("Daily check-in broadcast completed successfully");
+                if !due_users.is_empty() {
+                    tracing::info!("Sending smart reminders to {} users", due_users.len());
+                    if let Err(e) = send_smart_reminders(&state, due_users).await {
+                        tracing::error!("Failed to send smart reminders: {}", e);
+                    }
                 }
             })
         })?)
@@ -214,8 +220,7 @@ async fn run() -> anyhow::Result<()> {
 
     scheduler.start().await?;
     tracing::info!("Scheduler started:");
-    tracing::info!("  - Smart reminders: every 15 min");
-    tracing::info!("  - Default check-ins: 10:00 AM daily");
+    tracing::info!("  - Smart reminders: every minute (timezone-aware)");
     tracing::info!("  - Weekly summaries: Fridays 17:00");
     tracing::info!("  - Session cleanup: hourly");
 
@@ -305,32 +310,35 @@ async fn send_daily_checkins_to_all(state: &SharedState) -> anyhow::Result<()> {
     let bot = teloxide::Bot::new(bot_token);
 
     // Отримати всіх користувачів з telegram_id (окрім ADMIN ролі)
-    let users = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT id, telegram_id
         FROM users
         WHERE telegram_id IS NOT NULL
           AND role != 'ADMIN'
-        "#
+          AND is_active = true
+        "#,
     )
     .fetch_all(&state.pool)
     .await?;
 
-    tracing::info!("Broadcasting daily check-ins to {} users", users.len());
+    tracing::info!("Broadcasting daily check-ins to {} users", rows.len());
 
     let mut success_count = 0;
     let mut error_count = 0;
 
-    for user in users {
-        if let Some(telegram_id) = user.telegram_id {
+    for row in rows {
+        let user_id: Uuid = row.try_get("id")?;
+        let telegram_id: Option<i64> = row.try_get("telegram_id")?;
+        if let Some(telegram_id) = telegram_id {
             let chat_id = teloxide::types::ChatId(telegram_id);
 
-            match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, user.id).await {
+            match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, user_id).await {
                 Ok(_) => {
                     success_count += 1;
                     tracing::debug!(
                         "Sent check-in to user {} (telegram: {})",
-                        user.id,
+                        user_id,
                         telegram_id
                     );
                 }
@@ -338,7 +346,7 @@ async fn send_daily_checkins_to_all(state: &SharedState) -> anyhow::Result<()> {
                     error_count += 1;
                     tracing::error!(
                         "Failed to send check-in to user {} (telegram: {}): {}",
-                        user.id,
+                        user_id,
                         telegram_id,
                         e
                     );

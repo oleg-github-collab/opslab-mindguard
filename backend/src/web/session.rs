@@ -1,3 +1,4 @@
+use crate::db;
 use crate::domain::models::UserRole;
 use axum::{
     async_trait,
@@ -145,6 +146,21 @@ where
             tracing::warn!("Session verification failed: {}", e);
             StatusCode::UNAUTHORIZED
         })?;
+
+        let user = db::find_user_by_id(&shared_state.pool, claims.user_id)
+            .await
+            .map_err(|e| {
+                tracing::warn!("User lookup failed for session: {}", e);
+                StatusCode::UNAUTHORIZED
+            })?;
+
+        let Some(user) = user else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+
+        if !user.is_active {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
 
         Ok(UserSession(claims.user_id))
     }

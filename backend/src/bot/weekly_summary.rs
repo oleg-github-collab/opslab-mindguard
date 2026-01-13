@@ -1,6 +1,7 @@
 ///! Weekly Summary System (#6 + #10)
 ///! Відправляє щоп'ятниці о 17:00 детальний summary з метриками та team benchmark
 use crate::bot::daily_checkin::Metrics;
+use crate::bot::markdown::mdv2;
 use crate::db::{self, TeamAverage};
 use crate::state::SharedState;
 use anyhow::Result;
@@ -84,24 +85,24 @@ impl WeeklySummary {
         pool: &sqlx::PgPool,
         crypto: &crate::crypto::Crypto,
     ) -> Result<String> {
-        let mut msg = String::from("📊 *ТВІЙ ТИЖНЕВИЙ SUMMARY*\n\n");
+        let mut msg = String::from("📊 Твій тижневий summary\n\n");
 
         // Check-ins & Streak
-        msg.push_str(&format!("✅ Чекінів: *{}/7*\n", self.checkin_count));
-        msg.push_str(&format!("🔥 Streak: *{} днів*\n", self.streak));
+        msg.push_str(&format!("✅ Чекінів: {}/7\n", self.checkin_count));
+        msg.push_str(&format!("🔥 Streak: {} днів\n", self.streak));
 
         if self.kudos_count > 0 {
-            msg.push_str(&format!("🎉 Kudos отримано: *{}*\n", self.kudos_count));
+            msg.push_str(&format!("🎉 Kudos отримано: {}\n", self.kudos_count));
         }
 
         msg.push_str("\n");
 
         // Mental Health Metrics
-        msg.push_str("🧠 *Ментальне здоров'я:*\n\n");
+        msg.push_str("🧠 Ментальне здоров'я:\n\n");
 
         // WHO-5 Well-being
         msg.push_str(&format!(
-            "💚 WHO-5 Well-being: *{:.1}/100* {}\n",
+            "💚 WHO-5 Well-being: {:.1}/100 {}\n",
             self.current_metrics.who5_score,
             self.get_trend_emoji("who5")
         ));
@@ -110,7 +111,7 @@ impl WeeklySummary {
 
         // PHQ-9 Depression
         msg.push_str(&format!(
-            "🧠 PHQ-9 Depression: *{:.1}/27* {}\n",
+            "🧠 PHQ-9 Depression: {:.1}/27 {}\n",
             self.current_metrics.phq9_score,
             self.get_trend_emoji("phq9")
         ));
@@ -119,7 +120,7 @@ impl WeeklySummary {
 
         // GAD-7 Anxiety
         msg.push_str(&format!(
-            "😰 GAD-7 Anxiety: *{:.1}/21* {}\n",
+            "😰 GAD-7 Anxiety: {:.1}/21 {}\n",
             self.current_metrics.gad7_score,
             self.get_trend_emoji("gad7")
         ));
@@ -128,7 +129,7 @@ impl WeeklySummary {
 
         // Burnout
         msg.push_str(&format!(
-            "🔥 Burnout Risk: *{:.0}%* {}\n",
+            "🔥 Burnout Risk: {:.0}% {}\n",
             self.current_metrics.burnout_percentage(),
             self.get_trend_emoji("burnout")
         ));
@@ -136,30 +137,30 @@ impl WeeklySummary {
         msg.push_str("\n\n");
 
         // #10 Team Benchmark (Anonymous)
-        msg.push_str("📈 *Порівняння з командою (анонімно):*\n");
+        msg.push_str("📈 Порівняння з командою (анонімно):\n");
         msg.push_str(&self.format_team_comparison());
         msg.push_str("\n\n");
 
         // Insights
-        msg.push_str("💡 *Інсайти тижня:*\n");
+        msg.push_str("💡 Інсайти тижня:\n");
         msg.push_str(&self.generate_insights());
         msg.push_str("\n");
 
         // Kudos section if received any
         if self.kudos_count > 0 {
-            msg.push_str("\n🎉 *Kudos від колег:*\n");
+            msg.push_str("\n🎉 Kudos від колег:\n");
             let kudos_list = db::get_recent_kudos(pool, self.user_id, 3).await?;
             for kudos in kudos_list {
                 let enc_str = String::from_utf8_lossy(&kudos.from_user_enc_name);
                 let from_name = crypto
                     .decrypt_str(&enc_str)
                     .unwrap_or_else(|_| "Colleague".to_string());
-                msg.push_str(&format!("• \"{}\" - _{}_\n", kudos.message, from_name));
+                msg.push_str(&format!("• \"{}\" — {}\n", kudos.message, from_name));
             }
         }
 
-        msg.push_str("\n_Продовжуй в тому ж дусі! 💪_\n");
-        msg.push_str("_Наступний summary - в п'ятницю!_");
+        msg.push_str("\nПродовжуй в тому ж дусі! 💪\n");
+        msg.push_str("Наступний summary - в п'ятницю!");
 
         Ok(msg)
     }
@@ -361,8 +362,8 @@ pub async fn send_weekly_summaries(state: &SharedState) -> Result<()> {
                         );
 
                         if let Err(e) = bot
-                            .send_message(ChatId(telegram_id), msg)
-                            .parse_mode(ParseMode::Markdown)
+                            .send_message(ChatId(telegram_id), mdv2(msg))
+                            .parse_mode(ParseMode::MarkdownV2)
                             .await
                         {
                             tracing::error!(

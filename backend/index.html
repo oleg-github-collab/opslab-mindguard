@@ -77,6 +77,13 @@
       flex-wrap: wrap;
     }
 
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
     .nav-link {
       padding: 0.75rem 1.5rem;
       border: 3px solid var(--dark);
@@ -381,6 +388,199 @@
       font-weight: 700;
     }
 
+    .wall-category {
+      padding: 0.25rem 0.75rem;
+      border: 2px solid var(--dark);
+      font-weight: 700;
+      background: var(--white);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.03em;
+    }
+
+    .wall-author {
+      font-weight: 700;
+    }
+
+    .wall-ai {
+      background: var(--accent);
+      color: var(--dark);
+    }
+
+    .form-hint {
+      color: var(--gray);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .status-chip {
+      padding: 0.25rem 0.6rem;
+      border: 2px solid var(--dark);
+      background: var(--gray-light);
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* ===== ADMIN USERS ===== */
+    .admin-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      margin: 1.5rem 0 1rem;
+    }
+
+    .admin-table-wrap {
+      overflow-x: auto;
+      border: 3px solid var(--dark);
+      background: var(--white);
+    }
+
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    .admin-table th,
+    .admin-table td {
+      border: 2px solid var(--dark);
+      padding: 0.75rem 0.9rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .admin-table th {
+      background: var(--gray-light);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+
+    .admin-row-inactive {
+      opacity: 0.6;
+      background: #fff7f7;
+    }
+
+    .admin-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    /* ===== WELLNESS + INSIGHTS ===== */
+    .plan-list,
+    .insight-list,
+    .kudos-list,
+    .pulse-list,
+    .moderation-queue {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .plan-item,
+    .kudos-item,
+    .pulse-message,
+    .insight-item,
+    .moderation-card {
+      border: 3px solid var(--dark);
+      padding: 1rem;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+    }
+
+    .plan-title,
+    .kudos-message,
+    .insight-title {
+      font-weight: 700;
+    }
+
+    .plan-meta,
+    .kudos-meta,
+    .insight-meta {
+      font-size: 0.85rem;
+      color: var(--gray);
+      margin-top: 0.35rem;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tag-chip {
+      padding: 0.25rem 0.6rem;
+      border: 2px solid var(--dark);
+      background: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .insight-banner {
+      margin-top: 1rem;
+      border: 3px solid var(--dark);
+      padding: 1rem;
+      font-weight: 700;
+    }
+
+    .insight-banner.level-critical { background: #ffe5e5; }
+    .insight-banner.level-alert { background: #fff3e0; }
+    .insight-banner.level-watch { background: #f0f6ff; }
+
+    /* ===== PULSE ROOMS ===== */
+    .pulse-room-card {
+      border: 3px solid var(--dark);
+      padding: 1rem;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pulse-room-card:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
+    }
+
+    .pulse-room-card.active {
+      background: var(--accent);
+    }
+
+    .pulse-message.pending {
+      background: #fff3e0;
+    }
+
+    .moderation-card {
+      border-style: dashed;
+      background: #fff7f7;
+    }
+
+    .action-card {
+      border: 2px dashed var(--dark);
+      padding: 0.65rem;
+      margin-top: 0.5rem;
+      background: #fff7f7;
+      font-size: 0.85rem;
+    }
+
     /* ===== ANIMATIONS ===== */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
@@ -391,11 +591,22 @@
 
     /* ===== RESPONSIVE ===== */
     @media (max-width: 768px) {
-      .nav-container { flex-direction: column; }
-      .nav-menu { flex-direction: column; width: 100%; }
+      .nav-container { flex-direction: column; align-items: flex-start; }
+      .nav-menu { width: 100%; justify-content: flex-start; }
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .month-selector { justify-content: center; }
       .login-container { padding: 2rem; }
+      .card { padding: 1.5rem; }
+      .admin-table thead { display: none; }
+      .admin-table tr { display: block; margin-bottom: 1rem; }
+      .admin-table td { display: flex; justify-content: space-between; gap: 1rem; }
+      .admin-table td::before { content: attr(data-label); font-weight: 700; }
+    }
+
+    @media (max-width: 560px) {
+      .nav-menu { flex-direction: column; }
+      .nav-link { width: 100%; text-align: center; }
+      .container { padding: 1.25rem; }
     }
 
     /* ===== LOADING ===== */
@@ -455,11 +666,14 @@
 
         <ul class="nav-menu">
           <li><a href="#" class="nav-link active" data-section="mindguard">📊 Mindguard</a></li>
+          <li><a href="#" class="nav-link" data-section="pulse">🗣 Pulse Rooms</a></li>
           <li><a href="#" class="nav-link" data-section="wall">💬 Стіна Плачу</a></li>
+          <li><a href="#" class="nav-link hidden" data-section="admin" id="admin-link">🧩 Команда</a></li>
         </ul>
 
-        <div>
-          <span id="user-name" class="mono" style="margin-right: 1rem;"></span>
+        <div class="nav-actions">
+          <span id="user-name" class="mono"></span>
+          <span id="user-role" class="status-chip"></span>
           <button id="logout-btn" class="btn btn-secondary">Вийти</button>
         </div>
       </div>
@@ -477,13 +691,7 @@
           </p>
 
           <!-- Month Selector -->
-          <div class="month-selector">
-            <button class="month-btn" data-month="8">Серпень</button>
-            <button class="month-btn" data-month="9">Вересень</button>
-            <button class="month-btn" data-month="10">Жовтень</button>
-            <button class="month-btn" data-month="11">Листопад</button>
-            <button class="month-btn active" data-month="12">Грудень</button>
-          </div>
+          <div class="month-selector" id="month-selector"></div>
 
           <!-- Key Metrics -->
           <div class="grid grid-4">
@@ -491,28 +699,28 @@
               <div class="metric-label">WHO-5 Благополуччя</div>
               <div class="metric-value" id="wellbeing-value">65.5</div>
               <div class="metric-desc">Індекс благополуччя ВООЗ</div>
-              <span class="metric-badge badge-success">НОРМА</span>
+              <span class="metric-badge badge-success" id="wellbeing-badge">НОРМА</span>
             </div>
 
             <div class="metric-card warning">
               <div class="metric-label">PHQ-9 Депресія</div>
               <div class="metric-value" id="depression-value">8.25</div>
               <div class="metric-desc">Рівень депресії</div>
-              <span class="metric-badge badge-warning">ЛЕГКА</span>
+              <span class="metric-badge badge-warning" id="depression-badge">ЛЕГКА</span>
             </div>
 
             <div class="metric-card warning">
               <div class="metric-label">GAD-7 Тривожність</div>
               <div class="metric-value" id="anxiety-value">7.38</div>
               <div class="metric-desc">Рівень тривожності</div>
-              <span class="metric-badge badge-warning">ЛЕГКА</span>
+              <span class="metric-badge badge-warning" id="anxiety-badge">ЛЕГКА</span>
             </div>
 
             <div class="metric-card danger">
               <div class="metric-label">MBI Вигорання</div>
               <div class="metric-value" id="burnout-value">44.8%</div>
               <div class="metric-desc">Індекс вигорання</div>
-              <span class="metric-badge badge-warning">СЕРЕДНІЙ</span>
+              <span class="metric-badge badge-warning" id="burnout-badge">СЕРЕДНІЙ</span>
             </div>
           </div>
 
@@ -542,13 +750,121 @@
             <h3 style="margin-bottom: 1rem;">⚠️ Зведення по Ризикам</h3>
             <div style="display: flex; gap: 2rem;">
               <div>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--warning);" id="risk-count">4</div>
-                <div style="color: var(--gray);">Співробітників у зоні ризику</div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--warning);" id="risk-count">—</div>
+                <div style="color: var(--gray);" id="risk-primary-label">Рівень ризику</div>
               </div>
               <div>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="critical-count">1</div>
-                <div style="color: var(--gray);">Критичний стан</div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="critical-count">—</div>
+                <div style="color: var(--gray);" id="risk-secondary-label">Streak</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">📈 Тренди по місяцях</div>
+          <div id="trend-container" class="grid grid-2"></div>
+        </div>
+
+        <div class="card" id="wellness-card">
+          <div class="card-header">🌿 Wellness OS · План + Цілі</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Персональний план на день, який адаптується до метрик, сну та стресу.
+          </p>
+          <div class="grid grid-2">
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">План на сьогодні</h4>
+              <div id="wellness-plan" class="plan-list">
+                <div class="form-hint">Завантаження плану...</div>
+              </div>
+              <div class="toggle-row">
+                <button id="complete-plan-btn" class="btn btn-secondary" type="button">Позначити виконаним</button>
+                <span id="wellness-plan-status" class="form-hint"></span>
+              </div>
+            </div>
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Wellbeing goals</h4>
+              <form id="wellness-goals-form">
+                <div class="form-group">
+                  <label for="goal-sleep">Сон (год/ніч)</label>
+                  <input id="goal-sleep" type="number" min="4" max="10" step="1" />
+                </div>
+                <div class="form-group">
+                  <label for="goal-breaks">Пауза / день (кількість)</label>
+                  <input id="goal-breaks" type="number" min="1" max="10" step="1" />
+                </div>
+                <div class="form-group">
+                  <label for="goal-move">Рух (хв / день)</label>
+                  <input id="goal-move" type="number" min="5" max="120" step="5" />
+                </div>
+                <div class="toggle-row">
+                  <input type="checkbox" id="goal-notifications" />
+                  <label for="goal-notifications">Gentle nudges</label>
+                </div>
+                <div class="toggle-row">
+                  <button type="submit" class="btn btn-primary">Зберегти цілі</button>
+                  <span id="wellness-goals-status" class="form-hint"></span>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="insights-card">
+          <div class="card-header">🔍 Персональні інсайти</div>
+          <div class="grid grid-2">
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Self-benchmark · ти vs ти</h4>
+              <div id="self-benchmark" class="insight-list">
+                <div class="form-hint">Недостатньо даних</div>
+              </div>
+            </div>
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Кореляції + рекомендації</h4>
+              <div id="correlations-list" class="insight-list">
+                <div class="form-hint">Дані ще збираються</div>
+              </div>
+            </div>
+          </div>
+          <div id="early-signal-banner" class="insight-banner hidden"></div>
+        </div>
+
+        <div class="card" id="kudos-card">
+          <div class="card-header">🎉 Kudos + Recognition</div>
+          <p style="color: var(--gray); margin-bottom: 1rem;">
+            Підтримуйте одне одного. Подяка підсилює мотивацію й культуру.
+          </p>
+          <div class="grid grid-2">
+            <form id="kudos-form">
+              <div class="form-group">
+                <label for="kudos-email">Email колеги</label>
+                <input id="kudos-email" type="email" placeholder="colleague@opslab.uk" required />
+              </div>
+              <div class="form-group">
+                <label for="kudos-message">Повідомлення</label>
+                <textarea id="kudos-message" rows="3" maxlength="500" placeholder="Дякую за підтримку..."></textarea>
+              </div>
+              <div class="toggle-row">
+                <button type="submit" class="btn btn-success">Надіслати kudos</button>
+                <span id="kudos-status" class="form-hint"></span>
+              </div>
+            </form>
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Інсайти визнання</h4>
+              <div id="kudos-insights" class="tag-row">
+                <span class="form-hint">Завантаження...</span>
+              </div>
+              <div class="form-hint">Топ теми та люди, які найчастіше дякують.</div>
+            </div>
+          </div>
+          <div class="grid grid-2" style="margin-top: 1.5rem;">
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Отримані kudos</h4>
+              <div id="kudos-received" class="kudos-list"></div>
+            </div>
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Надіслані kudos</h4>
+              <div id="kudos-sent" class="kudos-list"></div>
             </div>
           </div>
         </div>
@@ -569,6 +885,14 @@
                 <li class="mono" style="margin: 0.5rem 0;">🔗 /weblogin - Вхід в платформу</li>
                 <li class="mono" style="margin: 0.5rem 0;">💬 /wall - Стіна плачу</li>
                 <li class="mono" style="margin: 0.5rem 0;">⏰ /settime - Час нагадувань</li>
+                <li class="mono" style="margin: 0.5rem 0;">🌍 /timezone - Часовий пояс</li>
+                <li class="mono" style="margin: 0.5rem 0;">🔔 /notify - Нагадування on/off</li>
+                <li class="mono" style="margin: 0.5rem 0;">⚙️ /settings - Налаштування</li>
+                <li class="mono" style="margin: 0.5rem 0;">🎉 /kudos - Подяка колезі</li>
+                <li class="mono" style="margin: 0.5rem 0;">🌿 /plan - План Wellness OS</li>
+                <li class="mono" style="margin: 0.5rem 0;">🎯 /goals - Персональні цілі</li>
+                <li class="mono" style="margin: 0.5rem 0;">🗣 /pulse - Pulse rooms</li>
+                <li class="mono" style="margin: 0.5rem 0;">✨ /insight - Персональний інсайт</li>
               </ul>
             </div>
             <div>
@@ -583,6 +907,43 @@
           </div>
         </div>
 
+        <div class="card" id="telegram-settings-card">
+          <div class="card-header">🔔 Налаштування нагадувань</div>
+          <div class="grid grid-2">
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Статус підключення</h4>
+              <div id="telegram-connection-status" class="form-hint">Завантаження...</div>
+              <div id="telegram-pin-info" class="form-hint"></div>
+              <div class="toggle-row">
+                <button id="generate-pin-btn" class="btn btn-secondary" type="button">Згенерувати PIN</button>
+                <span id="pin-expiry" class="status-chip"></span>
+              </div>
+              <div class="form-hint">Відправте PIN у боті командою <span class="mono">/start 1234</span>.</div>
+            </div>
+            <div>
+              <h4 style="margin-bottom: 0.5rem;">Особисті налаштування</h4>
+              <form id="telegram-settings-form">
+                <div class="form-group">
+                  <label for="reminder-time">Час нагадувань</label>
+                  <input type="time" id="reminder-time" />
+                </div>
+                <div class="form-group">
+                  <label for="timezone-input">Часовий пояс</label>
+                  <input type="text" id="timezone-input" placeholder="Europe/Kyiv або UTC+2" />
+                </div>
+                <div class="toggle-row">
+                  <input type="checkbox" id="notifications-enabled" />
+                  <label for="notifications-enabled">Увімкнути нагадування</label>
+                </div>
+                <div class="toggle-row">
+                  <button type="submit" class="btn btn-primary">Зберегти</button>
+                  <span id="telegram-settings-status" class="form-hint"></span>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -593,7 +954,8 @@
         <div class="card">
           <div class="card-header">💬 Стіна Плачу (Wall of Tears)</div>
           <p style="color: var(--gray); margin-bottom: 2rem;">
-            Анонімний простір для фідбеку про роботу, команду та процеси.
+            Простір для чесного фідбеку про роботу, команду та процеси.
+            Можна публікувати анонімно або з імʼям.
             Всі дані зашифровані та проаналізовані AI для виявлення трендів.
           </p>
 
@@ -602,15 +964,24 @@
             <h3 style="margin-bottom: 1rem;">✍️ Додати новий пост</h3>
             <form id="wall-post-form">
               <div class="form-group">
-                <label for="post-content">Ваш фідбек (анонімно)</label>
+                <label for="post-content">Ваш фідбек</label>
                 <textarea
                   id="post-content"
                   style="width: 100%; padding: 1rem; border: 3px solid var(--dark); font-family: inherit; min-height: 120px; resize: vertical;"
                   placeholder="Напишіть що вас турбує або радує..."
                   maxlength="5000"
                 ></textarea>
+                <div class="toggle-row">
+                  <input type="checkbox" id="post-anonymous" checked />
+                  <label for="post-anonymous">Опублікувати анонімно</label>
+                  <span id="post-visibility-preview" class="status-chip">Анонімно</span>
+                </div>
+                <div class="form-hint">Для публічного поста буде показано ваше імʼя.</div>
               </div>
-              <button type="submit" class="btn btn-success">Опублікувати</button>
+              <div class="toggle-row">
+                <button type="submit" class="btn btn-success">Опублікувати</button>
+                <span id="wall-post-status" class="form-hint"></span>
+              </div>
             </form>
           </div>
 
@@ -626,31 +997,177 @@
       </div>
     </div>
 
+    <!-- ===== PULSE ROOMS SECTION ===== -->
+    <div id="pulse-section" class="section">
+      <div class="container">
+        <div class="card">
+          <div class="card-header">🗣 Pulse Rooms</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Анонімні командні pulse-кімнати з модерацією для чесних обговорень.
+          </p>
+          <div id="pulse-rooms" class="grid grid-3"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">💬 Обговорення кімнати</div>
+          <div id="pulse-room-meta" class="form-hint">Оберіть кімнату для перегляду</div>
+          <div id="pulse-messages" class="pulse-list"></div>
+          <form id="pulse-message-form" style="margin-top: 1rem;">
+            <div class="form-group">
+              <label for="pulse-message-content">Ваше повідомлення</label>
+              <textarea id="pulse-message-content" rows="3" maxlength="3000" placeholder="Поділіться думками..."></textarea>
+              <div class="toggle-row">
+                <input type="checkbox" id="pulse-anonymous" checked />
+                <label for="pulse-anonymous">Надсилати анонімно</label>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <button type="submit" class="btn btn-success">Надіслати</button>
+              <span id="pulse-message-status" class="form-hint"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="card hidden" id="pulse-moderation-card">
+          <div class="card-header">🛡️ Черга модерації</div>
+          <div id="pulse-moderation-queue" class="moderation-queue"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ADMIN SECTION ===== -->
+    <div id="admin-section" class="section">
+      <div class="container">
+        <div class="card">
+          <div class="card-header">👥 Керування користувачами</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Створюйте нові акаунти, деактивуйте звільнених та відновлюйте доступ за потреби.
+            Дані користувача залишаються в системі для аналітики.
+          </p>
+
+          <div class="grid grid-2">
+            <form id="admin-user-form">
+              <div class="form-group">
+                <label for="admin-user-name">Імʼя та прізвище</label>
+                <input id="admin-user-name" type="text" placeholder="Імʼя користувача" required />
+              </div>
+              <div class="form-group">
+                <label for="admin-user-email">Корпоративна пошта</label>
+                <input id="admin-user-email" type="email" placeholder="user@opslab.uk" required />
+              </div>
+              <div class="form-group">
+                <label for="admin-user-role">Роль</label>
+                <select id="admin-user-role">
+                  <option value="EMPLOYEE">EMPLOYEE</option>
+                  <option value="FOUNDER">FOUNDER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="admin-user-code">4-значний код</label>
+                <div class="toggle-row">
+                  <input id="admin-user-code" type="text" maxlength="4" placeholder="1234" />
+                  <button id="generate-user-code" class="btn btn-secondary" type="button">Згенерувати</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="admin-user-note">Нотатка (опційно)</label>
+                <input id="admin-user-note" type="text" placeholder="Команда, відділ або роль" />
+              </div>
+              <div class="toggle-row">
+                <button type="submit" class="btn btn-primary">Додати користувача</button>
+                <span id="admin-user-status" class="form-hint"></span>
+              </div>
+            </form>
+            <div>
+              <h4 style="margin-bottom: 0.75rem;">Підказки для адміністратора</h4>
+              <ul style="padding-left: 1.2rem;">
+                <li>Код доступу повідомляється користувачу окремим каналом.</li>
+                <li>Після деактивації Telegram ID очищується для безпеки.</li>
+                <li>Відновлення доступу не видаляє історичні дані.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="admin-toolbar">
+            <input id="admin-user-search" type="text" placeholder="Пошук за імʼям або email" />
+            <label class="toggle-row" style="margin: 0;">
+              <input type="checkbox" id="admin-show-inactive" checked />
+              <span>Показувати неактивних</span>
+            </label>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Користувач</th>
+                  <th>Роль</th>
+                  <th>Статус</th>
+                  <th>Створено</th>
+                  <th>Відключено</th>
+                  <th>Дії</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">🧩 Командний Heatmap</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Стан команди на основі щоденних чекінів (доступно для Admin/Founder).
+          </p>
+          <div id="team-heatmap" class="grid grid-3"></div>
+        </div>
+
+        <div class="card" id="wall-toxicity-card">
+          <div class="card-header">🛡️ Toxicity Summary (HR)</div>
+          <p style="color: var(--gray); margin-bottom: 1rem;">
+            Автоматичне виявлення токсичних тем у стіні плачу. Анонімна агрегація.
+          </p>
+          <div id="wall-toxicity-summary" class="insight-list"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     // ===== GLOBAL STATE =====
     let currentUser = null;
     let currentSection = 'mindguard';
-    let currentMonth = 12;
-    let mindguardData = {
-      wellbeingIndex: 65.5,
-      depressionLevel: 8.25,
-      anxietyLevel: 7.375,
-      burnoutIndex: 44.8125,
-      sleepDuration: 6.325,
-      sleepQuality: 4.25,
-      workLifeBalance: 4.875,
-      stressLevel: 23.875,
-      atRiskCount: 4,
-      criticalCount: 1
+    let historyMonths = [];
+    let selectedMonthKey = null;
+    let userMetrics = null;
+    let userStats = { checkins_last_week: 0, streak: 0 };
+    let teamHeatmap = null;
+    let adminUsers = [];
+    let adminSearch = '';
+    let showInactiveUsers = true;
+    let wellnessPlan = null;
+    let wellnessGoals = null;
+    let insights = { selfBenchmark: null, correlations: [], earlySignal: null };
+    let kudosData = null;
+    let pulseRooms = [];
+    let activePulseRoom = null;
+    let pulseMessages = [];
+    let pulseModerationQueue = [];
+
+    const categoryMap = {
+      Complaint: { label: 'Скарга', emoji: '😤' },
+      Suggestion: { label: 'Пропозиція', emoji: '💡' },
+      Celebration: { label: 'Успіх', emoji: '🎉' },
+      Question: { label: 'Питання', emoji: '❓' },
+      SupportNeeded: { label: 'Потрібна підтримка', emoji: '💙' }
     };
 
     // ===== API HELPERS =====
     async function apiCall(endpoint, options = {}) {
       const response = await fetch(endpoint, {
         ...options,
-        credentials: 'same-origin',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -662,11 +1179,20 @@
         throw new Error('Unauthorized');
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (response.status === 204) {
+        return null;
       }
 
-      return response.json();
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `HTTP ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return response.json();
+      }
+      return null;
     }
 
     // ===== LOGIN =====
@@ -683,16 +1209,14 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, code }),
+          credentials: 'include',
         });
 
         if (!response.ok) {
           throw new Error('Невірний email або код');
         }
 
-        const data = await response.json();
-        currentUser = data;
-
-        // Load app
+        currentUser = await response.json();
         await loadApp();
 
       } catch (error) {
@@ -706,8 +1230,11 @@
 
     // ===== LOGOUT =====
     document.getElementById('logout-btn').addEventListener('click', async () => {
-      await fetch('/auth/logout', { method: 'POST' });
-      showLogin();
+      try {
+        await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+      } finally {
+        showLogin();
+      }
     });
 
     // ===== NAVIGATION =====
@@ -720,6 +1247,9 @@
     });
 
     function switchSection(section) {
+      if (section === 'admin' && !isAdmin()) {
+        return;
+      }
       currentSection = section;
 
       // Update nav
@@ -733,20 +1263,19 @@
       // Load data
       if (section === 'mindguard') {
         loadMindguardData();
+      } else if (section === 'pulse') {
+        loadPulseRooms();
+        if (isAdmin()) {
+          loadPulseModeration();
+        }
       } else if (section === 'wall') {
         loadWallPosts();
+      } else if (section === 'admin') {
+        loadTeamHeatmap();
+        loadAdminUsers();
+        loadWallToxicitySummary();
       }
     }
-
-    // ===== MONTH SELECTOR =====
-    document.querySelectorAll('.month-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentMonth = parseInt(btn.dataset.month);
-        document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        loadMindguardData();
-      });
-    });
 
     // ===== LOAD APP =====
     async function loadApp() {
@@ -754,7 +1283,22 @@
       document.getElementById('app').classList.remove('hidden');
 
       // Set user name
-      document.getElementById('user-name').textContent = currentUser.full_name;
+      document.getElementById('user-name').textContent = currentUser?.name || 'User';
+      document.getElementById('user-role').textContent = currentUser?.role || '';
+
+      const adminLink = document.getElementById('admin-link');
+      if (isAdmin()) {
+        adminLink.classList.remove('hidden');
+      } else {
+        adminLink.classList.add('hidden');
+      }
+
+      const anonToggle = document.getElementById('post-anonymous');
+      const anonPreview = document.getElementById('post-visibility-preview');
+      if (anonToggle && anonPreview) {
+        anonToggle.checked = true;
+        anonPreview.textContent = 'Анонімно';
+      }
 
       // Load initial data
       await loadMindguardData();
@@ -766,18 +1310,701 @@
       currentUser = null;
     }
 
+    function isAdmin() {
+      return currentUser?.role === 'ADMIN' || currentUser?.role === 'FOUNDER';
+    }
+
     // ===== MINDGUARD DATA =====
     async function loadMindguardData() {
-      // Using hardcoded data from teampulse extraction
-      document.getElementById('wellbeing-value').textContent = mindguardData.wellbeingIndex;
-      document.getElementById('depression-value').textContent = mindguardData.depressionLevel.toFixed(2);
-      document.getElementById('anxiety-value').textContent = mindguardData.anxietyLevel.toFixed(2);
-      document.getElementById('burnout-value').textContent = mindguardData.burnoutIndex.toFixed(1) + '%';
-      document.getElementById('sleep-value').textContent = mindguardData.sleepDuration.toFixed(1);
-      document.getElementById('balance-value').textContent = mindguardData.workLifeBalance.toFixed(1);
-      document.getElementById('stress-value').textContent = mindguardData.stressLevel.toFixed(1);
-      document.getElementById('risk-count').textContent = mindguardData.atRiskCount;
-      document.getElementById('critical-count').textContent = mindguardData.criticalCount;
+      const [metricsResponse, historyResponse] = await Promise.all([
+        apiCall('/dashboard/metrics'),
+        apiCall(`/dashboard/user/${currentUser.user_id}/history`)
+      ]);
+
+      userMetrics = metricsResponse?.metrics || null;
+      userStats = {
+        checkins_last_week: metricsResponse?.checkins_last_week || 0,
+        streak: metricsResponse?.streak || 0
+      };
+      historyMonths = historyResponse?.months || [];
+
+      renderMonthSelector();
+      renderMetrics();
+      renderTrends();
+      renderRiskSummary();
+      await loadTelegramStatus();
+      await Promise.all([
+        loadWellnessData(),
+        loadInsights(),
+        loadKudos(),
+      ]);
+
+      if (isAdmin()) {
+        await loadTeamHeatmap();
+      }
+    }
+
+    function renderMonthSelector() {
+      const container = document.getElementById('month-selector');
+      container.innerHTML = '';
+
+      if (!historyMonths.length) {
+        container.innerHTML = '<span class="form-hint">Немає історичних даних</span>';
+        return;
+      }
+
+      const monthKey = (m) => `${m.year}-${m.month}`;
+      if (!selectedMonthKey || !historyMonths.find(m => monthKey(m) === selectedMonthKey)) {
+        selectedMonthKey = monthKey(historyMonths[0]);
+      }
+
+      historyMonths.slice(0, 6).forEach((month) => {
+        const key = monthKey(month);
+        const button = document.createElement('button');
+        button.className = `month-btn${key === selectedMonthKey ? ' active' : ''}`;
+        button.textContent = `${month.month_name} ${month.year}`;
+        button.addEventListener('click', () => {
+          selectedMonthKey = key;
+          renderMonthSelector();
+          renderMetrics();
+        });
+        container.appendChild(button);
+      });
+    }
+
+    function getSelectedMonth() {
+      if (!selectedMonthKey) return null;
+      return historyMonths.find(m => `${m.year}-${m.month}` === selectedMonthKey) || null;
+    }
+
+    function renderMetrics() {
+      const selectedMonth = getSelectedMonth();
+      const fallback = userMetrics;
+
+      const who5 = selectedMonth?.who5_score ?? fallback?.who5_score ?? null;
+      const phq9 = selectedMonth?.phq9_score ?? fallback?.phq9_score ?? null;
+      const gad7 = selectedMonth?.gad7_score ?? fallback?.gad7_score ?? null;
+      const burnout = selectedMonth?.burnout_percentage ?? fallback?.mbi_score ?? null;
+
+      document.getElementById('wellbeing-value').textContent = who5 !== null ? who5.toFixed(1) : '—';
+      document.getElementById('depression-value').textContent = phq9 !== null ? phq9.toFixed(1) : '—';
+      document.getElementById('anxiety-value').textContent = gad7 !== null ? gad7.toFixed(1) : '—';
+      document.getElementById('burnout-value').textContent = burnout !== null ? `${burnout.toFixed(1)}%` : '—';
+
+      document.getElementById('sleep-value').textContent = fallback?.sleep_duration !== undefined
+        ? fallback.sleep_duration.toFixed(1)
+        : '—';
+      document.getElementById('balance-value').textContent = fallback?.work_life_balance !== undefined
+        ? fallback.work_life_balance.toFixed(1)
+        : '—';
+      document.getElementById('stress-value').textContent = fallback?.stress_level !== undefined
+        ? fallback.stress_level.toFixed(1)
+        : '—';
+
+      updateBadges({ who5, phq9, gad7, burnout });
+    }
+
+    function renderTrends() {
+      const container = document.getElementById('trend-container');
+      container.innerHTML = '';
+
+      if (!historyMonths.length) {
+        container.innerHTML = '<div class="form-hint">Немає історичних даних для трендів</div>';
+        return;
+      }
+
+      const latest = historyMonths[0];
+      const previous = historyMonths[1];
+      const metrics = [
+        { key: 'who5_score', label: 'WHO-5', max: 100, higherIsBetter: true },
+        { key: 'phq9_score', label: 'PHQ-9', max: 27, higherIsBetter: false },
+        { key: 'gad7_score', label: 'GAD-7', max: 21, higherIsBetter: false },
+        { key: 'burnout_percentage', label: 'Burnout', max: 100, higherIsBetter: false },
+        { key: 'stress_level', label: 'Стрес', max: 40, higherIsBetter: false },
+      ];
+
+      metrics.slice(0, 4).forEach(metric => {
+        const value = latest?.[metric.key];
+        const prev = previous?.[metric.key];
+        const delta = value !== undefined && prev !== undefined ? value - prev : null;
+        const improving = delta !== null
+          ? (metric.higherIsBetter ? delta > 0 : delta < 0)
+          : null;
+        const deltaSymbol = delta === null
+          ? '—'
+          : (Math.abs(delta) < 0.5 ? '→' : (delta > 0 ? '↑' : '↓'));
+        const deltaColor = improving === null ? 'var(--gray)' : (improving ? 'var(--success)' : 'var(--danger)');
+
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+
+        const displayValue = value !== undefined && value !== null ? value.toFixed(1) : '—';
+        const percent = value !== undefined && value !== null
+          ? Math.min(100, Math.max(0, (value / metric.max) * 100))
+          : 0;
+
+        card.innerHTML = `
+          <div class="metric-label">${metric.label}</div>
+          <div class="metric-value">${displayValue}</div>
+          <div class="form-hint" style="color: ${deltaColor}; font-weight: 700;">
+            ${deltaSymbol} ${delta !== null ? delta.toFixed(1) : ''}
+          </div>
+          <div style="margin-top: 0.75rem;">
+            <div style="height: 10px; border: 2px solid var(--dark); background: var(--gray-light);">
+              <div style="height: 100%; width: ${percent}%; background: var(--primary);"></div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function updateBadges({ who5, phq9, gad7, burnout }) {
+      setBadge('wellbeing-badge', who5, [
+        { max: 35, label: 'КРИТИЧНО', cls: 'badge-danger' },
+        { max: 50, label: 'НИЗЬКИЙ', cls: 'badge-warning' },
+        { max: 75, label: 'НОРМА', cls: 'badge-success' },
+        { max: 100, label: 'ВІДМІННО', cls: 'badge-success' },
+      ], true);
+
+      setBadge('depression-badge', phq9, [
+        { max: 5, label: 'МІНІМАЛЬНА', cls: 'badge-success' },
+        { max: 10, label: 'ЛЕГКА', cls: 'badge-warning' },
+        { max: 15, label: 'ПОМІРНА', cls: 'badge-warning' },
+        { max: 100, label: 'ВИСОКА', cls: 'badge-danger' },
+      ], false);
+
+      setBadge('anxiety-badge', gad7, [
+        { max: 5, label: 'МІНІМАЛЬНА', cls: 'badge-success' },
+        { max: 10, label: 'ЛЕГКА', cls: 'badge-warning' },
+        { max: 15, label: 'ПОМІРНА', cls: 'badge-warning' },
+        { max: 100, label: 'ВИСОКА', cls: 'badge-danger' },
+      ], false);
+
+      setBadge('burnout-badge', burnout, [
+        { max: 35, label: 'НИЗЬКИЙ', cls: 'badge-success' },
+        { max: 50, label: 'СЕРЕДНІЙ', cls: 'badge-warning' },
+        { max: 70, label: 'ВИСОКИЙ', cls: 'badge-warning' },
+        { max: 100, label: 'КРИТИЧНИЙ', cls: 'badge-danger' },
+      ], false);
+    }
+
+    function setBadge(id, value, levels) {
+      const badge = document.getElementById(id);
+      if (!badge) return;
+      badge.classList.remove('badge-success', 'badge-warning', 'badge-danger');
+
+      if (value === null || value === undefined) {
+        badge.textContent = 'Н/Д';
+        badge.classList.add('badge-warning');
+        return;
+      }
+
+      const level = levels.find(l => value <= l.max) || levels[levels.length - 1];
+      badge.textContent = level.label;
+      badge.classList.add(level.cls);
+    }
+
+    function computeRisk(metrics) {
+      if (!metrics) {
+        return { label: 'Немає даних', color: 'var(--gray)', emoji: '⚪' };
+      }
+      if (metrics.who5_score < 50 || metrics.phq9_score >= 15 || metrics.gad7_score >= 15 || metrics.mbi_score >= 70) {
+        return { label: 'Критичний', color: 'var(--danger)', emoji: '🔴' };
+      }
+      if (metrics.who5_score < 60 || metrics.phq9_score >= 10 || metrics.gad7_score >= 10 || metrics.mbi_score >= 50) {
+        return { label: 'Високий', color: 'var(--warning)', emoji: '🟠' };
+      }
+      if (metrics.who5_score < 70 || metrics.phq9_score >= 5 || metrics.gad7_score >= 5 || metrics.mbi_score >= 35) {
+        return { label: 'Середній', color: '#ffb800', emoji: '🟡' };
+      }
+      return { label: 'Низький', color: 'var(--success)', emoji: '🟢' };
+    }
+
+    function renderRiskSummary() {
+      const riskCountEl = document.getElementById('risk-count');
+      const criticalCountEl = document.getElementById('critical-count');
+      const riskLabelEl = document.getElementById('risk-primary-label');
+      const secondaryLabelEl = document.getElementById('risk-secondary-label');
+
+      if (isAdmin() && teamHeatmap?.users?.length) {
+        const critical = teamHeatmap.users.filter(u => u.status === 'CRITICAL').length;
+        const concerning = teamHeatmap.users.filter(u => u.status === 'CONCERNING').length;
+        const atRisk = critical + concerning;
+
+        riskCountEl.textContent = atRisk;
+        riskCountEl.style.color = 'var(--warning)';
+        criticalCountEl.textContent = critical;
+        criticalCountEl.style.color = 'var(--danger)';
+        riskLabelEl.textContent = 'У зоні ризику';
+        secondaryLabelEl.textContent = 'Критичний стан';
+        return;
+      }
+
+      const risk = computeRisk(userMetrics);
+      riskCountEl.textContent = `${risk.emoji} ${risk.label}`;
+      riskCountEl.style.color = risk.color;
+      criticalCountEl.textContent = `${userStats.streak} днів`;
+      criticalCountEl.style.color = 'var(--dark)';
+      riskLabelEl.textContent = 'Рівень ризику';
+      secondaryLabelEl.textContent = 'Streak';
+    }
+
+    // ===== WELLNESS =====
+    async function loadWellnessData() {
+      try {
+        const [goals, plan] = await Promise.all([
+          apiCall('/wellness/goals'),
+          apiCall('/wellness/plan'),
+        ]);
+        wellnessGoals = goals;
+        wellnessPlan = plan;
+        renderWellness();
+      } catch (error) {
+        const container = document.getElementById('wellness-plan');
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити план</div>';
+        }
+      }
+    }
+
+    function renderWellness() {
+      const planContainer = document.getElementById('wellness-plan');
+      const planStatus = document.getElementById('wellness-plan-status');
+      const completeBtn = document.getElementById('complete-plan-btn');
+
+      if (planContainer) {
+        planContainer.innerHTML = '';
+        const items = wellnessPlan?.items || [];
+        if (!items.length) {
+          planContainer.innerHTML = '<div class="form-hint">План буде доступний після чекіну</div>';
+        } else {
+          items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'plan-item';
+            const duration = item.duration_minutes ? ` · ${item.duration_minutes} хв` : '';
+            card.innerHTML = `
+              <div class="plan-title">${item.title}${duration}</div>
+              <div class="plan-meta">${item.description}</div>
+            `;
+            planContainer.appendChild(card);
+          });
+        }
+      }
+
+      if (planStatus && completeBtn) {
+        if (wellnessPlan?.completed_at) {
+          planStatus.textContent = '✅ План виконано';
+          completeBtn.disabled = true;
+        } else {
+          planStatus.textContent = '';
+          completeBtn.disabled = false;
+        }
+      }
+
+      if (wellnessGoals) {
+        const sleepInput = document.getElementById('goal-sleep');
+        const breakInput = document.getElementById('goal-breaks');
+        const moveInput = document.getElementById('goal-move');
+        const notifyInput = document.getElementById('goal-notifications');
+        if (sleepInput) sleepInput.value = wellnessGoals.sleep_target ?? 7;
+        if (breakInput) breakInput.value = wellnessGoals.break_target ?? 3;
+        if (moveInput) moveInput.value = wellnessGoals.move_target ?? 20;
+        if (notifyInput) notifyInput.checked = !!wellnessGoals.notifications_enabled;
+      }
+    }
+
+    // ===== INSIGHTS =====
+    async function loadInsights() {
+      try {
+        const [benchmark, correlations, earlySignal] = await Promise.all([
+          apiCall('/insights/self-benchmark'),
+          apiCall('/insights/correlations'),
+          apiCall('/insights/early-signal'),
+        ]);
+        insights.selfBenchmark = benchmark;
+        insights.correlations = correlations || [];
+        insights.earlySignal = earlySignal;
+        renderInsights();
+      } catch (error) {
+        renderInsights();
+      }
+    }
+
+    function renderInsights() {
+      renderSelfBenchmark(insights.selfBenchmark);
+      renderCorrelations(insights.correlations || []);
+      renderEarlySignal(insights.earlySignal);
+    }
+
+    function renderSelfBenchmark(benchmark) {
+      const container = document.getElementById('self-benchmark');
+      if (!container) return;
+
+      container.innerHTML = '';
+      if (!benchmark) {
+        container.innerHTML = '<div class="form-hint">Недостатньо даних для порівняння</div>';
+        return;
+      }
+
+      const current = benchmark.current;
+      const summary = document.createElement('div');
+      summary.className = 'insight-item';
+      summary.innerHTML = `
+        <div class="insight-title">Останні 7 днів</div>
+        <div class="insight-meta">WHO-5: ${current.who5.toFixed(1)} · Burnout: ${current.burnout.toFixed(1)}%</div>
+      `;
+      container.appendChild(summary);
+
+      if (!benchmark.deltas || !benchmark.previous) {
+        const note = document.createElement('div');
+        note.className = 'form-hint';
+        note.textContent = 'Збираємо ще 7 днів даних для повного порівняння.';
+        container.appendChild(note);
+        return;
+      }
+
+      const metrics = [
+        { key: 'who5', label: 'WHO-5', higherBetter: true, suffix: '' },
+        { key: 'phq9', label: 'PHQ-9', higherBetter: false, suffix: '' },
+        { key: 'gad7', label: 'GAD-7', higherBetter: false, suffix: '' },
+        { key: 'burnout', label: 'Burnout', higherBetter: false, suffix: '%' },
+        { key: 'stress', label: 'Стрес', higherBetter: false, suffix: '' },
+        { key: 'sleep', label: 'Сон', higherBetter: true, suffix: 'h' },
+        { key: 'balance', label: 'Баланс', higherBetter: true, suffix: '' },
+      ];
+
+      metrics.forEach(metric => {
+        const delta = benchmark.deltas[metric.key];
+        if (delta === null || delta === undefined || Math.abs(delta) < 0.4) return;
+        const arrow = delta > 0 ? '↑' : '↓';
+        const improving = metric.higherBetter ? delta > 0 : delta < 0;
+        const color = improving ? 'var(--success)' : 'var(--warning)';
+        const item = document.createElement('div');
+        item.className = 'insight-item';
+        item.innerHTML = `
+          <div class="insight-title" style="color:${color};">${metric.label} ${arrow} ${delta.toFixed(1)}${metric.suffix}</div>
+          <div class="insight-meta">Тепер: ${benchmark.current[metric.key].toFixed(1)}${metric.suffix} · Було: ${benchmark.previous[metric.key].toFixed(1)}${metric.suffix}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function renderCorrelations(list) {
+      const container = document.getElementById('correlations-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div class="form-hint">Кореляції зʼявляться після 2-3 тижнів даних</div>';
+        return;
+      }
+
+      list.slice(0, 4).forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'insight-item';
+        card.innerHTML = `
+          <div class="insight-title">${item.description}</div>
+          <div class="insight-meta">${item.recommendation}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderEarlySignal(signal) {
+      const banner = document.getElementById('early-signal-banner');
+      if (!banner) return;
+
+      if (!signal) {
+        banner.classList.add('hidden');
+        return;
+      }
+
+      const labels = {
+        critical: 'Критичний сигнал',
+        alert: 'Увага: ранній сигнал',
+        watch: 'Спостерігаємо тренд',
+      };
+      banner.classList.remove('hidden', 'level-critical', 'level-alert', 'level-watch');
+      banner.classList.add(`level-${signal.level}`);
+      banner.innerHTML = `
+        ⚡ ${labels[signal.level] || 'Ранній сигнал'} · confidence ${(signal.confidence * 100).toFixed(0)}%
+        <div class="form-hint">Індикатори: ${(signal.indicators || []).join(', ')}</div>
+      `;
+    }
+
+    // ===== KUDOS =====
+    async function loadKudos() {
+      try {
+        kudosData = await apiCall('/kudos');
+        renderKudos();
+      } catch (error) {
+        const container = document.getElementById('kudos-received');
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити kudos</div>';
+        }
+      }
+    }
+
+    function renderKudos() {
+      const receivedContainer = document.getElementById('kudos-received');
+      const sentContainer = document.getElementById('kudos-sent');
+      const insightsContainer = document.getElementById('kudos-insights');
+
+      if (receivedContainer) receivedContainer.innerHTML = '';
+      if (sentContainer) sentContainer.innerHTML = '';
+      if (insightsContainer) insightsContainer.innerHTML = '';
+
+      if (!kudosData) return;
+
+      const topSenders = kudosData.insights?.top_senders || [];
+      const topKeywords = kudosData.insights?.top_keywords || [];
+
+      if (insightsContainer) {
+        if (topSenders.length === 0 && topKeywords.length === 0) {
+          insightsContainer.innerHTML = '<span class="form-hint">Немає даних для інсайтів</span>';
+        } else {
+          topSenders.forEach(name => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.textContent = `⭐ ${name}`;
+            insightsContainer.appendChild(chip);
+          });
+          topKeywords.forEach(word => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.textContent = `#${word}`;
+            insightsContainer.appendChild(chip);
+          });
+        }
+      }
+
+      if (receivedContainer) {
+        if (!kudosData.received || kudosData.received.length === 0) {
+          receivedContainer.innerHTML = '<div class="form-hint">Поки що немає отриманих kudos</div>';
+        } else {
+          kudosData.received.forEach(entry => {
+            const card = document.createElement('div');
+            card.className = 'kudos-item';
+            const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('uk-UA') : 'Нещодавно';
+            card.innerHTML = `
+              <div class="kudos-meta">Від: ${entry.from_name} · ${date}</div>
+              <div class="kudos-message">${entry.message}</div>
+            `;
+            receivedContainer.appendChild(card);
+          });
+        }
+      }
+
+      if (sentContainer) {
+        if (!kudosData.sent || kudosData.sent.length === 0) {
+          sentContainer.innerHTML = '<div class="form-hint">Поки що немає надісланих kudos</div>';
+        } else {
+          kudosData.sent.forEach(entry => {
+            const card = document.createElement('div');
+            card.className = 'kudos-item';
+            const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('uk-UA') : 'Нещодавно';
+            card.innerHTML = `
+              <div class="kudos-meta">Кому: ${entry.to_name} · ${date}</div>
+              <div class="kudos-message">${entry.message}</div>
+            `;
+            sentContainer.appendChild(card);
+          });
+        }
+      }
+    }
+
+    // ===== PULSE ROOMS =====
+    async function loadPulseRooms() {
+      const container = document.getElementById('pulse-rooms');
+      if (container) container.innerHTML = '<div class="form-hint">Завантаження кімнат...</div>';
+
+      try {
+        pulseRooms = await apiCall('/pulse/rooms');
+        renderPulseRooms();
+        if (!activePulseRoom && pulseRooms.length) {
+          setActivePulseRoom(pulseRooms[0]);
+        }
+      } catch (error) {
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити кімнати</div>';
+        }
+      }
+    }
+
+    function setActivePulseRoom(room) {
+      activePulseRoom = room;
+      renderPulseRooms();
+      loadPulseMessages();
+    }
+
+    function renderPulseRooms() {
+      const container = document.getElementById('pulse-rooms');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!pulseRooms || pulseRooms.length === 0) {
+        container.innerHTML = '<div class="form-hint">Немає доступних кімнат</div>';
+        return;
+      }
+
+      pulseRooms.forEach(room => {
+        const card = document.createElement('div');
+        card.className = `pulse-room-card${activePulseRoom?.id === room.id ? ' active' : ''}`;
+        card.innerHTML = `
+          <div class="plan-title">${room.title}</div>
+          <div class="plan-meta">${room.description || ''}</div>
+        `;
+        card.addEventListener('click', () => setActivePulseRoom(room));
+        container.appendChild(card);
+      });
+    }
+
+    async function loadPulseMessages() {
+      if (!activePulseRoom) return;
+      const container = document.getElementById('pulse-messages');
+      if (container) container.innerHTML = '<div class="form-hint">Завантаження повідомлень...</div>';
+
+      try {
+        pulseMessages = await apiCall(`/pulse/rooms/${activePulseRoom.slug}/messages`);
+        renderPulseMessages();
+      } catch (error) {
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити повідомлення</div>';
+        }
+      }
+    }
+
+    function renderPulseMessages() {
+      const container = document.getElementById('pulse-messages');
+      const meta = document.getElementById('pulse-room-meta');
+      if (!container) return;
+
+      if (meta) {
+        meta.textContent = activePulseRoom
+          ? `${activePulseRoom.title} · ${activePulseRoom.description || ''}`
+          : 'Оберіть кімнату для перегляду';
+      }
+
+      container.innerHTML = '';
+      if (!pulseMessages || pulseMessages.length === 0) {
+        container.innerHTML = '<div class="form-hint">Поки що немає повідомлень</div>';
+        return;
+      }
+
+      pulseMessages.forEach(message => {
+        const card = document.createElement('div');
+        card.className = `pulse-message${message.status === 'PENDING' ? ' pending' : ''}`;
+        const created = message.created_at ? new Date(message.created_at).toLocaleString('uk-UA') : 'Нещодавно';
+        const status = message.status === 'PENDING' ? ' · На модерації' : '';
+        card.innerHTML = `
+          <div class="plan-meta">${created}${status}</div>
+          <div class="plan-title">${message.content}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function loadPulseModeration() {
+      const card = document.getElementById('pulse-moderation-card');
+      if (!card) return;
+      if (!isAdmin()) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+
+      try {
+        pulseModerationQueue = await apiCall('/pulse/moderation');
+        renderPulseModeration();
+      } catch (error) {
+        const container = document.getElementById('pulse-moderation-queue');
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити чергу</div>';
+        }
+      }
+    }
+
+    function renderPulseModeration() {
+      const container = document.getElementById('pulse-moderation-queue');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!pulseModerationQueue || pulseModerationQueue.length === 0) {
+        container.innerHTML = '<div class="form-hint">Черга порожня</div>';
+        return;
+      }
+
+      pulseModerationQueue.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'moderation-card';
+        const created = item.created_at ? new Date(item.created_at).toLocaleString('uk-UA') : 'Нещодавно';
+        card.innerHTML = `
+          <div class="plan-title">${item.room_title}</div>
+          <div class="plan-meta">${created} · ${item.room_slug}</div>
+          <div style="margin-top:0.5rem;">${item.content}</div>
+          <div class="toggle-row" style="margin-top:0.75rem;">
+            <button class="btn btn-secondary" data-action="approve" data-id="${item.id}">Approve</button>
+            <button class="btn btn-secondary" data-action="reject" data-id="${item.id}">Reject</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // ===== WALL TOXICITY =====
+    async function loadWallToxicitySummary() {
+      if (!isAdmin()) return;
+      try {
+        const data = await apiCall('/admin/wall/toxicity');
+        renderWallToxicitySummary(data);
+      } catch (error) {
+        const container = document.getElementById('wall-toxicity-summary');
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити summary</div>';
+        }
+      }
+    }
+
+    function renderWallToxicitySummary(data) {
+      const container = document.getElementById('wall-toxicity-summary');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!data) {
+        container.innerHTML = '<div class="form-hint">Немає даних</div>';
+        return;
+      }
+
+      const stats = document.createElement('div');
+      stats.className = 'insight-item';
+      stats.innerHTML = `
+        <div class="insight-title">Пости: ${data.total_posts} · Flagged: ${data.flagged_posts}</div>
+        <div class="insight-meta">Середня severity: ${data.avg_severity.toFixed(1)}</div>
+      `;
+      container.appendChild(stats);
+
+      const themes = document.createElement('div');
+      themes.className = 'insight-item';
+      const themeChips = (data.top_themes || [])
+        .map(t => `<span class="tag-chip">${t.theme} (${t.count})</span>`)
+        .join('');
+      themes.innerHTML = `
+        <div class="insight-title">Теми</div>
+        <div class="tag-row">${themeChips || '<span class="form-hint">Немає тем</span>'}</div>
+      `;
+      container.appendChild(themes);
+
+      const keywords = document.createElement('div');
+      keywords.className = 'insight-item';
+      const keywordChips = (data.keywords || [])
+        .map(k => `<span class="tag-chip">#${k}</span>`)
+        .join('');
+      keywords.innerHTML = `
+        <div class="insight-title">Ключові слова</div>
+        <div class="tag-row">${keywordChips || '<span class="form-hint">Немає ключових слів</span>'}</div>
+      `;
+      container.appendChild(keywords);
     }
 
     // ===== WALL POSTS =====
@@ -786,8 +2013,8 @@
       container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Завантаження постів...</div></div>';
 
       try {
-        const posts = await apiCall('/feedback/stats');
-        renderWallPosts(posts);
+        const posts = await apiCall('/feedback/wall');
+        renderWallPosts(posts || []);
       } catch (error) {
         container.innerHTML = `
           <div style="text-align: center; padding: 2rem; color: var(--gray);">
@@ -811,43 +2038,49 @@
         return;
       }
 
-      container.innerHTML = posts.map(post => {
-        const date = new Date(post.created_at).toLocaleString('uk-UA', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+      container.innerHTML = '';
 
-        return `
-          <div class="wall-post fade-in">
-            <div class="wall-post-header">
-              <div class="wall-post-meta">
-                <span class="wall-post-date">${date}</span>
-                ${post.user_name ? `<span style="font-weight: 700;">${post.user_name}</span>` : '<span style="color: var(--gray);">Анонімно</span>'}
-              </div>
-              <div>
-                <span class="wall-post-sentiment sentiment-${post.sentiment}">
-                  ${post.sentiment === 'positive' ? '😊 ПОЗИТИВ' : post.sentiment === 'negative' ? '😞 НЕГАТИВ' : '🤔 ЗМІШАНО'}
-                </span>
-              </div>
-            </div>
-            <div class="wall-post-content">
-              ${post.summary}
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid var(--gray-light); flex-wrap: wrap; gap: 1rem;">
-              <div class="wall-post-tags">
-                ${(post.tags || []).slice(0, 5).map(tag => `<span class="tag">#${tag}</span>`).join('')}
-              </div>
-              <div style="display: flex; gap: 1rem; font-size: 0.875rem; color: var(--gray);">
-                <span>📁 ${post.work_aspect}</span>
-                <span>💥 ${post.emotional_intensity}/5</span>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
+      posts.forEach(post => {
+        const card = document.createElement('div');
+        card.className = 'wall-post fade-in';
+
+        const header = document.createElement('div');
+        header.className = 'wall-post-header';
+
+        const meta = document.createElement('div');
+        meta.className = 'wall-post-meta';
+
+        const date = document.createElement('span');
+        const created = post.created_at ? new Date(post.created_at) : null;
+        date.className = 'wall-post-date';
+        date.textContent = created && !isNaN(created)
+          ? created.toLocaleString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : 'Нещодавно';
+
+        const author = document.createElement('span');
+        author.className = 'wall-author';
+        author.textContent = post.is_anonymous || !post.author_name ? 'Анонімно' : post.author_name;
+
+        meta.appendChild(date);
+        meta.appendChild(author);
+
+        const category = document.createElement('span');
+        const info = categoryMap[post.category] || { label: 'Без категорії', emoji: '💬' };
+        category.className = `wall-category${post.ai_categorized ? ' wall-ai' : ''}`;
+        category.textContent = `${info.emoji} ${info.label}`;
+
+        header.appendChild(meta);
+        header.appendChild(category);
+
+        const content = document.createElement('div');
+        content.className = 'wall-post-content';
+        content.textContent = post.content;
+
+        card.appendChild(header);
+        card.appendChild(content);
+
+        container.appendChild(card);
+      });
     }
 
     // ===== WALL POST FORM =====
@@ -855,33 +2088,571 @@
       e.preventDefault();
 
       const content = document.getElementById('post-content').value.trim();
+      const isAnonymous = document.getElementById('post-anonymous').checked;
+      const statusEl = document.getElementById('wall-post-status');
       if (!content) return;
 
       try {
+        statusEl.textContent = 'Публікація...';
         await apiCall('/feedback/wall', {
           method: 'POST',
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, is_anonymous: isAnonymous }),
         });
 
         document.getElementById('post-content').value = '';
-        alert('✅ Пост успішно опубліковано!');
+        statusEl.textContent = '✅ Пост успішно опубліковано!';
 
         // Reload posts
         await loadWallPosts();
 
       } catch (error) {
-        alert('❌ Помилка: ' + error.message);
+        statusEl.textContent = '❌ Помилка: ' + error.message;
       }
     });
 
+    document.getElementById('post-anonymous').addEventListener('change', (e) => {
+      const preview = document.getElementById('post-visibility-preview');
+      preview.textContent = e.target.checked ? 'Анонімно' : `Публічно: ${currentUser?.name || 'User'}`;
+    });
+
+    // ===== WELLNESS GOALS =====
+    const wellnessGoalsForm = document.getElementById('wellness-goals-form');
+    if (wellnessGoalsForm) {
+      wellnessGoalsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('wellness-goals-status');
+        statusEl.textContent = 'Збереження...';
+
+        const payload = {
+          sleep_target: parseInt(document.getElementById('goal-sleep').value, 10),
+          break_target: parseInt(document.getElementById('goal-breaks').value, 10),
+          move_target: parseInt(document.getElementById('goal-move').value, 10),
+          notifications_enabled: document.getElementById('goal-notifications').checked,
+        };
+
+        try {
+          wellnessGoals = await apiCall('/wellness/goals', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          statusEl.textContent = '✅ Збережено';
+          renderWellness();
+        } catch (error) {
+          statusEl.textContent = '❌ ' + error.message;
+        }
+      });
+    }
+
+    const completePlanBtn = document.getElementById('complete-plan-btn');
+    if (completePlanBtn) {
+      completePlanBtn.addEventListener('click', async () => {
+        const statusEl = document.getElementById('wellness-plan-status');
+        statusEl.textContent = 'Збереження...';
+        try {
+          await apiCall('/wellness/plan/complete', { method: 'POST' });
+          await loadWellnessData();
+          statusEl.textContent = '✅ План виконано';
+        } catch (error) {
+          statusEl.textContent = '❌ ' + error.message;
+        }
+      });
+    }
+
+    // ===== KUDOS FORM =====
+    const kudosForm = document.getElementById('kudos-form');
+    if (kudosForm) {
+      kudosForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('kudos-status');
+        statusEl.textContent = 'Відправка...';
+
+        const recipient = document.getElementById('kudos-email').value.trim();
+        const message = document.getElementById('kudos-message').value.trim();
+        if (!recipient || !message) {
+          statusEl.textContent = '❌ Заповніть всі поля';
+          return;
+        }
+
+        try {
+          await apiCall('/kudos', {
+            method: 'POST',
+            body: JSON.stringify({ recipient_email: recipient, message }),
+          });
+          statusEl.textContent = '✅ Kudos відправлено';
+          document.getElementById('kudos-message').value = '';
+          await loadKudos();
+        } catch (error) {
+          statusEl.textContent = '❌ ' + error.message;
+        }
+      });
+    }
+
+    // ===== PULSE MESSAGE FORM =====
+    const pulseMessageForm = document.getElementById('pulse-message-form');
+    if (pulseMessageForm) {
+      pulseMessageForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('pulse-message-status');
+        statusEl.textContent = '';
+
+        if (!activePulseRoom) {
+          statusEl.textContent = 'Оберіть кімнату';
+          return;
+        }
+
+        const content = document.getElementById('pulse-message-content').value.trim();
+        if (!content) {
+          statusEl.textContent = 'Повідомлення порожнє';
+          return;
+        }
+
+        try {
+          const res = await apiCall(`/pulse/rooms/${activePulseRoom.slug}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({
+              content,
+              is_anonymous: document.getElementById('pulse-anonymous').checked,
+            }),
+          });
+          document.getElementById('pulse-message-content').value = '';
+          if (res?.status === 'PENDING') {
+            statusEl.textContent = '⏳ Повідомлення на модерації';
+          } else {
+            statusEl.textContent = '✅ Опубліковано';
+            await loadPulseMessages();
+          }
+          if (isAdmin()) {
+            await loadPulseModeration();
+          }
+        } catch (error) {
+          statusEl.textContent = '❌ ' + error.message;
+        }
+      });
+    }
+
+    const moderationQueue = document.getElementById('pulse-moderation-queue');
+    if (moderationQueue) {
+      moderationQueue.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        if (!id) return;
+
+        try {
+          if (action === 'approve') {
+            await apiCall(`/pulse/messages/${id}/approve`, { method: 'POST' });
+          } else if (action === 'reject') {
+            const reason = prompt('Причина відхилення (опційно):') || '';
+            await apiCall(`/pulse/messages/${id}/reject`, {
+              method: 'POST',
+              body: JSON.stringify({ reason }),
+            });
+          }
+          await loadPulseModeration();
+          if (activePulseRoom) {
+            await loadPulseMessages();
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      });
+    }
+
+    // ===== TELEGRAM SETTINGS =====
+    async function loadTelegramStatus() {
+      const status = await apiCall('/telegram/status');
+      if (!status) return;
+
+      const connection = document.getElementById('telegram-connection-status');
+      const pinInfo = document.getElementById('telegram-pin-info');
+      const pinExpiry = document.getElementById('pin-expiry');
+
+      if (status.connected) {
+        connection.textContent = `✅ Підключено (ID ${status.telegram_id})`;
+        pinInfo.textContent = '';
+        pinExpiry.textContent = '';
+      } else {
+        connection.textContent = '⛔ Не підключено';
+        if (status.active_pin) {
+          pinInfo.textContent = `Активний PIN: ${status.active_pin}`;
+          pinExpiry.textContent = 'Діє 5 хв';
+        } else {
+          pinInfo.textContent = 'PIN не згенеровано';
+          pinExpiry.textContent = '';
+        }
+      }
+
+      document.getElementById('reminder-time').value =
+        `${String(status.reminder_hour).padStart(2, '0')}:${String(status.reminder_minute).padStart(2, '0')}`;
+      document.getElementById('timezone-input').value = status.timezone || 'UTC';
+      document.getElementById('notifications-enabled').checked = !!status.notification_enabled;
+    }
+
+    document.getElementById('generate-pin-btn').addEventListener('click', async () => {
+      const pinInfo = document.getElementById('telegram-pin-info');
+      const pinExpiry = document.getElementById('pin-expiry');
+      try {
+        const data = await apiCall('/telegram/generate-pin', { method: 'POST' });
+        pinInfo.textContent = `Активний PIN: ${data.pin_code}`;
+        pinExpiry.textContent = 'Діє 5 хв';
+      } catch (error) {
+        pinInfo.textContent = '❌ Не вдалося згенерувати PIN';
+        pinExpiry.textContent = '';
+      }
+    });
+
+    document.getElementById('telegram-settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('telegram-settings-status');
+      statusEl.textContent = 'Збереження...';
+
+      const reminderTime = document.getElementById('reminder-time').value;
+      const timezone = document.getElementById('timezone-input').value.trim();
+      const notificationsEnabled = document.getElementById('notifications-enabled').checked;
+
+      const payload = {
+        notification_enabled: notificationsEnabled,
+      };
+
+      if (reminderTime) {
+        payload.reminder_time = reminderTime;
+      }
+      if (timezone) {
+        payload.timezone = timezone;
+      }
+
+      try {
+        await apiCall('/telegram/preferences', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        statusEl.textContent = '✅ Збережено';
+        await loadTelegramStatus();
+      } catch (error) {
+        statusEl.textContent = '❌ ' + error.message;
+      }
+    });
+
+    // ===== ADMIN HEATMAP =====
+    async function loadTeamHeatmap() {
+      if (!isAdmin()) return;
+      const data = await apiCall('/admin/heatmap');
+      teamHeatmap = data;
+      renderTeamHeatmap(data);
+      renderRiskSummary();
+    }
+
+    function renderTeamHeatmap(data) {
+      const container = document.getElementById('team-heatmap');
+      container.innerHTML = '';
+
+      if (!data || !data.users || data.users.length === 0) {
+        container.innerHTML = '<div class="form-hint">Немає даних</div>';
+        return;
+      }
+
+      const statusLabel = (status) => {
+        switch (status) {
+          case 'CRITICAL': return { label: 'Критичний', color: 'var(--danger)' };
+          case 'CONCERNING': return { label: 'Ризик', color: 'var(--warning)' };
+          case 'GOOD': return { label: 'Добре', color: 'var(--success)' };
+          case 'EXCELLENT': return { label: 'Відмінно', color: 'var(--success)' };
+          default: return { label: 'Немає даних', color: 'var(--gray)' };
+        }
+      };
+
+      data.users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+
+        const status = statusLabel(user.status);
+        const earlySignal = user.early_signal
+          ? `⚡ ${user.early_signal.level} · ${(user.early_signal.indicators || []).slice(0, 2).join(', ')}`
+          : '';
+        const actionCards = (user.action_cards || [])
+          .map(card => `<div class="action-card"><strong>${card.title}</strong><br>${card.description}</div>`)
+          .join('');
+        card.innerHTML = `
+          <div class="metric-label">${user.name}</div>
+          <div class="metric-desc" style="color:${status.color}; font-weight:700;">${status.label}</div>
+          <div class="form-hint">WHO-5: ${user.who5_score.toFixed(1)} · Burnout: ${user.burnout_percentage.toFixed(1)}%</div>
+          <div class="form-hint">Streak: ${user.streak} днів</div>
+          ${earlySignal ? `<div class="form-hint">${earlySignal}</div>` : ''}
+          ${actionCards}
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // ===== ADMIN USERS =====
+    async function loadAdminUsers() {
+      if (!isAdmin()) return;
+      try {
+        const data = await apiCall('/admin/users');
+        adminUsers = Array.isArray(data) ? data : [];
+        renderAdminUsers();
+      } catch (error) {
+        const tbody = document.getElementById('admin-users-table');
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6">Не вдалося завантажити користувачів</td></tr>';
+        }
+      }
+    }
+
+    function renderAdminUsers() {
+      const tbody = document.getElementById('admin-users-table');
+      if (!tbody) return;
+
+      const term = adminSearch.trim().toLowerCase();
+      const filtered = adminUsers.filter(user => {
+        if (!showInactiveUsers && !user.is_active) return false;
+        if (!term) return true;
+        return user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term);
+      });
+
+      tbody.innerHTML = '';
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6">Немає користувачів за цим фільтром</td></tr>';
+        return;
+      }
+
+      const canManageTarget = (target) => {
+        if (!currentUser) return false;
+        if (target.id === currentUser.user_id) return false;
+        if ((target.role === 'ADMIN' || target.role === 'FOUNDER') && currentUser.role !== 'FOUNDER') {
+          return false;
+        }
+        return true;
+      };
+
+      filtered.forEach(user => {
+        const tr = document.createElement('tr');
+        if (!user.is_active) tr.classList.add('admin-row-inactive');
+
+        const userCell = document.createElement('td');
+        userCell.dataset.label = 'Користувач';
+        const nameEl = document.createElement('div');
+        nameEl.style.fontWeight = '700';
+        nameEl.textContent = user.name;
+        const emailEl = document.createElement('div');
+        emailEl.className = 'form-hint';
+        emailEl.textContent = user.email;
+        userCell.appendChild(nameEl);
+        userCell.appendChild(emailEl);
+        if (user.note) {
+          const noteEl = document.createElement('div');
+          noteEl.className = 'form-hint';
+          noteEl.textContent = user.note;
+          userCell.appendChild(noteEl);
+        }
+
+        const roleCell = document.createElement('td');
+        roleCell.dataset.label = 'Роль';
+        roleCell.textContent = user.role;
+
+        const statusCell = document.createElement('td');
+        statusCell.dataset.label = 'Статус';
+        const statusChip = document.createElement('span');
+        statusChip.className = 'status-chip';
+        statusChip.textContent = user.is_active ? 'Активний' : 'Неактивний';
+        statusCell.appendChild(statusChip);
+
+        const createdCell = document.createElement('td');
+        createdCell.dataset.label = 'Створено';
+        createdCell.textContent = user.created_at
+          ? new Date(user.created_at).toLocaleDateString('uk-UA')
+          : '—';
+
+        const offboardedCell = document.createElement('td');
+        offboardedCell.dataset.label = 'Відключено';
+        offboardedCell.textContent = user.offboarded_at
+          ? new Date(user.offboarded_at).toLocaleDateString('uk-UA')
+          : '—';
+        if (user.offboarded_reason) {
+          const reasonEl = document.createElement('div');
+          reasonEl.className = 'form-hint';
+          reasonEl.textContent = user.offboarded_reason;
+          offboardedCell.appendChild(reasonEl);
+        }
+
+        const actionsCell = document.createElement('td');
+        actionsCell.dataset.label = 'Дії';
+        actionsCell.className = 'admin-actions';
+
+        const canManage = canManageTarget(user);
+        if (user.is_active) {
+          const deactivateBtn = document.createElement('button');
+          deactivateBtn.className = 'btn btn-secondary';
+          deactivateBtn.textContent = 'Деактивувати';
+          deactivateBtn.dataset.action = 'deactivate';
+          deactivateBtn.dataset.id = user.id;
+          if (!canManage) deactivateBtn.disabled = true;
+          actionsCell.appendChild(deactivateBtn);
+        } else {
+          const reactivateBtn = document.createElement('button');
+          reactivateBtn.className = 'btn btn-success';
+          reactivateBtn.textContent = 'Відновити';
+          reactivateBtn.dataset.action = 'reactivate';
+          reactivateBtn.dataset.id = user.id;
+          if (!canManage) reactivateBtn.disabled = true;
+          actionsCell.appendChild(reactivateBtn);
+        }
+
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn btn-primary';
+        resetBtn.textContent = 'Скинути код';
+        resetBtn.dataset.action = 'reset';
+        resetBtn.dataset.id = user.id;
+        if (!canManage) resetBtn.disabled = true;
+        actionsCell.appendChild(resetBtn);
+
+        tr.appendChild(userCell);
+        tr.appendChild(roleCell);
+        tr.appendChild(statusCell);
+        tr.appendChild(createdCell);
+        tr.appendChild(offboardedCell);
+        tr.appendChild(actionsCell);
+        tbody.appendChild(tr);
+      });
+    }
+
+    const adminSearchInput = document.getElementById('admin-user-search');
+    if (adminSearchInput) {
+      adminSearchInput.addEventListener('input', (e) => {
+        adminSearch = e.target.value || '';
+        renderAdminUsers();
+      });
+    }
+
+    const adminShowInactive = document.getElementById('admin-show-inactive');
+    if (adminShowInactive) {
+      adminShowInactive.addEventListener('change', (e) => {
+        showInactiveUsers = !!e.target.checked;
+        renderAdminUsers();
+      });
+    }
+
+    const generateUserCodeBtn = document.getElementById('generate-user-code');
+    if (generateUserCodeBtn) {
+      generateUserCodeBtn.addEventListener('click', () => {
+        const code = String(Math.floor(1000 + Math.random() * 9000));
+        const codeInput = document.getElementById('admin-user-code');
+        if (codeInput) {
+          codeInput.value = code;
+        }
+      });
+    }
+
+    const adminUserForm = document.getElementById('admin-user-form');
+    if (adminUserForm) {
+      adminUserForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('admin-user-status');
+        if (statusEl) statusEl.textContent = 'Збереження...';
+
+        const name = document.getElementById('admin-user-name').value.trim();
+        const email = document.getElementById('admin-user-email').value.trim();
+        const role = document.getElementById('admin-user-role').value;
+        const code = document.getElementById('admin-user-code').value.trim();
+        const note = document.getElementById('admin-user-note').value.trim();
+
+        if (!name || !email || !code) {
+          if (statusEl) statusEl.textContent = '❌ Заповніть всі обовʼязкові поля';
+          return;
+        }
+
+        try {
+          await apiCall('/admin/users', {
+            method: 'POST',
+            body: JSON.stringify({
+              name,
+              email,
+              code,
+              role: role || 'EMPLOYEE',
+              note: note || null
+            }),
+          });
+          if (statusEl) statusEl.textContent = '✅ Користувача створено';
+          adminUserForm.reset();
+          await loadAdminUsers();
+        } catch (error) {
+          if (statusEl) statusEl.textContent = `❌ ${error.message}`;
+        }
+      });
+    }
+
+    const adminUsersTable = document.getElementById('admin-users-table');
+    if (adminUsersTable) {
+      adminUsersTable.addEventListener('click', async (e) => {
+        const target = e.target.closest('button[data-action]');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const userId = target.dataset.id;
+        if (!userId) return;
+
+        try {
+          if (action === 'deactivate') {
+            const reason = prompt('Причина деактивації (опційно):') || null;
+            if (!confirm('Деактивувати користувача?')) return;
+            await apiCall(`/admin/users/${userId}/deactivate`, {
+              method: 'POST',
+              body: JSON.stringify({ reason }),
+            });
+          } else if (action === 'reactivate') {
+            if (!confirm('Відновити доступ користувачу?')) return;
+            await apiCall(`/admin/users/${userId}/reactivate`, {
+              method: 'POST',
+            });
+          } else if (action === 'reset') {
+            const code = prompt('Введіть новий 4-значний код доступу:');
+            if (!code) return;
+            await apiCall(`/admin/users/${userId}/reset-code`, {
+              method: 'POST',
+              body: JSON.stringify({ code: code.trim() }),
+            });
+            alert('Код оновлено');
+          }
+
+          await loadAdminUsers();
+        } catch (error) {
+          alert(`Помилка: ${error.message}`);
+        }
+      });
+    }
+
+    async function loginWithToken(token) {
+      const data = await apiCall('/auth/token-login', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+      currentUser = data;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      await loadApp();
+    }
+
     // ===== AUTO-LOAD ON SESSION =====
     (async function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      if (token) {
+        try {
+          await loginWithToken(token);
+          return;
+        } catch (error) {
+          showLogin();
+          return;
+        }
+      }
+
       try {
         const user = await apiCall('/dashboard/me');
         currentUser = user;
         await loadApp();
       } catch (error) {
-        // Not logged in, show login screen
         showLogin();
       }
     })();

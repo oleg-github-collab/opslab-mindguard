@@ -39,6 +39,7 @@ pub struct LoginResponse {
 pub fn router(state: SharedState) -> Router {
     Router::new()
         .route("/login", post(login))
+        .route("/logout", post(logout))
         .route("/token-login", post(token_login))
         .with_state(state)
 }
@@ -164,6 +165,9 @@ async fn token_login(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
+    if !user.is_active {
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     let name = state
         .crypto
@@ -201,4 +205,21 @@ async fn token_login(
     tracing::info!("User {} logged in via Telegram token", user.id);
 
     Ok((headers, Json(resp)))
+}
+
+async fn logout() -> impl IntoResponse {
+    let is_production = std::env::var("RAILWAY_ENVIRONMENT").is_ok()
+        || std::env::var("RENDER").is_ok()
+        || std::env::var("FLY_APP_NAME").is_ok()
+        || std::env::var("PRODUCTION").is_ok();
+    let secure_flag = if is_production { "; Secure" } else { "" };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::SET_COOKIE,
+        format!("session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax{secure_flag}")
+            .parse()
+            .unwrap(),
+    );
+    (headers, StatusCode::NO_CONTENT)
 }
