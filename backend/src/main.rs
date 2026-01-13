@@ -151,6 +151,9 @@ async fn run() -> anyhow::Result<()> {
                     if !candidate.notification_enabled {
                         continue;
                     }
+                    if !candidate.onboarding_completed {
+                        continue;
+                    }
 
                     let (local_date, local_hour, local_minute) =
                         time_utils::local_components(&candidate.timezone, now);

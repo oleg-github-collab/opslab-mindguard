@@ -1,0 +1,619 @@
+use crate::db;
+use crate::domain::models::UserRole;
+use crate::state::SharedState;
+use crate::web::session::UserSession;
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+use chrono::{DateTime, Utc};
+use serde::Serialize;
+use sqlx::Row;
+use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MetricBlock {
+    who5: f64,
+    phq9: f64,
+    gad7: f64,
+    mbi: f64,
+    sleep_duration: f64,
+    sleep_quality: f64,
+    work_life_balance: f64,
+    stress_level: f64,
+}
+
+impl MetricBlock {
+    fn zero() -> Self {
+        Self {
+            who5: 0.0,
+            phq9: 0.0,
+            gad7: 0.0,
+            mbi: 0.0,
+            sleep_duration: 0.0,
+            sleep_quality: 0.0,
+            work_life_balance: 0.0,
+            stress_level: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EmployeeMonthMetrics {
+    user_id: Uuid,
+    name: String,
+    #[serde(flatten)]
+    metrics: MetricBlock,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TeamMonthData {
+    year: i32,
+    month: u32,
+    averages: MetricBlock,
+    employees: Vec<EmployeeMonthMetrics>,
+}
+
+#[derive(Debug, Serialize)]
+struct TeamDataResponse {
+    months: Vec<TeamMonthData>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EmployeeProfile {
+    user_id: Uuid,
+    name: String,
+    email: Option<String>,
+    metrics: MetricBlock,
+    history: HashMap<String, MetricBlock>,
+    risk_level: String,
+    notes: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IndustryBenchmarks {
+    tech_sector: MetricBlock,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Alert {
+    severity: String,
+    employee: String,
+    message: String,
+    timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Recommendation {
+    category: String,
+    title: String,
+    description: String,
+    affected_employees: Vec<String>,
+    priority: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EmployeeDataResponse {
+    company: String,
+    last_updated: DateTime<Utc>,
+    employees: Vec<EmployeeProfile>,
+    team_averages: HashMap<String, MetricBlock>,
+    industry_benchmarks: IndustryBenchmarks,
+    alerts: Vec<Alert>,
+    recommendations: Vec<Recommendation>,
+}
+
+pub fn router(state: SharedState) -> Router {
+    Router::new()
+        .route("/team-data", get(team_data))
+        .route("/employee-data", get(employee_data))
+        .with_state(state)
+}
+
+async fn team_data(
+    UserSession(user_id): UserSession,
+    State(state): State<SharedState>,
+) -> Result<Json<TeamDataResponse>, StatusCode> {
+    let requester = db::find_user_by_id(&state.pool, user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    if !requester.is_active {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let include_all = matches!(requester.role, UserRole::Admin | UserRole::Founder);
+    let users = fetch_users(&state, user_id, include_all).await?;
+    let analytics = build_analytics(&state, &users).await?;
+
+    Ok(Json(TeamDataResponse {
+        months: analytics.months,
+    }))
+}
+
+async fn employee_data(
+    UserSession(user_id): UserSession,
+    State(state): State<SharedState>,
+) -> Result<Json<EmployeeDataResponse>, StatusCode> {
+    let requester = db::find_user_by_id(&state.pool, user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    if !requester.is_active {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let include_all = matches!(requester.role, UserRole::Admin | UserRole::Founder);
+    let users = fetch_users(&state, user_id, include_all).await?;
+    let analytics = build_analytics(&state, &users).await?;
+
+    let latest_key = analytics
+        .month_keys
+        .last()
+        .cloned()
+        .unwrap_or_else(|| analytics.month_keys.first().cloned().unwrap_or_default());
+
+    let mut team_averages = analytics.team_averages.clone();
+    if let Some(latest_avg) = analytics.team_averages.get(&latest_key).cloned() {
+        team_averages.insert("current".to_string(), latest_avg);
+    }
+
+    let mut alerts = Vec::new();
+    let mut recommendations = Vec::new();
+
+    let mut employees = Vec::new();
+    for user in users {
+        let history = analytics
+            .user_history
+            .get(&user.id)
+            .cloned()
+            .unwrap_or_default();
+
+        let mut filled_history = HashMap::new();
+        for key in &analytics.month_keys {
+            let metrics = history.get(key).cloned().unwrap_or_else(MetricBlock::zero);
+            filled_history.insert(key.clone(), metrics);
+        }
+
+        let metrics = latest_user_metrics(&history, &analytics.month_keys)
+            .unwrap_or_else(MetricBlock::zero);
+        let risk_level = calculate_employee_risk(&metrics);
+
+        if risk_level == "critical" {
+            alerts.push(Alert {
+                severity: "critical".to_string(),
+                employee: user.name.clone(),
+                message: format!(
+                    "Критичний стан! WHO-5 {:.1}, PHQ-9 {:.1}, GAD-7 {:.1}, MBI {:.1}%",
+                    metrics.who5, metrics.phq9, metrics.gad7, metrics.mbi
+                ),
+                timestamp: Utc::now(),
+            });
+        }
+
+        let notes = build_notes(&metrics, &history, &analytics.month_keys, &risk_level);
+
+        employees.push(EmployeeProfile {
+            user_id: user.id,
+            name: user.name.clone(),
+            email: if include_all { Some(user.email.clone()) } else { None },
+            metrics,
+            history: filled_history,
+            risk_level: risk_level.to_string(),
+            notes,
+        });
+    }
+
+    if include_all {
+        let high_risk: Vec<String> = employees
+            .iter()
+            .filter(|e| matches!(e.risk_level.as_str(), "critical" | "high"))
+            .map(|e| e.name.clone())
+            .collect();
+        if !high_risk.is_empty() {
+            recommendations.push(Recommendation {
+                category: "emergency".to_string(),
+                title: "Термінова підтримка".to_string(),
+                description: "Критичні показники у частини команди. Необхідні швидкі 1:1 та зниження навантаження."
+                    .to_string(),
+                affected_employees: high_risk,
+                priority: "critical".to_string(),
+            });
+        }
+    }
+
+    Ok(Json(EmployeeDataResponse {
+        company: "OpsLab".to_string(),
+        last_updated: Utc::now(),
+        employees,
+        team_averages,
+        industry_benchmarks: IndustryBenchmarks {
+            tech_sector: MetricBlock {
+                who5: 62.0,
+                phq9: 6.8,
+                gad7: 7.5,
+                mbi: 42.0,
+                sleep_duration: 6.5,
+                sleep_quality: 6.0,
+                work_life_balance: 5.5,
+                stress_level: 18.0,
+            },
+        },
+        alerts,
+        recommendations,
+    }))
+}
+
+struct AnalyticsData {
+    months: Vec<TeamMonthData>,
+    team_averages: HashMap<String, MetricBlock>,
+    user_history: HashMap<Uuid, HashMap<String, MetricBlock>>,
+    month_keys: Vec<String>,
+}
+
+struct UserInfo {
+    id: Uuid,
+    name: String,
+    email: String,
+}
+
+async fn fetch_users(
+    state: &SharedState,
+    requester_id: Uuid,
+    include_all: bool,
+) -> Result<Vec<UserInfo>, StatusCode> {
+    let users = if include_all {
+        sqlx::query(
+            r#"
+            SELECT id, email, enc_name
+            FROM users
+            ORDER BY created_at ASC
+            "#,
+        )
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    } else {
+        sqlx::query(
+            r#"
+            SELECT id, email, enc_name
+            FROM users
+            WHERE id = $1
+            "#,
+        )
+        .bind(requester_id)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    };
+
+    let mut out = Vec::new();
+    for row in users {
+        let id: Uuid = row.try_get("id").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let email: String = row.try_get("email").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let enc_name: String = row.try_get("enc_name").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let name = state
+            .crypto
+            .decrypt_str(&enc_name)
+            .unwrap_or_else(|_| "User".to_string());
+        out.push(UserInfo { id, name, email });
+    }
+    Ok(out)
+}
+
+async fn build_analytics(
+    state: &SharedState,
+    users: &[UserInfo],
+) -> Result<AnalyticsData, StatusCode> {
+    if users.is_empty() {
+        return Ok(AnalyticsData {
+            months: Vec::new(),
+            team_averages: HashMap::new(),
+            user_history: HashMap::new(),
+            month_keys: Vec::new(),
+        });
+    }
+
+    let user_ids: Vec<Uuid> = users.iter().map(|u| u.id).collect();
+
+    #[derive(sqlx::FromRow)]
+    struct MonthRow {
+        user_id: Uuid,
+        year: i32,
+        month: i32,
+        mood_avg: Option<f64>,
+        energy_avg: Option<f64>,
+        wellbeing_avg: Option<f64>,
+        motivation_avg: Option<f64>,
+        focus_avg: Option<f64>,
+        stress_avg: Option<f64>,
+        sleep_avg: Option<f64>,
+        workload_avg: Option<f64>,
+        answers_count: i64,
+    }
+
+    let rows: Vec<MonthRow> = sqlx::query_as(
+        r#"
+        SELECT
+            user_id,
+            EXTRACT(YEAR FROM created_at)::int AS year,
+            EXTRACT(MONTH FROM created_at)::int AS month,
+            AVG(CASE WHEN question_type = 'mood' THEN value END) AS mood_avg,
+            AVG(CASE WHEN question_type = 'energy' THEN value END) AS energy_avg,
+            AVG(CASE WHEN question_type = 'wellbeing' THEN value END) AS wellbeing_avg,
+            AVG(CASE WHEN question_type = 'motivation' THEN value END) AS motivation_avg,
+            AVG(CASE WHEN question_type = 'focus' THEN value END) AS focus_avg,
+            AVG(CASE WHEN question_type = 'stress' THEN value END) AS stress_avg,
+            AVG(CASE WHEN question_type = 'sleep' THEN value END) AS sleep_avg,
+            AVG(CASE WHEN question_type = 'workload' THEN value END) AS workload_avg,
+            COUNT(*)::bigint AS answers_count
+        FROM checkin_answers
+        WHERE user_id = ANY($1)
+        GROUP BY 1, 2, 3
+        ORDER BY 2, 3
+        "#,
+    )
+    .bind(&user_ids)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut user_history: HashMap<Uuid, HashMap<String, MetricBlock>> = HashMap::new();
+    let mut month_keys_set: HashSet<String> = HashSet::new();
+
+    for row in rows {
+        let key = format!("{}-{:02}", row.year, row.month);
+        let metrics = compute_metrics(
+            row.mood_avg,
+            row.energy_avg,
+            row.wellbeing_avg,
+            row.motivation_avg,
+            row.focus_avg,
+            row.stress_avg,
+            row.sleep_avg,
+            row.workload_avg,
+        );
+
+        user_history
+            .entry(row.user_id)
+            .or_default()
+            .insert(key.clone(), metrics);
+        month_keys_set.insert(key);
+    }
+
+    let mut month_keys: Vec<String> = month_keys_set.into_iter().collect();
+    month_keys.sort_by(|a, b| {
+        let (ay, am) = parse_month_key(a);
+        let (by, bm) = parse_month_key(b);
+        ay.cmp(&by).then(am.cmp(&bm))
+    });
+
+    if !month_keys.is_empty() {
+        let (start_year, start_month) = parse_month_key(&month_keys[0]);
+        let (end_year, end_month) = parse_month_key(month_keys.last().unwrap());
+        let mut expanded = Vec::new();
+        let mut year = start_year;
+        let mut month = start_month;
+        loop {
+            expanded.push(format!("{year}-{month:02}"));
+            if year == end_year && month == end_month {
+                break;
+            }
+            month += 1;
+            if month > 12 {
+                month = 1;
+                year += 1;
+            }
+        }
+        month_keys = expanded;
+    }
+
+    let mut months_output = Vec::new();
+    let mut team_averages = HashMap::new();
+
+    for key in &month_keys {
+        let (year, month) = parse_month_key(key);
+        let mut employees = Vec::new();
+        let mut sum = MetricBlock::zero();
+        let mut count = 0.0f64;
+
+        for user in users {
+            let metrics = user_history
+                .get(&user.id)
+                .and_then(|h| h.get(key))
+                .cloned()
+                .unwrap_or_else(MetricBlock::zero);
+
+            let has_data = user_history
+                .get(&user.id)
+                .and_then(|h| h.get(key))
+                .is_some();
+
+            if has_data {
+                sum = add_metrics(&sum, &metrics);
+                count += 1.0;
+            }
+
+            employees.push(EmployeeMonthMetrics {
+                user_id: user.id,
+                name: user.name.clone(),
+                metrics,
+            });
+        }
+
+        let averages = if count > 0.0 {
+            divide_metrics(&sum, count)
+        } else {
+            MetricBlock::zero()
+        };
+
+        team_averages.insert(key.clone(), averages.clone());
+        months_output.push(TeamMonthData {
+            year,
+            month: month as u32,
+            averages,
+            employees,
+        });
+    }
+
+    Ok(AnalyticsData {
+        months: months_output,
+        team_averages,
+        user_history,
+        month_keys,
+    })
+}
+
+fn parse_month_key(key: &str) -> (i32, i32) {
+    let mut parts = key.split('-');
+    let year = parts.next().and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
+    let month = parts.next().and_then(|v| v.parse::<i32>().ok()).unwrap_or(0);
+    (year, month)
+}
+
+fn compute_metrics(
+    mood_avg: Option<f64>,
+    energy_avg: Option<f64>,
+    wellbeing_avg: Option<f64>,
+    motivation_avg: Option<f64>,
+    focus_avg: Option<f64>,
+    stress_avg: Option<f64>,
+    sleep_avg: Option<f64>,
+    workload_avg: Option<f64>,
+) -> MetricBlock {
+    let mood = mood_avg.unwrap_or(0.0);
+    let energy = energy_avg.unwrap_or(0.0);
+    let wellbeing = wellbeing_avg.unwrap_or(0.0);
+    let motivation = motivation_avg.unwrap_or(0.0);
+    let focus = focus_avg.unwrap_or(0.0);
+    let stress = stress_avg.unwrap_or(0.0);
+    let sleep = sleep_avg.unwrap_or(0.0);
+    let workload = workload_avg.unwrap_or(0.0);
+
+    let who5 = ((mood + energy + wellbeing) / 3.0 * 10.0).clamp(0.0, 100.0);
+    let phq9 = (((10.0 - mood) + (10.0 - energy) + (10.0 - motivation)) / 3.0 * 2.7)
+        .clamp(0.0, 27.0);
+    let gad7 = ((stress + (10.0 - focus)) / 2.0 * 2.1).clamp(0.0, 21.0);
+    let mbi = ((stress + workload + (10.0 - energy) + (10.0 - motivation)) / 4.0 * 10.0)
+        .clamp(0.0, 100.0);
+    let stress_level = (stress * 4.0).clamp(0.0, 40.0);
+    let work_life_balance = (10.0 - workload).clamp(0.0, 10.0);
+
+    MetricBlock {
+        who5,
+        phq9,
+        gad7,
+        mbi,
+        sleep_duration: sleep,
+        sleep_quality: sleep,
+        work_life_balance,
+        stress_level,
+    }
+}
+
+fn add_metrics(a: &MetricBlock, b: &MetricBlock) -> MetricBlock {
+    MetricBlock {
+        who5: a.who5 + b.who5,
+        phq9: a.phq9 + b.phq9,
+        gad7: a.gad7 + b.gad7,
+        mbi: a.mbi + b.mbi,
+        sleep_duration: a.sleep_duration + b.sleep_duration,
+        sleep_quality: a.sleep_quality + b.sleep_quality,
+        work_life_balance: a.work_life_balance + b.work_life_balance,
+        stress_level: a.stress_level + b.stress_level,
+    }
+}
+
+fn divide_metrics(a: &MetricBlock, denom: f64) -> MetricBlock {
+    MetricBlock {
+        who5: a.who5 / denom,
+        phq9: a.phq9 / denom,
+        gad7: a.gad7 / denom,
+        mbi: a.mbi / denom,
+        sleep_duration: a.sleep_duration / denom,
+        sleep_quality: a.sleep_quality / denom,
+        work_life_balance: a.work_life_balance / denom,
+        stress_level: a.stress_level / denom,
+    }
+}
+
+fn calculate_employee_risk(metrics: &MetricBlock) -> &'static str {
+    if metrics.who5 < 28.0 || metrics.phq9 > 15.0 || metrics.gad7 > 15.0 {
+        return "critical";
+    }
+    if metrics.who5 < 50.0 || metrics.phq9 > 10.0 || metrics.gad7 > 10.0 || metrics.mbi > 40.0 {
+        return "high";
+    }
+    if metrics.mbi > 30.0 || metrics.stress_level > 20.0 {
+        return "medium";
+    }
+    "low"
+}
+
+fn latest_user_metrics(
+    history: &HashMap<String, MetricBlock>,
+    month_keys: &[String],
+) -> Option<MetricBlock> {
+    if let Some(last_key) = month_keys.last() {
+        if let Some(metrics) = history.get(last_key) {
+            return Some(metrics.clone());
+        }
+    }
+    for key in month_keys.iter().rev() {
+        if let Some(metrics) = history.get(key) {
+            return Some(metrics.clone());
+        }
+    }
+    None
+}
+
+fn build_notes(
+    metrics: &MetricBlock,
+    history: &HashMap<String, MetricBlock>,
+    month_keys: &[String],
+    risk_level: &str,
+) -> String {
+    let latest = month_keys.last().and_then(|k| history.get(k));
+    let prev = if month_keys.len() >= 2 {
+        history.get(&month_keys[month_keys.len() - 2])
+    } else {
+        None
+    };
+
+    let who5_delta = match (latest, prev) {
+        (Some(latest), Some(prev)) => latest.who5 - prev.who5,
+        _ => 0.0,
+    };
+
+    match risk_level {
+        "critical" => format!(
+            "Критичний стан. WHO-5: {:.1}, PHQ-9: {:.1}, GAD-7: {:.1}, MBI: {:.1}%. Потрібна термінова підтримка.",
+            metrics.who5, metrics.phq9, metrics.gad7, metrics.mbi
+        ),
+        "high" => format!(
+            "Підвищений ризик. WHO-5: {:.1}, PHQ-9: {:.1}, стрес: {:.1}/40. Рекомендується 1:1 і зниження навантаження.",
+            metrics.who5, metrics.phq9, metrics.stress_level
+        ),
+        _ => {
+            if who5_delta >= 10.0 {
+                format!(
+                    "Позитивна динаміка WHO-5 +{:.1}. Продовжуйте підтримувати баланс.",
+                    who5_delta
+                )
+            } else if who5_delta <= -10.0 {
+                format!(
+                    "Негативна динаміка WHO-5 {:.1}. Варто перевірити фактори стресу.",
+                    who5_delta
+                )
+            } else {
+                "Стабільні показники. Продовжуйте регулярні чекіни.".to_string()
+            }
+        }
+    }
+}

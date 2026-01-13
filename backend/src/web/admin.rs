@@ -1,7 +1,6 @@
 use crate::analytics::early_signal;
 use crate::db;
 use crate::domain::models::UserRole;
-use crate::services::moderation;
 use crate::state::SharedState;
 use crate::web::session::UserSession;
 use argon2::{
@@ -12,7 +11,6 @@ use axum::{extract::{Path, State}, http::StatusCode, routing::{get, post}, Json,
 use chrono::{DateTime, Utc};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,21 +65,6 @@ pub struct ActionCard {
     pub priority: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ToxicityThemeCount {
-    pub theme: String,
-    pub count: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct WallToxicitySummary {
-    pub total_posts: i64,
-    pub flagged_posts: i64,
-    pub avg_severity: f64,
-    pub top_themes: Vec<ToxicityThemeCount>,
-    pub keywords: Vec<String>,
-    pub generated_at: DateTime<Utc>,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserPayload {
@@ -110,7 +93,7 @@ pub fn router(state: SharedState) -> Router {
         .route("/users/:id/deactivate", post(deactivate_user))
         .route("/users/:id/reactivate", post(reactivate_user))
         .route("/users/:id/reset-code", post(reset_user_code))
-        .route("/wall/toxicity", get(get_wall_toxicity_summary))
+        .route("/users/:id/reset-telegram", post(reset_user_telegram))
         .with_state(state)
 }
 
@@ -442,6 +425,41 @@ async fn reset_user_code(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn reset_user_telegram(
+    UserSession(user_id): UserSession,
+    State(state): State<SharedState>,
+    Path(target_id): Path<Uuid>,
+) -> Result<StatusCode, StatusCode> {
+    let requester = require_admin(&state, user_id).await?;
+
+    let target = db::find_user_by_id(&state.pool, target_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if !can_manage_role(&requester, &target.role) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET telegram_id = NULL,
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(target_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to reset telegram for {}: {}", target_id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn get_team_heatmap(
     UserSession(user_id): UserSession,
     State(state): State<SharedState>,
@@ -699,91 +717,4 @@ fn build_action_cards(
 
     cards.sort_by(|a, b| b.0.cmp(&a.0));
     cards.into_iter().take(3).map(|c| c.1).collect()
-}
-
-async fn get_wall_toxicity_summary(
-    UserSession(user_id): UserSession,
-    State(state): State<SharedState>,
-) -> Result<Json<WallToxicitySummary>, StatusCode> {
-    require_admin(&state, user_id).await?;
-
-    let rows = sqlx::query(
-        r#"
-        SELECT wp.id, wp.enc_content, wp.created_at,
-               wts.severity, wts.flagged, wts.themes
-        FROM wall_posts wp
-        LEFT JOIN wall_toxic_signals wts ON wp.id = wts.post_id
-        WHERE wp.created_at >= NOW() - INTERVAL '90 days'
-        ORDER BY wp.created_at DESC
-        LIMIT 400
-        "#,
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut total_posts = 0i64;
-    let mut flagged_posts = 0i64;
-    let mut severity_sum = 0i64;
-    let mut theme_counts: std::collections::HashMap<String, i64> =
-        std::collections::HashMap::new();
-    let mut flagged_messages = Vec::new();
-
-    for row in rows {
-        total_posts += 1;
-        let enc_content: Vec<u8> = row.try_get("enc_content").unwrap_or_default();
-        let content = state
-            .crypto
-            .decrypt_str(&String::from_utf8_lossy(&enc_content))
-            .unwrap_or_default();
-
-        let stored_themes: Option<serde_json::Value> = row.try_get("themes").ok();
-        let stored_flagged: Option<bool> = row.try_get("flagged").ok();
-        let stored_severity: Option<i16> = row.try_get("severity").ok();
-
-        let (flagged, severity, themes) = if let Some(themes_val) = stored_themes {
-            let themes: Vec<String> = serde_json::from_value(themes_val).unwrap_or_default();
-            (
-                stored_flagged.unwrap_or(false),
-                stored_severity.unwrap_or(0),
-                themes,
-            )
-        } else {
-            let signal = moderation::analyze_toxicity(&content);
-            (signal.flagged, signal.severity, signal.themes)
-        };
-
-        if flagged {
-            flagged_posts += 1;
-            severity_sum += severity as i64;
-            flagged_messages.push(content);
-        }
-
-        for theme in themes {
-            *theme_counts.entry(theme).or_insert(0) += 1;
-        }
-    }
-
-    let mut themes: Vec<ToxicityThemeCount> = theme_counts
-        .into_iter()
-        .map(|(theme, count)| ToxicityThemeCount { theme, count })
-        .collect();
-    themes.sort_by(|a, b| b.count.cmp(&a.count));
-    let top_themes = themes.into_iter().take(6).collect::<Vec<_>>();
-
-    let keywords = moderation::extract_keywords(&flagged_messages, 8);
-    let avg_severity = if flagged_posts > 0 {
-        severity_sum as f64 / flagged_posts as f64
-    } else {
-        0.0
-    };
-
-    Ok(Json(WallToxicitySummary {
-        total_posts,
-        flagged_posts,
-        avg_severity,
-        top_themes,
-        keywords,
-        generated_at: Utc::now(),
-    }))
 }

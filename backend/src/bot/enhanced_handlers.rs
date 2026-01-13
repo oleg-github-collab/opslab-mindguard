@@ -49,7 +49,22 @@ fn bot_username() -> Option<String> {
 
 fn is_group_command(text: &str, bot_name: Option<&str>) -> bool {
     let trimmed = text.trim();
-    let commands = ["/mindguard", "/help", "/support"];
+    let commands = [
+        "/mindguard",
+        "/help",
+        "/support",
+        "/checkin",
+        "/status",
+        "/weblogin",
+        "/settings",
+        "/kudos",
+        "/plan",
+        "/goals",
+        "/pulse",
+        "/insight",
+        "/wall",
+        "/link",
+    ];
     if commands.iter().any(|cmd| trimmed.starts_with(cmd)) {
         return true;
     }
@@ -67,6 +82,12 @@ fn is_personal_request(text: &str) -> bool {
         "/status",
         "/checkin",
         "/weblogin",
+        "/settings",
+        "/kudos",
+        "/plan",
+        "/goals",
+        "/insight",
+        "/link",
         "мій",
         "мої",
         "моє",
@@ -82,6 +103,64 @@ fn is_personal_request(text: &str) -> bool {
     ];
 
     keywords.iter().any(|k| lowered.contains(k))
+}
+
+fn is_valid_code(code: &str) -> bool {
+    code.len() == 4 && code.chars().all(|c| c.is_ascii_digit())
+}
+
+fn is_valid_email(email: &str) -> bool {
+    let trimmed = email.trim_start_matches('@');
+    trimmed.contains('@') && trimmed.len() <= 254
+}
+
+fn parse_link_command(text: &str) -> Option<(String, String)> {
+    let mut parts = text.trim().split_whitespace();
+    let cmd = parts.next()?;
+    if !(cmd.starts_with("/start") || cmd.starts_with("/link")) {
+        return None;
+    }
+    let email = parts.next()?;
+    let code = parts.next()?;
+    if is_valid_email(email) && is_valid_code(code) {
+        return Some((email.to_string(), code.to_string()));
+    }
+    None
+}
+
+fn parse_plain_link(text: &str) -> Option<(String, String)> {
+    let mut parts = text.trim().split_whitespace();
+    let email = parts.next()?;
+    let code = parts.next()?;
+    if is_valid_email(email) && is_valid_code(code) {
+        return Some((email.to_string(), code.to_string()));
+    }
+    None
+}
+
+struct ParsedCommand {
+    name: String,
+    args: String,
+}
+
+fn normalize_command(text: &str, bot_name: Option<&str>) -> Option<ParsedCommand> {
+    let trimmed = text.trim();
+    if !trimmed.starts_with('/') {
+        return None;
+    }
+
+    let mut parts = trimmed.splitn(2, ' ');
+    let mut cmd = parts.next()?.to_string();
+    let args = parts.next().unwrap_or("").trim().to_string();
+
+    if let Some(name) = bot_name {
+        let suffix = format!("@{name}");
+        if cmd.ends_with(&suffix) {
+            cmd.truncate(cmd.len() - suffix.len());
+        }
+    }
+
+    Some(ParsedCommand { name: cmd, args })
 }
 
 /// #5 Quick Actions after check-in
@@ -107,7 +186,7 @@ async fn send_quick_actions(
     }
 
     if metrics.who5_score < 60.0 {
-        actions.push(("📝 Написати на Wall", "action_wall_post"));
+        actions.push(("📝 Дати фідбек", "action_feedback"));
         actions.push(("💬 Поговорити з кимось", "action_talk"));
     }
 
@@ -184,16 +263,16 @@ async fn handle_action_callback(
             .parse_mode(ParseMode::MarkdownV2)
             .await?;
         }
-        "wall_post" => {
-            let base_url = app_base_url();
+        "feedback" | "wall_post" => {
+            let feedback_url = "https://opslab-feedback-production.up.railway.app/";
             bot.send_message(
                 msg.chat.id,
                 mdv2(format!(
-                    "📝 Стіна плачу\n\n\
-                    Поділись своїми думками анонімно або публічно:\n\
+                    "📝 OpsLab Feedback\n\n\
+                    Анонімний або публічний фідбек доступний тут:\n\
                     {}\n\n\
-                    Написати голосовим сюди - також працює!",
-                    base_url
+                    Це окремий сервіс — без передачі твоїх приватних даних у групи.",
+                    feedback_url
                 )),
             )
             .parse_mode(ParseMode::MarkdownV2)
@@ -397,39 +476,86 @@ fn bot() -> teloxide::Bot {
 
 async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -> Result<()> {
     let telegram_id = msg.chat.id.0;
+    let text = msg.text().map(|t| t.trim().to_string());
+    let bot_name = bot_username();
+    let command = text
+        .as_deref()
+        .and_then(|t| normalize_command(t, bot_name.as_deref()));
 
-    // Handle /start with PIN code
-    if let Some(text) = msg.text() {
-        if text.starts_with("/start ") {
-            let parts: Vec<&str> = text.split_whitespace().collect();
-            if parts.len() == 2 {
-                let pin = parts[1];
-                return handle_pin_verification(bot, &state, msg.chat.id, telegram_id, pin).await;
-            }
+    // Handle /start or /link with linking payload
+    if let Some(text) = text.as_deref() {
+        if let Some((email, code)) = parse_link_command(text) {
+            return handle_link_by_code(bot, &state, msg.chat.id, telegram_id, &email, &code).await;
         }
     }
 
     let user = db::find_user_by_telegram(&state.pool, telegram_id).await?;
     let Some(user) = user else {
+        if let Some(text) = text.as_deref() {
+            if let Some((email, code)) = parse_plain_link(text) {
+                return handle_link_by_code(bot, &state, msg.chat.id, telegram_id, &email, &code)
+                    .await;
+            }
+            if let Some(cmd) = command.as_ref() {
+                if cmd.name == "/start" || cmd.name == "/link" {
+                    bot.send_message(
+                        msg.chat.id,
+                        mdv2(
+                            "🧩 Для привʼязки потрібні email та 4-значний код доступу.\n\n\
+                            Формат:\n\
+                            /start email@opslab.uk 1234\n\n\
+                            Або:\n\
+                            /link email@opslab.uk 1234\n\n\
+                            Якщо ви втратили код — зверніться до адміністратора.",
+                        ),
+                    )
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .await?;
+                    return Ok(());
+                }
+            }
+            if text.trim().starts_with('/') {
+                let base_url = app_base_url();
+                bot.send_message(
+                    msg.chat.id,
+                    mdv2(format!(
+                        "🔒 Щоб команди працювали, пройдіть короткий онбординг:\n\n\
+                        1) Відкрийте web: {}\n\
+                        2) Увійдіть (email + 4-значний код)\n\
+                        3) Налаштуйте час і пояс\n\
+                        4) Поверніться в бот і привʼяжіть Telegram:\n\
+                        /link email@opslab.uk 1234\n\n\
+                        Після цього бот почне надсилати чекіни та звіти.",
+                        base_url
+                    )),
+                )
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+                return Ok(());
+            }
+        }
         let base_url = app_base_url();
         bot.send_message(
             msg.chat.id,
             mdv2(format!(
                 "👋 Привіт! Ласкаво просимо до OpsLab Mindguard!\n\n\
                 🧠 Що це за платформа?\n\
-                OpsLab Mindguard - це платформа для моніторингу та підтримки ментального здоров'я команди.\n\n\
+                OpsLab Mindguard — система для моніторингу та підтримки ментального здоров'я команди.\n\n\
                 🔐 Як почати?\n\
-                1. Перейдіть на платформу: {}\n\
-                2. Увійдіть за допомогою вашої корпоративної пошти та унікального 4-значного коду\n\
-                3. Після входу ваш Telegram автоматично зв'яжеться з акаунтом!\n\n\
-                💡 Підказка: ваш унікальний код ви отримали при реєстрації в команді.\n\n\
+                1. Відкрийте web: {0}\n\
+                2. Увійдіть (email + 4-значний код)\n\
+                3. Пройдіть онбординг і встановіть час нагадувань\n\
+                4. Поверніться в бот і привʼяжіть Telegram:\n\
+                   /link email@opslab.uk 1234\n\n\
+                💡 Код доступу ви отримали від адміністратора.\n\
+                🔒 Привʼязка одноразова — для зміни зверніться до адміністратора.\n\n\
                 📋 Доступні команди:\n\
                 /help - Показати всі команди\n\
                 /checkin - Пройти щоденний чекін\n\
                 /status - Подивитись свій стан\n\
                 /weblogin - Отримати посилання для входу\n\
-                /wall - Стіна плачу (анонімно або публічно)\n\n\
-                Якщо ви не знаєте свій код - зверніться до адміністратора команди.",
+                /wall - OpsLab Feedback (зовнішній)\n\n\
+                Веб-платформа: {0}",
                 base_url
             )),
         )
@@ -448,6 +574,43 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         return Ok(());
     }
 
+    let prefs = db::get_user_preferences(&state.pool, user.id)
+        .await
+        .unwrap_or(crate::db::UserPreferences {
+            reminder_hour: 10,
+            reminder_minute: 0,
+            timezone: "Europe/Kyiv".to_string(),
+            notification_enabled: true,
+            last_reminder_date: None,
+            last_plan_nudge_date: None,
+            onboarding_completed: false,
+            onboarding_completed_at: None,
+        });
+
+    if !prefs.onboarding_completed {
+        if let Some(cmd) = command.as_ref() {
+            if cmd.name == "/weblogin" {
+                send_web_login_link(bot, &state, msg.chat.id, user.id).await?;
+                return Ok(());
+            }
+            if cmd.name == "/link" {
+                bot.send_message(
+                    msg.chat.id,
+                    mdv2(
+                        "✅ Telegram уже привʼязаний до вашого акаунту.\n\n\
+                        Для зміни зверніться до адміністратора.",
+                    ),
+                )
+                .parse_mode(ParseMode::MarkdownV2)
+                .await?;
+                return Ok(());
+            }
+        }
+
+        send_onboarding_gate(bot, msg.chat.id, &prefs).await?;
+        return Ok(());
+    }
+
     // Handle voice messages
     if let Some(voice) = msg.voice() {
         let file_id = voice.file.id.clone();
@@ -456,205 +619,210 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
     }
 
     // Handle text commands
-    if let Some(text) = msg.text() {
-        if text.starts_with("/start") {
-            send_start_message(bot, msg.chat.id).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/checkin") {
+    if let Some(cmd) = command {
+        match cmd.name.as_str() {
+            "/start" => {
+                send_start_message(bot, msg.chat.id).await?;
+                return Ok(());
+            }
+            "/link" => {
+                bot.send_message(
+                    msg.chat.id,
+                    mdv2(
+                        "✅ Telegram уже привʼязаний до вашого акаунту.\n\n\
+                        Для зміни зверніться до адміністратора.",
+                    ),
+                )
+                .parse_mode(ParseMode::MarkdownV2)
+                .await?;
+                return Ok(());
+            }
+            "/checkin" => {
             start_daily_checkin(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
-        }
-
-        if text.starts_with("/status") {
+            }
+            "/status" => {
             send_user_status(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
-        }
-
-        if text.starts_with("/wall") {
+            }
+            "/wall" => {
             send_wall_info(bot, msg.chat.id).await?;
             return Ok(());
-        }
-
-        if text.starts_with("/weblogin") {
+            }
+            "/weblogin" => {
             send_web_login_link(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
-        }
-
-        // #2 WOW Feature: Smart Reminders
-        if text.starts_with("/settime") {
-            let args = text.trim_start_matches("/settime").trim();
-            handle_settime_command(bot, &state, msg.chat.id, user.id, args).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/timezone") {
-            let args = text.trim_start_matches("/timezone").trim();
-            handle_timezone_command(bot, &state, msg.chat.id, user.id, args).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/notify") {
-            let args = text.trim_start_matches("/notify").trim();
-            handle_notify_command(bot, &state, msg.chat.id, user.id, args).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/settings") {
+            }
+            "/settime" => {
+                handle_settime_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
+            "/timezone" => {
+                handle_timezone_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
+            "/notify" => {
+                handle_notify_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
+            "/settings" => {
             send_settings(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
-        }
-
-        // #17 WOW Feature: Kudos System
-        if text.starts_with("/kudos") {
-            let args = text.trim_start_matches("/kudos").trim();
-            handle_kudos_command(bot, &state, msg.chat.id, user.id, args).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/plan") {
+            }
+            "/kudos" => {
+                handle_kudos_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
+            "/plan" => {
             send_wellness_plan(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
-        }
-
-        if text.starts_with("/goals") {
-            let args = text.trim_start_matches("/goals").trim();
-            handle_goals_command(bot, &state, msg.chat.id, user.id, args).await?;
-            return Ok(());
-        }
-
-        if text.starts_with("/pulse") {
+            }
+            "/goals" => {
+                handle_goals_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
+            "/pulse" => {
             send_pulse_info(bot, msg.chat.id).await?;
             return Ok(());
-        }
-
-        if text.starts_with("/insight") {
+            }
+            "/insight" => {
             send_personal_insight(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
+            }
+            "/help" => {
+                send_help_message(bot, msg.chat.id).await?;
+                return Ok(());
+            }
+            _ => {}
         }
+    }
 
-        if text.starts_with("/help") || text.contains("тривога") || text.contains("паніка")
-        {
-            bot.send_message(
-                msg.chat.id,
-                mdv2(
-                    "📱 Команди бота:\n\n\
-                    /checkin - Щоденний чекін\n\
-                    /status - Поточний стан\n\
-                    /wall - Стіна плачу\n\
-                    /weblogin - Вхід у web dashboard\n\
-                    /settime - Час нагадувань\n\
-                    /timezone - Часовий пояс\n\
-                    /notify - Нагадування on/off\n\
-                    /settings - Налаштування\n\
-                    /kudos - Подяка колезі\n\
-                    /plan - План Wellness OS\n\
-                    /goals - Персональні цілі\n\
-                    /pulse - Pulse rooms\n\
-                    /insight - Персональний інсайт\n\n\
-                    🧑‍🤝‍🧑 У груповому чаті:\n\
-                    Звертайтесь до бота через /mindguard або @mention для загальних порад.\n\
-                    Персональні дані доступні лише в приваті.\n\n\
-                    💆 Миттєва підтримка\n\
-                    Дихання 4-7-8: 4с вдих → 7с затримка → 8с видих (4 цикли).\n\n\
-                    Якщо потрібна термінова допомога — зверніться до психолога або керівника.",
-                ),
-            )
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await?;
+    if let Some(text) = text.as_deref() {
+        let lowered = text.to_lowercase();
+        if lowered.contains("тривога") || lowered.contains("паніка") {
+            send_help_message(bot, msg.chat.id).await?;
             return Ok(());
         }
-
-        // Fallback
-        bot.send_message(
-            msg.chat.id,
-            mdv2(
-                "📱 Команди бота:\n\n\
-                /checkin - Щоденний чекін (2-3 хв)\n\
-                /status - Ваш поточний стан\n\
-                /wall - Стіна плачу\n\
-                /settings - Налаштування\n\
-                /settime - Встановити час чекіну ⏰\n\
-                /timezone - Часовий пояс\n\
-                /notify - Нагадування on/off\n\
-                /kudos - Подякувати колезі 🎉\n\
-                /plan - План Wellness OS\n\
-                /goals - Персональні цілі\n\
-                /pulse - Pulse rooms\n\
-                /insight - Персональний інсайт\n\
-                /help - Допомога",
-            ),
-        )
-        .parse_mode(ParseMode::MarkdownV2)
-        .await?;
     }
+
+    // Fallback
+    bot.send_message(
+        msg.chat.id,
+        mdv2(
+            "📱 Команди бота:\n\n\
+            /checkin - Щоденний чекін (2-3 хв)\n\
+            /status - Ваш поточний стан\n\
+            /wall - OpsLab Feedback\n\
+            /settings - Налаштування\n\
+            /settime - Встановити час чекіну ⏰\n\
+            /timezone - Часовий пояс\n\
+            /notify - Нагадування on/off\n\
+            /kudos - Подякувати колезі 🎉\n\
+            /plan - План Wellness OS\n\
+            /goals - Персональні цілі\n\
+            /pulse - Pulse rooms\n\
+            /insight - Персональний інсайт\n\
+            /help - Допомога\n\
+            /weblogin - Вхід у web\n\
+            /link email@opslab.uk 1234 - Привʼязка Telegram",
+        ),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
 
     Ok(())
 }
 
-/// Обробка PIN-коду для зв'язування Telegram
-async fn handle_pin_verification(
+/// Обробка коду доступу для зв'язування Telegram
+async fn handle_link_by_code(
     bot: &teloxide::Bot,
     state: &SharedState,
     chat_id: ChatId,
     telegram_id: i64,
-    pin: &str,
+    email: &str,
+    code: &str,
 ) -> Result<()> {
-    // Verify PIN and link Telegram ID
-    match db::verify_and_link_telegram(&state.pool, pin, telegram_id).await {
-        Ok(Some(user_id)) => {
-            // Success! Telegram linked
+    let email = email.trim_start_matches('@');
+    match db::link_telegram_by_email_code(&state.pool, email, code, telegram_id).await {
+        Ok(db::TelegramLinkOutcome::Linked(user_id)) => {
             let user = db::find_user_by_id(&state.pool, user_id).await?;
-            let name = if let Some(user) = user {
-                state
-                    .crypto
-                    .decrypt_str(&user.enc_name)
-                    .unwrap_or("користувач".to_string())
-            } else {
-                "користувач".to_string()
-            };
+            let name = user
+                .and_then(|u| state.crypto.decrypt_str(&u.enc_name).ok())
+                .unwrap_or_else(|| "користувач".to_string());
+            let base_url = app_base_url();
 
             bot.send_message(
                 chat_id,
                 mdv2(format!(
                     "✅ Вітаємо, {}!\n\n\
-                    Telegram успішно підключено до вашого акаунту!\n\n\
-                    🎉 Тепер ви будете отримувати:\n\
-                    • Щоденні чекіни у вибраний час (за локальним часом)\n\
-                    • Критичні сповіщення\n\
-                    • Можливість відправляти голосові для AI аналізу\n\n\
-                    ⚙️ Налаштування часу та поясу: /settings\n\n\
-                    Доступні команди:\n\
-                    /checkin - Пройти чекін зараз\n\
-                    /status - Переглянути свої метрики\n\
-                    /wall - Стіна плачу\n\
-                    /help - Допомога\n\n\
+                    Telegram успішно підключено до вашого акаунту.\n\n\
+                    🧭 Наступний крок:\n\
+                    1) Відкрий web: {base_url}\n\
+                    2) Пройди онбординг і задай час нагадувань\n\
+                    3) Натисни \"Завершити онбординг\"\n\n\
+                    Швидкий вхід у web: /weblogin\n\n\
+                    Після завершення стануть доступні чекіни, звіти та персональні інсайти.\n\
                     Побачимось у твій обраний час! 👋",
-                    name
+                    name,
                 )),
             )
             .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
         }
-        Ok(None) => {
-            // Invalid or expired PIN
+        Ok(db::TelegramLinkOutcome::AlreadyLinked {
+            same_telegram: true,
+            ..
+        }) => {
             bot.send_message(
                 chat_id,
                 mdv2(
-                    "❌ Невірний або прострочений PIN-код\n\n\
-                    PIN-код дійсний тільки 5 хвилин.\n\n\
-                    Будь ласка:\n\
-                    1️⃣ Увійдіть на платформу знову\n\
-                    2️⃣ Згенеруйте новий PIN-код\n\
-                    3️⃣ Напишіть: /start НОВИЙ-PIN",
+                    "✅ Telegram вже привʼязаний до вашого акаунту.\n\n\
+                    Використайте /help для списку команд або /weblogin для швидкого входу.",
+                ),
+            )
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .await?;
+        }
+        Ok(db::TelegramLinkOutcome::AlreadyLinked {
+            same_telegram: false,
+            ..
+        }) => {
+            bot.send_message(
+                chat_id,
+                mdv2(
+                    "⚠️ Цей акаунт вже привʼязаний до іншого Telegram.\n\n\
+                    Для зміни зверніться до адміністратора.",
+                ),
+            )
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .await?;
+        }
+        Ok(db::TelegramLinkOutcome::TelegramIdInUse) => {
+            bot.send_message(
+                chat_id,
+                mdv2(
+                    "⚠️ Цей Telegram вже привʼязаний до іншого акаунту.\n\n\
+                    Якщо це помилка — зверніться до адміністратора.",
+                ),
+            )
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .await?;
+        }
+        Ok(db::TelegramLinkOutcome::InvalidCredentials) => {
+            bot.send_message(
+                chat_id,
+                mdv2(
+                    "❌ Невірний email або код доступу.\n\n\
+                    Формат:\n\
+                    /start email@opslab.uk 1234\n\n\
+                    Якщо код втрачено — зверніться до адміністратора.",
                 ),
             )
             .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await?;
         }
         Err(e) => {
-            tracing::error!("Error verifying PIN: {}", e);
+            tracing::error!("Error linking Telegram: {}", e);
             bot.send_message(
                 chat_id,
                 "⚠️ Виникла помилка при підключенні.\n\
@@ -669,31 +837,98 @@ async fn handle_pin_verification(
 
 /// Відправка привітального повідомлення
 async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
+    let base_url = app_base_url();
     bot.send_message(
         chat_id,
-        mdv2(
+        mdv2(format!(
             "👋 Привіт! Я OpsLab Mindguard Bot\n\n\
             Допомагаю відстежувати твоє ментальне здоров'я:\n\n\
             🔹 Щоденні чекіни (2-3 хв) - автоматична розсилка у твій час\n\
             🔹 Голосова підтримка - запиши голосове і отримай аналіз\n\
-            🔹 Стіна плачу - фідбек анонімно або публічно\n\
+            🔹 OpsLab Feedback - окремий сервіс для фідбеку\n\
             🔹 Web dashboard - детальна статистика\n\n\
             Головні команди:\n\
             /checkin - Пройти чекін зараз\n\
             /status - Мій поточний стан\n\
             /weblogin - Отримати посилання для входу в dashboard\n\
-            /wall - Стіна плачу\n\
+            /wall - OpsLab Feedback\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
             /pulse - Pulse rooms\n\
             /insight - Персональний інсайт\n\
             /settings - Налаштування та час нагадувань\n\
-            /help - Допомога\n\n\
+            /help - Допомога\n\
+            /link email@opslab.uk 1234 - Привʼязка Telegram\n\n\
             💡 Швидкий старт:\n\
-            1. Надішліть /weblogin для входу в web dashboard\n\
-            2. Отримайте персональне посилання (дійсне 5 хв)\n\
-            3. Переглядайте свої метрики та тренди!\n\n\
+            1. Відкрий web dashboard: {base_url}\n\
+            2. Переглянь метрики та оновлюй час нагадувань\n\
+            3. Чекіни приходять у вибраний час\n\n\
             Час нагадувань можна змінити в /settings або /settime",
+        )),
+    )
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+    .await?;
+    Ok(())
+}
+
+async fn send_onboarding_gate(
+    bot: &teloxide::Bot,
+    chat_id: ChatId,
+    prefs: &crate::db::UserPreferences,
+) -> Result<()> {
+    let base_url = app_base_url();
+    let time = format!("{:02}:{:02}", prefs.reminder_hour, prefs.reminder_minute);
+    let notifications = if prefs.notification_enabled {
+        "увімкнені"
+    } else {
+        "вимкнені"
+    };
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "🧭 Ще один крок до активації Mindguard\n\n\
+            1) Відкрий web: {base_url}\n\
+            2) Пройди онбординг і задай час нагадувань\n\
+            3) Натисни кнопку \"Завершити онбординг\"\n\n\
+            Поточні налаштування: {time} · {} · сповіщення {}\n\n\
+            Після завершення будуть доступні /checkin, /status, /plan та інші команди.\n\
+            Швидкий вхід у web: /weblogin",
+            prefs.timezone, notifications
+        )),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await?;
+    Ok(())
+}
+
+async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
+    bot.send_message(
+        chat_id,
+        mdv2(
+            "📱 Команди бота:\n\n\
+            /checkin - Щоденний чекін\n\
+            /status - Поточний стан\n\
+            /wall - OpsLab Feedback\n\
+            /weblogin - Вхід у web dashboard\n\
+            /settime - Час нагадувань\n\
+            /timezone - Часовий пояс\n\
+            /notify - Нагадування on/off\n\
+            /settings - Налаштування\n\
+            /kudos - Подяка колезі\n\
+            /plan - План Wellness OS\n\
+            /goals - Персональні цілі\n\
+            /pulse - Pulse rooms\n\
+            /insight - Персональний інсайт\n\n\
+            🔗 Привʼязка Telegram:\n\
+            /start email@opslab.uk 1234\n\
+            /link email@opslab.uk 1234\n\n\
+            🧑‍🤝‍🧑 У груповому чаті:\n\
+            Звертайтесь до бота через /mindguard або @mention для загальних порад.\n\
+            Персональні дані доступні лише в приваті.\n\n\
+            💆 Миттєва підтримка\n\
+            Дихання 4-7-8: 4с вдих → 7с затримка → 8с видих (4 цикли).\n\n\
+            Якщо потрібна термінова допомога — зверніться до психолога або керівника.",
         ),
     )
     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
@@ -1042,18 +1277,17 @@ async fn send_user_status(
     Ok(())
 }
 
-/// Відправка інформації про Стіну плачу
+/// Відправка інформації про OpsLab Feedback
 async fn send_wall_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
-    let base_url = app_base_url();
+    let feedback_url = "https://opslab-feedback-production.up.railway.app/";
     bot.send_message(
         chat_id,
         mdv2(format!(
-            "📝 Стіна плачу\n\n\
+            "📝 OpsLab Feedback\n\n\
             Простір для чесного зворотного зв'язку.\n\
-            Поділися своїми думками, ідеями або переживаннями.\n\n\
-            Можна публікувати анонімно або публічно (з ім'ям) у web.\n\n\
+            Анонімно або публічно — у зовнішньому сервісі.\n\n\
             🔗 {}",
-            base_url
+            feedback_url
         )),
     )
     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
@@ -1326,20 +1560,31 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
         }
 
         let trimmed = text.trim();
-        if is_command
-            && (trimmed == "/mindguard"
+        if is_command {
+            if trimmed.starts_with("/wall") {
+                send_wall_info(bot, msg.chat.id).await?;
+                return Ok(());
+            }
+            if trimmed.starts_with("/pulse") {
+                send_pulse_info(bot, msg.chat.id).await?;
+                return Ok(());
+            }
+            if trimmed == "/mindguard"
                 || trimmed.starts_with("/mindguard@")
                 || trimmed == "/help"
-                || trimmed.starts_with("/help@"))
-        {
-            bot.send_message(
-                msg.chat.id,
-                "💬 Я можу допомогти з загальними порадами у групі.\n\
-                Напиши питання після /mindguard або з @mention.\n\
-                Наприклад: /mindguard як зняти стрес?",
-            )
-            .await?;
-            return Ok(());
+                || trimmed.starts_with("/help@")
+                || trimmed == "/support"
+                || trimmed.starts_with("/support@")
+            {
+                bot.send_message(
+                    msg.chat.id,
+                    "💬 Я можу допомогти з загальними порадами у групі.\n\
+                    Напиши питання після /mindguard або з @mention.\n\
+                    Наприклад: /mindguard як зняти стрес?",
+                )
+                .await?;
+                return Ok(());
+            }
         }
 
         // Проста логіка відповідей
@@ -1425,6 +1670,8 @@ async fn handle_settime_command(
                 notification_enabled: true,
                 last_reminder_date: None,
                 last_plan_nudge_date: None,
+                onboarding_completed: false,
+                onboarding_completed_at: None,
             });
         bot.send_message(
             chat_id,
@@ -1457,6 +1704,8 @@ async fn handle_settime_command(
                 notification_enabled: true,
                 last_reminder_date: None,
                 last_plan_nudge_date: None,
+                onboarding_completed: false,
+                onboarding_completed_at: None,
             });
         let (hour, minute) =
             db::calculate_best_reminder_time_local(&state.pool, user_id, &prefs.timezone).await?;
@@ -1525,6 +1774,8 @@ async fn handle_settime_command(
             notification_enabled: true,
             last_reminder_date: None,
             last_plan_nudge_date: None,
+            onboarding_completed: false,
+            onboarding_completed_at: None,
         });
 
     bot.send_message(
@@ -1659,6 +1910,8 @@ async fn send_wellness_plan(
             notification_enabled: true,
             last_reminder_date: None,
             last_plan_nudge_date: None,
+            onboarding_completed: false,
+            onboarding_completed_at: None,
         });
     let (local_date, _, _) = time_utils::local_components(&prefs.timezone, Utc::now());
 

@@ -87,12 +87,14 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 
 1. `GET /health` повертає `200 OK`.
 2. Web UI відкривається з браузера.
-3. Вхід по email + PIN працює.
-4. `/checkin`, `/status`, `/wall`, `/plan`, `/goals`, `/pulse`, `/insight` працюють.
-5. Стіна плачу приймає анонімні і публічні пости.
-6. Голосові опитування транскрибуються (OpenAI key).
-7. Адмін панель показує heatmap + action cards.
-8. Webhook активний і бот відповідає.
+3. Вхід по email + 4-значний код працює.
+4. Привʼязка Telegram: `/start email@opslab.uk 1234`.
+5. `/checkin`, `/status`, `/wall`, `/plan`, `/goals`, `/pulse`, `/insight` працюють.
+6. Кнопка OpsLab Feedback веде на зовнішній сервіс.
+7. Голосові опитування транскрибуються (OpenAI key).
+8. Адмін панель показує heatmap + action cards.
+9. Advanced Analytics доступна для Admin/Founder.
+10. Webhook активний і бот відповідає.
 
 ## 9) Міграції
 

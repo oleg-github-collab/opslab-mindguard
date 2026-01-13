@@ -5,6 +5,7 @@ use crate::crypto::Crypto;
 use crate::domain::models::UserRole;
 use crate::time_utils;
 use anyhow::Result;
+use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Row};
@@ -46,6 +47,8 @@ pub struct UserPreferences {
     pub notification_enabled: bool,
     pub last_reminder_date: Option<NaiveDate>,
     pub last_plan_nudge_date: Option<NaiveDate>,
+    pub onboarding_completed: bool,
+    pub onboarding_completed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,6 +61,7 @@ pub struct ReminderCandidate {
     pub notification_enabled: bool,
     pub last_reminder_date: Option<NaiveDate>,
     pub last_plan_nudge_date: Option<NaiveDate>,
+    pub onboarding_completed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -393,6 +397,65 @@ pub async fn get_checkin_answer_count(pool: &PgPool, user_id: Uuid, days: i32) -
 
 // ========== Telegram PIN Functions ==========
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TelegramLinkOutcome {
+    Linked(Uuid),
+    AlreadyLinked { user_id: Uuid, same_telegram: bool },
+    InvalidCredentials,
+    TelegramIdInUse,
+}
+
+/// Link Telegram to user using pre-issued access code (email + 4-digit code).
+pub async fn link_telegram_by_email_code(
+    pool: &PgPool,
+    email: &str,
+    code: &str,
+    telegram_id: i64,
+) -> Result<TelegramLinkOutcome> {
+    let email = email.trim().to_lowercase();
+    if email.is_empty() || code.is_empty() {
+        return Ok(TelegramLinkOutcome::InvalidCredentials);
+    }
+
+    let Some(user) = find_user_by_email(pool, &email).await? else {
+        return Ok(TelegramLinkOutcome::InvalidCredentials);
+    };
+
+    let parsed_hash = PasswordHash::new(&user.hash)
+        .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+    if Argon2::default()
+        .verify_password(code.as_bytes(), &parsed_hash)
+        .is_err()
+    {
+        return Ok(TelegramLinkOutcome::InvalidCredentials);
+    }
+
+    if let Some(existing) = user.telegram_id {
+        return Ok(TelegramLinkOutcome::AlreadyLinked {
+            user_id: user.id,
+            same_telegram: existing == telegram_id,
+        });
+    }
+
+    if find_user_by_telegram(pool, telegram_id).await?.is_some() {
+        return Ok(TelegramLinkOutcome::TelegramIdInUse);
+    }
+
+    sqlx::query!(
+        r#"
+        UPDATE users
+        SET telegram_id = $1, updated_at = NOW()
+        WHERE id = $2
+        "#,
+        telegram_id,
+        user.id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(TelegramLinkOutcome::Linked(user.id))
+}
+
 /// Generate a new PIN code for Telegram linking
 pub async fn generate_telegram_pin(pool: &PgPool, user_id: Uuid) -> Result<String> {
     use rand::Rng;
@@ -574,6 +637,28 @@ pub async fn set_user_notification_enabled(
     Ok(())
 }
 
+pub async fn set_user_onboarding_complete(
+    pool: &PgPool,
+    user_id: Uuid,
+    completed: bool,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, onboarding_completed, onboarding_completed_at)
+        VALUES ($1, $2, CASE WHEN $2 THEN NOW() ELSE NULL END)
+        ON CONFLICT (user_id) DO UPDATE
+        SET onboarding_completed = $2,
+            onboarding_completed_at = CASE WHEN $2 THEN NOW() ELSE NULL END,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(completed)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get user preferences with defaults
 pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPreferences> {
     let row = sqlx::query(
@@ -584,7 +669,9 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             COALESCE(timezone, 'Europe/Kyiv') as timezone,
             COALESCE(notification_enabled, true) as notification_enabled,
             last_reminder_date,
-            last_plan_nudge_date
+            last_plan_nudge_date,
+            COALESCE(onboarding_completed, false) as onboarding_completed,
+            onboarding_completed_at
         FROM user_preferences
         WHERE user_id = $1
         "#,
@@ -601,6 +688,8 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             notification_enabled: row.try_get::<bool, _>("notification_enabled")?,
             last_reminder_date: row.try_get::<Option<NaiveDate>, _>("last_reminder_date")?,
             last_plan_nudge_date: row.try_get::<Option<NaiveDate>, _>("last_plan_nudge_date")?,
+            onboarding_completed: row.try_get::<bool, _>("onboarding_completed")?,
+            onboarding_completed_at: row.try_get::<Option<DateTime<Utc>>, _>("onboarding_completed_at")?,
         })
     } else {
         Ok(UserPreferences {
@@ -610,6 +699,8 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             notification_enabled: true,
             last_reminder_date: None,
             last_plan_nudge_date: None,
+            onboarding_completed: false,
+            onboarding_completed_at: None,
         })
     }
 }
@@ -651,12 +742,14 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
             COALESCE(p.timezone, 'Europe/Kyiv') as timezone,
             COALESCE(p.notification_enabled, true) as notification_enabled,
             p.last_reminder_date as last_reminder_date,
-            p.last_plan_nudge_date as last_plan_nudge_date
+            p.last_plan_nudge_date as last_plan_nudge_date,
+            COALESCE(p.onboarding_completed, false) as onboarding_completed
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
           AND u.role != 'ADMIN'
           AND u.is_active = true
+          AND COALESCE(p.onboarding_completed, false) = true
         "#,
     )
     .fetch_all(pool)
@@ -677,6 +770,7 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
             notification_enabled: row.try_get("notification_enabled")?,
             last_reminder_date: row.try_get("last_reminder_date")?,
             last_plan_nudge_date: row.try_get("last_plan_nudge_date")?,
+            onboarding_completed: row.try_get("onboarding_completed")?,
         });
     }
 
@@ -837,11 +931,14 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
 pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, telegram_id
-        FROM users
-        WHERE telegram_id IS NOT NULL
-          AND role != 'ADMIN'
-          AND is_active = true
+        SELECT u.id, u.telegram_id
+        FROM users u
+        LEFT JOIN user_preferences p ON u.id = p.user_id
+        WHERE u.telegram_id IS NOT NULL
+          AND u.role != 'ADMIN'
+          AND u.is_active = true
+          AND COALESCE(p.onboarding_completed, false) = true
+          AND COALESCE(p.notification_enabled, true) = true
         "#,
     )
     .fetch_all(pool)

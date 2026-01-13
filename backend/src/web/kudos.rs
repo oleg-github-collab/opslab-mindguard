@@ -1,3 +1,4 @@
+use crate::bot::markdown::mdv2;
 use crate::db;
 use crate::domain::models::UserRole;
 use crate::services::moderation;
@@ -10,6 +11,9 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::env;
+use teloxide::prelude::*;
+use teloxide::types::ParseMode;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +42,7 @@ struct KudosInsights {
     sent_count_30d: usize,
     top_keywords: Vec<String>,
     top_senders: Vec<String>,
+    summary: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -52,6 +57,11 @@ pub fn router(state: SharedState) -> Router {
         .route("/", get(get_kudos))
         .route("/", post(send_kudos))
         .with_state(state)
+}
+
+fn telegram_bot() -> Option<teloxide::Bot> {
+    let token = env::var("TELEGRAM_BOT_TOKEN").ok()?;
+    Some(teloxide::Bot::new(token))
 }
 
 async fn resolve_user_id(
@@ -145,6 +155,7 @@ async fn get_kudos(
         .collect();
 
     let top_keywords = moderation::extract_keywords(&received_messages, 6);
+    let summary = build_kudos_summary(received_messages.len(), sent_entries.len(), &top_keywords);
 
     Ok(Json(KudosResponse {
         received: received_entries,
@@ -154,8 +165,29 @@ async fn get_kudos(
             sent_count_30d: sent_count_30d,
             top_keywords,
             top_senders,
+            summary,
         },
     }))
+}
+
+fn build_kudos_summary(received: usize, sent: usize, keywords: &[String]) -> String {
+    if received == 0 && sent == 0 {
+        return "Немає достатньо kudos для інсайту.".to_string();
+    }
+
+    let balance = if received >= sent + 2 {
+        "Команда активно відзначає ваш внесок."
+    } else if sent >= received + 2 {
+        "Ви активно підтримуєте команду — це підсилює культуру."
+    } else {
+        "Баланс подяк стабільний."
+    };
+
+    if keywords.is_empty() {
+        balance.to_string()
+    } else {
+        format!("{} Ключові теми: {}.", balance, keywords.iter().take(3).cloned().collect::<Vec<_>>().join(", "))
+    }
 }
 
 async fn send_kudos(
@@ -184,6 +216,29 @@ async fn send_kudos(
     db::insert_kudos(&state.pool, user_id, recipient.id, message)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(recipient_tg_id) = recipient.telegram_id {
+        if let Some(bot) = telegram_bot() {
+            let sender = db::find_user_by_id(&state.pool, user_id)
+                .await
+                .ok()
+                .flatten();
+            let sender_name = sender
+                .and_then(|u| state.crypto.decrypt_str(&u.enc_name).ok())
+                .unwrap_or_else(|| "Колега".to_string());
+            let text = mdv2(format!(
+                "🎉 Kudos від {}!\n\n{}\n\nДякуємо за підтримку команди.",
+                sender_name, message
+            ));
+            if let Err(err) = bot
+                .send_message(teloxide::types::ChatId(recipient_tg_id), text)
+                .parse_mode(ParseMode::MarkdownV2)
+                .await
+            {
+                tracing::warn!("Failed to send kudos via Telegram: {}", err);
+            }
+        }
+    }
 
     Ok(StatusCode::CREATED)
 }

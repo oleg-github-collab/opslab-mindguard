@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     /* ===== NEOBRUTAL DESIGN SYSTEM ===== */
     :root {
@@ -325,89 +326,479 @@
       color: var(--dark);
     }
 
-    /* ===== WALL POST ===== */
-    .wall-post {
+    /* ===== DASHBOARD / ADVANCED UI ===== */
+    .dashboard-block {
       background: var(--white);
       border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
       padding: 1.5rem;
       margin-bottom: 1.5rem;
-      box-shadow: 6px 6px 0 var(--dark);
-      position: relative;
     }
 
-    .wall-post-header {
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+
+    .section-heading {
+      margin-bottom: 1.25rem;
+    }
+
+    .section-subtitle {
+      color: var(--gray);
+      margin-top: 0.25rem;
+    }
+
+    .metrics-section {
+      margin-top: 1rem;
+    }
+
+    .metrics-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .metric-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 2px solid var(--dark);
-      flex-wrap: wrap;
-      gap: 0.5rem;
+      margin-bottom: 0.5rem;
     }
 
-    .wall-post-meta {
+    .metric-label-wrapper {
       display: flex;
-      gap: 1rem;
-      font-size: 0.875rem;
+      gap: 0.5rem;
+      align-items: center;
       flex-wrap: wrap;
     }
 
-    .wall-post-date {
-      font-family: 'Space Mono', monospace;
+    .metric-description {
+      color: var(--gray);
+      font-size: 0.85rem;
+    }
+
+    .employee-month-selector {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .employee-month-btn {
+      padding: 0.6rem 1.1rem;
+      border: 3px solid var(--dark);
+      background: var(--white);
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 var(--dark);
+      transition: all 0.2s;
+    }
+
+    .employee-month-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
+    }
+
+    .employee-month-btn.active {
+      background: var(--accent);
+      color: var(--dark);
+    }
+
+    .info-icon {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--dark);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 800;
+      cursor: help;
+      position: relative;
+      background: var(--accent);
+    }
+
+    .info-icon::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      bottom: 130%;
+      transform: translateX(-50%);
+      background: var(--white);
+      color: var(--dark);
+      border: 2px solid var(--dark);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      width: 220px;
+      box-shadow: 4px 4px 0 var(--dark);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .info-icon:hover::after {
+      opacity: 1;
+    }
+
+    .risk-indicator {
+      display: inline-flex;
+      padding: 0.25rem 0.6rem;
+      border: 2px solid var(--dark);
+      font-weight: 700;
+      margin-top: 0.5rem;
+      background: var(--gray-light);
+      font-size: 0.75rem;
+    }
+
+    .risk-low { background: var(--success); }
+    .risk-medium { background: var(--warning); }
+    .risk-high { background: var(--danger); color: var(--white); }
+    .risk-critical { background: var(--danger); color: var(--white); }
+
+    .chart-container {
+      border: 3px solid var(--dark);
+      background: var(--white);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+    }
+
+    .table-container {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      overflow-x: auto;
+      background: var(--white);
+    }
+
+    #employee-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    #employee-table th,
+    #employee-table td {
+      border: 2px solid var(--dark);
+      padding: 0.6rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #employee-table th {
+      background: var(--gray-light);
+      font-weight: 800;
+    }
+
+    .employee-name.clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .score-good { background: #e8f9e8; }
+    .score-warning { background: #fff0c2; }
+    .score-danger { background: #ffd6d6; }
+
+    .risk-items {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .risk-item {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .risk-item.high { background: #ffd6d6; }
+    .risk-item.medium { background: #fff1c2; }
+    .risk-item.low { background: #e8f9e8; }
+
+    /* ===== MODAL ===== */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-content {
+      background: var(--white);
+      border: 4px solid var(--dark);
+      box-shadow: 8px 8px 0 var(--dark);
+      padding: 1.5rem;
+      max-width: 860px;
+      width: 100%;
+      max-height: 85vh;
+      overflow: auto;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      right: 1rem;
+      top: 0.75rem;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-metrics-grid {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .modal-metric {
+      border: 2px solid var(--dark);
+      padding: 0.75rem;
+      background: var(--gray-light);
+    }
+
+    /* ===== ADVANCED ===== */
+    .health-score-card {
+      border: 4px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1.5rem;
+      background: var(--white);
+      text-align: center;
+    }
+
+    .health-score-value {
+      font-size: 3rem;
+      font-weight: 900;
+    }
+
+    .health-score-label,
+    .health-score-indicator,
+    .benchmark-status {
+      font-weight: 700;
       color: var(--gray);
     }
 
-    .wall-post-sentiment {
-      padding: 0.25rem 0.75rem;
+    .benchmark-grid,
+    .roi-grid,
+    .forecast-grid,
+    .sleep-debt-summary,
+    .insight-grid,
+    .recommendations-grid,
+    .playbooks-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .benchmark-card,
+    .forecast-card,
+    .roi-card,
+    .insight-card,
+    .recommendation-card,
+    .playbook-card {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .benchmark-bar {
+      position: relative;
+      height: 14px;
       border: 2px solid var(--dark);
+      background: var(--gray-light);
+      margin: 0.75rem 0;
+    }
+
+    .benchmark-your {
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .benchmark-industry {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .benchmark-values {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
+
+    .chart-note,
+    .chart-comment {
+      color: var(--gray);
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .forecast-value {
+      font-size: 1.4rem;
+      font-weight: 800;
+      margin: 0.5rem 0;
+    }
+
+    .forecast-trend,
+    .forecast-change {
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
+
+    .chart-card.full-width {
+      margin-top: 1rem;
+    }
+
+    .chart-card.lift {
+      cursor: pointer;
+    }
+
+    .chart-title {
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+    }
+
+    .forecast-warning {
       font-weight: 700;
-      font-size: 0.75rem;
-    }
-
-    .sentiment-positive { background: var(--success); }
-    .sentiment-negative { background: var(--danger); }
-    .sentiment-mixed { background: var(--warning); }
-
-    .wall-post-content {
       margin-bottom: 1rem;
-      line-height: 1.8;
     }
 
-    .wall-post-tags {
+    .sleep-debt-summary {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      margin-bottom: 1rem;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 800;
+    }
+
+    .insight-pill {
+      display: inline-flex;
+      border: 2px solid var(--dark);
+      padding: 0.25rem 0.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: var(--accent);
+    }
+
+    .rec-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .rec-category {
+      font-weight: 800;
+      padding: 0.2rem 0.5rem;
+      border: 2px solid var(--dark);
+      background: var(--gray-light);
+    }
+
+    .rec-actions {
       display: flex;
       gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .tag {
-      padding: 0.25rem 0.75rem;
-      background: var(--gray-light);
-      border: 2px solid var(--dark);
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-
-    .wall-category {
-      padding: 0.25rem 0.75rem;
-      border: 2px solid var(--dark);
-      font-weight: 700;
-      background: var(--white);
-      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      text-transform: uppercase;
-      font-size: 0.7rem;
-      letter-spacing: 0.03em;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
     }
 
-    .wall-author {
+    .copy-btn {
+      border: 2px solid var(--dark);
+      background: var(--white);
+      padding: 0.4rem 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .call-kit {
+      display: none;
+      margin-top: 0.75rem;
+      border-top: 2px solid var(--dark);
+      padding-top: 0.75rem;
+    }
+
+    .call-kit.open {
+      display: block;
+    }
+
+    .insight-title {
+      font-weight: 800;
+      margin: 0.5rem 0;
+    }
+
+    .insight-list {
+      margin: 0.5rem 0 0;
+      padding-left: 1.2rem;
+    }
+
+    .insight-plan {
+      margin-top: 0.75rem;
       font-weight: 700;
     }
 
-    .wall-ai {
-      background: var(--accent);
-      color: var(--dark);
+    .rec-message {
+      margin-top: 0.5rem;
+    }
+
+    .rec-action {
+      font-weight: 700;
+    }
+
+    .playbook-employee-name {
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .playbook-risk-level {
+      padding: 0.4rem 0.6rem;
+      border: 2px solid var(--dark);
+      font-weight: 700;
+      background: var(--gray-light);
+      margin-bottom: 0.75rem;
+    }
+
+    .playbook-section h4 {
+      margin: 0.5rem 0;
+      font-weight: 800;
+    }
+
+    .playbook-bullets,
+    .playbook-microactions {
+      padding-left: 1.2rem;
+      margin: 0.5rem 0 0.75rem;
+    }
+
+    .call-kit-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .call-block {
+      border: 2px solid var(--dark);
+      padding: 0.75rem;
+      background: var(--gray-light);
+    }
+
+    .december-notice {
+      margin-top: 1rem;
+      border: 3px solid var(--dark);
+      background: #fff1c2;
+      padding: 0.75rem 1rem;
+      font-weight: 700;
     }
 
     .form-hint {
@@ -545,6 +936,41 @@
     .insight-banner.level-alert { background: #fff3e0; }
     .insight-banner.level-watch { background: #f0f6ff; }
 
+    /* ===== ONBOARDING ===== */
+    .onboarding-card { border: 3px dashed var(--dark); background: #fff7d6; }
+    .onboarding-steps { display: grid; gap: 0.75rem; }
+    .onboarding-step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border: 3px solid var(--dark);
+      background: var(--light);
+      font-weight: 600;
+      flex-wrap: wrap;
+    }
+    .onboarding-step.complete {
+      background: #d9f7da;
+    }
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--dark);
+      background: var(--accent);
+      font-weight: 800;
+    }
+    #onboarding-telegram-status {
+      margin-left: auto;
+    }
+    #onboarding-reminder-preview {
+      display: block;
+      width: 100%;
+      margin-top: 0.25rem;
+    }
+
     /* ===== PULSE ROOMS ===== */
     .pulse-room-card {
       border: 3px solid var(--dark);
@@ -652,6 +1078,9 @@
         </div>
 
         <button type="submit" class="btn btn-primary" style="width: 100%;">Увійти</button>
+        <div class="form-hint" style="margin-top: 0.75rem;">
+          🔗 Привʼязка Telegram: <span class="mono">/start email@opslab.uk 1234</span>
+        </div>
       </form>
     </div>
   </div>
@@ -666,8 +1095,9 @@
 
         <ul class="nav-menu">
           <li><a href="#" class="nav-link active" data-section="mindguard">📊 Mindguard</a></li>
+          <li><a href="#" class="nav-link hidden" data-section="advanced" id="advanced-link">🧠 Advanced</a></li>
           <li><a href="#" class="nav-link" data-section="pulse">🗣 Pulse Rooms</a></li>
-          <li><a href="#" class="nav-link" data-section="wall">💬 Стіна Плачу</a></li>
+          <li><a href="https://opslab-feedback-production.up.railway.app/" class="nav-link nav-link-external" target="_blank" rel="noopener">💬 OpsLab Feedback</a></li>
           <li><a href="#" class="nav-link hidden" data-section="admin" id="admin-link">🧩 Команда</a></li>
         </ul>
 
@@ -682,88 +1112,225 @@
     <!-- ===== MINDGUARD SECTION ===== -->
     <div id="mindguard-section" class="section active">
       <div class="container">
+        <div class="card onboarding-card hidden" id="onboarding-card">
+          <div class="card-header">🚀 Старт у Mindguard</div>
+          <p style="color: var(--gray); margin-bottom: 1rem;">
+            Короткий онбординг допоможе увімкнути сповіщення та зрозуміти, як працює система.
+          </p>
+          <div class="onboarding-steps">
+            <div class="onboarding-step complete" id="onboarding-step-1">
+              <span class="step-badge">1</span>
+              Ознайомтесь з платформою та своїми метриками за минулі місяці.
+            </div>
+            <div class="onboarding-step" id="onboarding-step-2">
+              <span class="step-badge">2</span>
+              Привʼяжіть Telegram: <span class="mono">/link email@opslab.uk 1234</span>
+              <span id="onboarding-telegram-status" class="status-chip">Статус...</span>
+            </div>
+            <div class="onboarding-step" id="onboarding-step-3">
+              <span class="step-badge">3</span>
+              Встановіть час нагадувань та часовий пояс.
+              <span id="onboarding-reminder-preview" class="form-hint"></span>
+              <button id="onboarding-scroll-settings" class="btn btn-secondary" type="button">Перейти до налаштувань</button>
+            </div>
+            <div class="onboarding-step" id="onboarding-step-4">
+              <span class="step-badge">4</span>
+              Після завершення онбордингу бот почне надсилати чекіни та звіти.
+            </div>
+          </div>
+          <div class="toggle-row" style="margin-top: 1rem;">
+            <button id="onboarding-refresh" class="btn btn-secondary" type="button">Перевірити привʼязку</button>
+            <button id="complete-onboarding-btn" class="btn btn-primary" type="button">Завершити онбординг</button>
+            <span id="onboarding-status" class="form-hint"></span>
+          </div>
+        </div>
 
-        <div class="card">
-          <div class="card-header">📊 OpsLab Mindguard Analytics</div>
-          <p style="color: var(--gray); margin-bottom: 2rem;">
-            Моніторинг ментального здоров'я команди через щоденні чекіни в Telegram боті.
-            Використовуємо науково валідовані методики: WHO-5, PHQ-9, GAD-7, MBI.
+        <div class="card" id="team-dashboard-card">
+          <div class="card-header">📊 TeamPulse Mindguard Analytics</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Повна аналітика ментального здоров'я за всі місяці з деталями по ключових метриках.
           </p>
 
-          <!-- Month Selector -->
-          <div class="month-selector" id="month-selector"></div>
-
-          <!-- Key Metrics -->
-          <div class="grid grid-4">
-            <div class="metric-card positive">
-              <div class="metric-label">WHO-5 Благополуччя</div>
-              <div class="metric-value" id="wellbeing-value">65.5</div>
-              <div class="metric-desc">Індекс благополуччя ВООЗ</div>
-              <span class="metric-badge badge-success" id="wellbeing-badge">НОРМА</span>
-            </div>
-
-            <div class="metric-card warning">
-              <div class="metric-label">PHQ-9 Депресія</div>
-              <div class="metric-value" id="depression-value">8.25</div>
-              <div class="metric-desc">Рівень депресії</div>
-              <span class="metric-badge badge-warning" id="depression-badge">ЛЕГКА</span>
-            </div>
-
-            <div class="metric-card warning">
-              <div class="metric-label">GAD-7 Тривожність</div>
-              <div class="metric-value" id="anxiety-value">7.38</div>
-              <div class="metric-desc">Рівень тривожності</div>
-              <span class="metric-badge badge-warning" id="anxiety-badge">ЛЕГКА</span>
-            </div>
-
-            <div class="metric-card danger">
-              <div class="metric-label">MBI Вигорання</div>
-              <div class="metric-value" id="burnout-value">44.8%</div>
-              <div class="metric-desc">Індекс вигорання</div>
-              <span class="metric-badge badge-warning" id="burnout-badge">СЕРЕДНІЙ</span>
-            </div>
+          <div id="team-month-selector" class="month-selector"></div>
+          <div class="december-notice" id="dashboardDecemberNotice" style="display: none;">
+            ⚠️ Грудень: традиційно високий ризик вигорання через дедлайни та підсумки року.
           </div>
 
-          <!-- Additional Metrics -->
-          <div class="grid grid-3" style="margin-top: 1.5rem;">
-            <div class="metric-card">
-              <div class="metric-label">💤 Тривалість сну</div>
-              <div class="metric-value" id="sleep-value">6.3</div>
-              <div class="metric-desc">годин на ніч</div>
-            </div>
+          <section class="metrics-section">
+            <h3 class="section-title">Ключові показники</h3>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">WHO-5 Благополуччя</span>
+                    <span class="info-icon" data-tooltip="Індекс благополуччя ВООЗ (0-100). <50 — низьке благополуччя.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="who5-value">—</div>
+                <div class="metric-description">Середній показник</div>
+                <span class="risk-indicator" id="who5-risk">—</span>
+              </div>
 
-            <div class="metric-card">
-              <div class="metric-label">⚖️ Work-Life Balance</div>
-              <div class="metric-value" id="balance-value">4.9</div>
-              <div class="metric-desc">з 10</div>
-            </div>
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">PHQ-9 Депресія</span>
+                    <span class="info-icon" data-tooltip="PHQ-9 (0-27). 5-9: легка, 10-14: помірна, 15+: тяжка.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="phq9-value">—</div>
+                <div class="metric-description">Середній показник</div>
+                <span class="risk-indicator" id="phq9-risk">—</span>
+              </div>
 
-            <div class="metric-card">
-              <div class="metric-label">😰 Рівень стресу</div>
-              <div class="metric-value" id="stress-value">23.9</div>
-              <div class="metric-desc">показник стресу</div>
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">GAD-7 Тривожність</span>
+                    <span class="info-icon" data-tooltip="GAD-7 (0-21). 5-9: легка, 10-14: помірна, 15+: тяжка.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="gad7-value">—</div>
+                <div class="metric-description">Середній показник</div>
+                <span class="risk-indicator" id="gad7-risk">—</span>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">MBI Вигорання</span>
+                    <span class="info-icon" data-tooltip="MBI (0-100%). 25-50%: середній ризик, >50%: високий.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="mbi-value">—</div>
+                <div class="metric-description">Середній показник (%)</div>
+                <span class="risk-indicator" id="mbi-risk">—</span>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">Тривалість сну</span>
+                    <span class="info-icon" data-tooltip="Середня тривалість сну. Рекомендовано 7-9 год.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="sleep-duration-value">—</div>
+                <div class="metric-description">Середня кількість годин</div>
+                <span class="risk-indicator" id="sleep-duration-risk">—</span>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">Якість сну</span>
+                    <span class="info-icon" data-tooltip="Якість сну (1-10). 7-10: добра, <4: погана.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="sleep-quality-value">—</div>
+                <div class="metric-description">Середня оцінка (1-10)</div>
+                <span class="risk-indicator" id="sleep-quality-risk">—</span>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">Баланс життя</span>
+                    <span class="info-icon" data-tooltip="Баланс робота/життя (1-10). 7-10: здоровий.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="work-life-value">—</div>
+                <div class="metric-description">Середня оцінка (1-10)</div>
+                <span class="risk-indicator" id="work-life-risk">—</span>
+              </div>
+
+              <div class="metric-card">
+                <div class="metric-header">
+                  <div class="metric-label-wrapper">
+                    <span class="metric-label">Рівень стресу</span>
+                    <span class="info-icon" data-tooltip="PSS (0-40). 0-13: низький, 14-26: помірний, 27-40: високий.">i</span>
+                  </div>
+                </div>
+                <div class="metric-value" id="stress-value">—</div>
+                <div class="metric-description">Середній показник (0-40)</div>
+                <span class="risk-indicator" id="stress-risk">—</span>
+              </div>
             </div>
+          </section>
+        </div>
+
+        <div class="card">
+          <div class="card-header">📈 Динаміка команди</div>
+          <div class="chart-container" style="position: relative; height: 420px;">
+            <canvas id="teamTrendChart"></canvas>
           </div>
+        </div>
 
-          <!-- Risk Summary -->
-          <div style="margin-top: 2rem; padding: 1.5rem; background: #FFF3E0; border: 3px solid var(--dark);">
-            <h3 style="margin-bottom: 1rem;">⚠️ Зведення по Ризикам</h3>
-            <div style="display: flex; gap: 2rem;">
-              <div>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--warning);" id="risk-count">—</div>
-                <div style="color: var(--gray);" id="risk-primary-label">Рівень ризику</div>
-              </div>
-              <div>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="critical-count">—</div>
-                <div style="color: var(--gray);" id="risk-secondary-label">Streak</div>
-              </div>
+        <div class="card" id="employee-analysis-card">
+          <div class="card-header">🧑‍🤝‍🧑 Аналіз працівників</div>
+          <div id="employee-month-selector" class="employee-month-selector"></div>
+          <div class="table-container">
+            <table id="employee-table">
+              <thead>
+                <tr>
+                  <th>Співробітник</th>
+                  <th>WHO-5</th>
+                  <th>PHQ-9</th>
+                  <th>GAD-7</th>
+                  <th>MBI (%)</th>
+                  <th>Сон (год)</th>
+                  <th>Якість сну</th>
+                  <th>Баланс</th>
+                  <th>Стрес</th>
+                  <th>Ризик</th>
+                </tr>
+              </thead>
+              <tbody id="employee-table-body">
+                <tr>
+                  <td colspan="10" style="text-align: center; padding: 2rem;">Завантаження даних...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="risk-assessment-card">
+          <div class="card-header">⚠️ Оцінка ризиків</div>
+          <div class="risk-items" id="risk-items">
+            <div class="risk-item medium">
+              <div class="risk-item-title">Завантаження даних...</div>
+              <div class="risk-item-description">Зачекайте, будь ласка</div>
             </div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">📈 Тренди по місяцях</div>
-          <div id="trend-container" class="grid grid-2"></div>
+        <!-- Employee Details Modal -->
+        <div id="employeeModal" class="modal">
+          <div class="modal-content">
+            <span class="modal-close" onclick="closeEmployeeModal()">&times;</span>
+            <h2 id="modalEmployeeName" class="modal-title"></h2>
+
+            <div class="modal-metrics">
+              <h3>Поточні показники</h3>
+              <div class="modal-metrics-grid" id="modalMetrics"></div>
+            </div>
+
+            <div class="modal-chart">
+              <h3>Динаміка за 4 місяці</h3>
+              <div class="chart-container" style="position: relative; height: 300px; max-height: 300px;">
+                <canvas id="modalTrendChart"></canvas>
+              </div>
+            </div>
+
+            <div class="modal-risk">
+              <h3>Рівень ризику</h3>
+              <p id="modalRiskLevel"></p>
+            </div>
+
+            <div class="modal-notes">
+              <h3>Примітки</h3>
+              <p id="modalNotes"></p>
+            </div>
+          </div>
         </div>
 
         <div class="card" id="wellness-card">
@@ -854,6 +1421,7 @@
               <div id="kudos-insights" class="tag-row">
                 <span class="form-hint">Завантаження...</span>
               </div>
+              <div id="kudos-summary" class="form-hint" style="margin-top: 0.75rem;"></div>
               <div class="form-hint">Топ теми та люди, які найчастіше дякують.</div>
             </div>
           </div>
@@ -883,7 +1451,7 @@
                 <li class="mono" style="margin: 0.5rem 0;">✅ /checkin - Щоденний чекін</li>
                 <li class="mono" style="margin: 0.5rem 0;">📊 /status - Ваш стан</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔗 /weblogin - Вхід в платформу</li>
-                <li class="mono" style="margin: 0.5rem 0;">💬 /wall - Стіна плачу</li>
+                <li class="mono" style="margin: 0.5rem 0;">💬 /wall - OpsLab Feedback</li>
                 <li class="mono" style="margin: 0.5rem 0;">⏰ /settime - Час нагадувань</li>
                 <li class="mono" style="margin: 0.5rem 0;">🌍 /timezone - Часовий пояс</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔔 /notify - Нагадування on/off</li>
@@ -900,6 +1468,7 @@
               <ul style="padding-left: 1.5rem;">
                 <li>Голосові повідомлення з транскрипцією</li>
                 <li>AI-аналіз емоційного стану</li>
+                <li>Одноразова привʼязка: /start email код</li>
                 <li>Персональні нагадування</li>
                 <li>Щотижневі звіти (П'ятниця 17:00)</li>
               </ul>
@@ -914,11 +1483,8 @@
               <h4 style="margin-bottom: 0.5rem;">Статус підключення</h4>
               <div id="telegram-connection-status" class="form-hint">Завантаження...</div>
               <div id="telegram-pin-info" class="form-hint"></div>
-              <div class="toggle-row">
-                <button id="generate-pin-btn" class="btn btn-secondary" type="button">Згенерувати PIN</button>
-                <span id="pin-expiry" class="status-chip"></span>
-              </div>
-              <div class="form-hint">Відправте PIN у боті командою <span class="mono">/start 1234</span>.</div>
+              <div class="form-hint">Привʼязка: <span class="mono">/start email@opslab.uk 1234</span>.</div>
+              <div class="form-hint">Код доступу одноразово звʼязує Telegram з акаунтом.</div>
             </div>
             <div>
               <h4 style="margin-bottom: 0.5rem;">Особисті налаштування</h4>
@@ -947,53 +1513,242 @@
       </div>
     </div>
 
-    <!-- ===== WALL OF TEARS SECTION ===== -->
-    <div id="wall-section" class="section">
+    <!-- ===== ADVANCED ANALYTICS SECTION ===== -->
+    <div id="advanced-section" class="section">
       <div class="container">
-
         <div class="card">
-          <div class="card-header">💬 Стіна Плачу (Wall of Tears)</div>
-          <p style="color: var(--gray); margin-bottom: 2rem;">
-            Простір для чесного фідбеку про роботу, команду та процеси.
-            Можна публікувати анонімно або з імʼям.
-            Всі дані зашифровані та проаналізовані AI для виявлення трендів.
+          <div class="card-header">🧠 Advanced Analytics</div>
+          <p style="color: var(--gray); margin-bottom: 1.5rem;">
+            Розширені інсайти, ризики та прогнози для глибокої роботи з командою.
           </p>
+        </div>
 
-          <!-- Post Form -->
-          <div style="background: var(--gray-light); padding: 1.5rem; border: 3px solid var(--dark); margin-bottom: 2rem;">
-            <h3 style="margin-bottom: 1rem;">✍️ Додати новий пост</h3>
-            <form id="wall-post-form">
-              <div class="form-group">
-                <label for="post-content">Ваш фідбек</label>
-                <textarea
-                  id="post-content"
-                  style="width: 100%; padding: 1rem; border: 3px solid var(--dark); font-family: inherit; min-height: 120px; resize: vertical;"
-                  placeholder="Напишіть що вас турбує або радує..."
-                  maxlength="5000"
-                ></textarea>
-                <div class="toggle-row">
-                  <input type="checkbox" id="post-anonymous" checked />
-                  <label for="post-anonymous">Опублікувати анонімно</label>
-                  <span id="post-visibility-preview" class="status-chip">Анонімно</span>
+        <section class="health-score-section dashboard-block">
+          <h2 class="section-title">Team Health Score</h2>
+          <div class="health-score-card">
+            <div class="health-score-value" id="healthScore">—</div>
+            <div class="health-score-label">з 100</div>
+            <div class="health-score-indicator" id="healthIndicator"></div>
+          </div>
+          <div class="december-notice" id="decemberNotice" style="display: none;">
+            ⚠️ Грудень: традиційно високий ризик вигорання через дедлайни та підсумки року.
+          </div>
+        </section>
+
+        <section class="benchmarking-section dashboard-block">
+          <h2 class="section-title">Порівняння з індустрією</h2>
+          <div class="benchmark-grid">
+            <div class="benchmark-card">
+              <div class="benchmark-header">
+                <h3>WHO-5 Благополуччя</h3>
+                <span class="benchmark-status" id="who5Status"></span>
+              </div>
+              <div class="benchmark-comparison">
+                <div class="benchmark-bar">
+                  <div class="benchmark-your" id="who5Your"></div>
+                  <div class="benchmark-industry" id="who5Industry"></div>
                 </div>
-                <div class="form-hint">Для публічного поста буде показано ваше імʼя.</div>
+                <div class="benchmark-values">
+                  <span>Ви: <strong id="who5YourValue">—</strong></span>
+                  <span>Індустрія: <strong>62</strong></span>
+                </div>
               </div>
-              <div class="toggle-row">
-                <button type="submit" class="btn btn-success">Опублікувати</button>
-                <span id="wall-post-status" class="form-hint"></span>
+            </div>
+
+            <div class="benchmark-card">
+              <div class="benchmark-header">
+                <h3>PHQ-9 Депресія</h3>
+                <span class="benchmark-status" id="phq9Status"></span>
               </div>
-            </form>
+              <div class="benchmark-comparison">
+                <div class="benchmark-bar">
+                  <div class="benchmark-your" id="phq9Your"></div>
+                  <div class="benchmark-industry" id="phq9Industry"></div>
+                </div>
+                <div class="benchmark-values">
+                  <span>Ви: <strong id="phq9YourValue">—</strong></span>
+                  <span>Індустрія: <strong>6.8</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="benchmark-card">
+              <div class="benchmark-header">
+                <h3>GAD-7 Тривожність</h3>
+                <span class="benchmark-status" id="gad7Status"></span>
+              </div>
+              <div class="benchmark-comparison">
+                <div class="benchmark-bar">
+                  <div class="benchmark-your" id="gad7Your"></div>
+                  <div class="benchmark-industry" id="gad7Industry"></div>
+                </div>
+                <div class="benchmark-values">
+                  <span>Ви: <strong id="gad7YourValue">—</strong></span>
+                  <span>Індустрія: <strong>7.5</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="benchmark-card">
+              <div class="benchmark-header">
+                <h3>MBI Вигорання</h3>
+                <span class="benchmark-status" id="mbiStatus"></span>
+              </div>
+              <div class="benchmark-comparison">
+                <div class="benchmark-bar">
+                  <div class="benchmark-your" id="mbiYour"></div>
+                  <div class="benchmark-industry" id="mbiIndustry"></div>
+                </div>
+                <div class="benchmark-values">
+                  <span>Ви: <strong id="mbiYourValue">—</strong></span>
+                  <span>Індустрія: <strong>42</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="benchmark-card">
+              <div class="benchmark-header">
+                <h3>Рівень стресу</h3>
+                <span class="benchmark-status" id="stressStatus"></span>
+              </div>
+              <div class="benchmark-comparison">
+                <div class="benchmark-bar">
+                  <div class="benchmark-your" id="stressYour"></div>
+                  <div class="benchmark-industry" id="stressIndustry"></div>
+                </div>
+                <div class="benchmark-values">
+                  <span>Ви: <strong id="stressYourValue">—</strong></span>
+                  <span>Індустрія: <strong>18</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="charts-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Динаміка та ризики</h2>
+            <p class="section-subtitle">Траєкторія благополуччя, ранні сигнали та матриця ризиків.</p>
           </div>
 
-          <!-- Posts List -->
-          <div id="wall-posts-container">
-            <div class="loading">
-              <div class="spinner"></div>
-              <div>Завантаження постів...</div>
+          <div class="chart-card full-width lift" onclick="openChartModal('trajectoryModal')">
+            <div class="chart-title">Траєкторія благополуччя</div>
+            <div class="chart-container trajectory-container">
+              <canvas id="trajectoryChart"></canvas>
+            </div>
+            <p class="chart-note">WHO-5, стрес і сон нормовані до 100 для порівняння.</p>
+            <p class="chart-comment" id="trajectoryComment">Дані оновлюються...</p>
+          </div>
+
+          <div class="chart-card full-width lift" onclick="openChartModal('riskModal')">
+            <div class="chart-title">Матриця ризиків 1:1</div>
+            <div class="chart-container risk-matrix-container">
+              <canvas id="riskBubbleChart"></canvas>
+            </div>
+            <p class="chart-comment" id="riskComment">Дані оновлюються...</p>
+          </div>
+        </section>
+
+        <section class="forecast-section dashboard-block">
+          <h2 class="section-title">Прогноз на наступний місяць</h2>
+          <div class="forecast-warning">⚠️ Прогноз базується на поточній динаміці</div>
+          <div class="forecast-grid" id="forecastGrid"></div>
+        </section>
+
+        <section class="sleep-debt-section dashboard-block">
+          <h2 class="section-title">Аналіз боргу сну</h2>
+          <div class="sleep-debt-summary">
+            <div class="sleep-debt-stat">
+              <div class="stat-value" id="totalSleepDebt">—</div>
+              <div class="stat-label">Загальний борг сну (год)</div>
+            </div>
+            <div class="sleep-debt-stat">
+              <div class="stat-value" id="avgSleepDebt">—</div>
+              <div class="stat-label">Середній борг на людину (год/тиждень)</div>
+            </div>
+            <div class="sleep-debt-stat">
+              <div class="stat-value" id="atRiskCount">—</div>
+              <div class="stat-label">Людей у зоні ризику</div>
+            </div>
+          </div>
+          <div class="chart-container" style="height: 320px;">
+            <canvas id="sleepDebtChart"></canvas>
+          </div>
+        </section>
+
+        <section class="insights-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Ключові інсайти по людям</h2>
+            <p class="section-subtitle">Топ-ризики, відновлення та еталонні практики.</p>
+          </div>
+          <div class="insight-grid" id="insightGrid"></div>
+        </section>
+
+        <section class="roi-section dashboard-block">
+          <h2 class="section-title">ROI Calculator</h2>
+          <div class="roi-grid">
+            <div class="roi-card">
+              <div class="roi-label">Покращення сну</div>
+              <div class="roi-value" id="roiSleep">+1.2 год/день</div>
+            </div>
+            <div class="roi-card">
+              <div class="roi-label">Зростання продуктивності</div>
+              <div class="roi-value" id="roiProductivity">+18%</div>
+            </div>
+            <div class="roi-card">
+              <div class="roi-label">Зниження вигорання</div>
+              <div class="roi-value" id="roiBurnout">-35%</div>
+            </div>
+            <div class="roi-card roi-highlight">
+              <div class="roi-label">Річна економія</div>
+              <div class="roi-value" id="roiSavings">$21,500</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="playbooks-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">🎯 1:1 Плейбуки та наступні кроки</h2>
+            <p class="section-subtitle">Автоматичні сценарії 1:1 для фокусу на ризиках.</p>
+          </div>
+          <div id="playbooks-grid" class="playbooks-grid"></div>
+        </section>
+
+        <section class="recommendations-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Персоналізовані рекомендації</h2>
+            <p class="section-subtitle">Згенеровано на основі метрик та трендів.</p>
+          </div>
+          <div class="recommendations-grid" id="recommendationsGrid"></div>
+        </section>
+
+        <div id="trajectoryModal" class="modal" onclick="modalBgClick(event, 'trajectoryModal')">
+          <div class="modal-content">
+            <span class="modal-close" onclick="closeChartModal('trajectoryModal')">&times;</span>
+            <h2 class="modal-title">Траєкторія благополуччя</h2>
+            <div class="modal-notes">
+              <p id="trajectorySummary">Дані оновлюються...</p>
+            </div>
+            <div class="modal-metrics">
+              <h3>Ключові показники</h3>
+              <div class="modal-metrics-grid" id="trajectoryMetrics"></div>
             </div>
           </div>
         </div>
 
+        <div id="riskModal" class="modal" onclick="modalBgClick(event, 'riskModal')">
+          <div class="modal-content">
+            <span class="modal-close" onclick="closeChartModal('riskModal')">&times;</span>
+            <h2 class="modal-title">Матриця ризиків 1:1</h2>
+            <div class="modal-notes">
+              <p id="riskSummary">Дані оновлюються...</p>
+            </div>
+            <div class="modal-metrics">
+              <h3>Розкладання ризику</h3>
+              <div class="modal-metrics-grid" id="riskMetrics"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1083,6 +1838,8 @@
               <h4 style="margin-bottom: 0.75rem;">Підказки для адміністратора</h4>
               <ul style="padding-left: 1.2rem;">
                 <li>Код доступу повідомляється користувачу окремим каналом.</li>
+                <li>Цей код потрібен для одноразової привʼязки Telegram: /start email код.</li>
+                <li>Привʼязку Telegram можна скинути для повторної активації.</li>
                 <li>Після деактивації Telegram ID очищується для безпеки.</li>
                 <li>Відновлення доступу не видаляє історичні дані.</li>
               </ul>
@@ -1104,6 +1861,7 @@
                   <th>Користувач</th>
                   <th>Роль</th>
                   <th>Статус</th>
+                  <th>Telegram</th>
                   <th>Створено</th>
                   <th>Відключено</th>
                   <th>Дії</th>
@@ -1122,13 +1880,6 @@
           <div id="team-heatmap" class="grid grid-3"></div>
         </div>
 
-        <div class="card" id="wall-toxicity-card">
-          <div class="card-header">🛡️ Toxicity Summary (HR)</div>
-          <p style="color: var(--gray); margin-bottom: 1rem;">
-            Автоматичне виявлення токсичних тем у стіні плачу. Анонімна агрегація.
-          </p>
-          <div id="wall-toxicity-summary" class="insight-list"></div>
-        </div>
       </div>
     </div>
 
@@ -1138,10 +1889,13 @@
     // ===== GLOBAL STATE =====
     let currentUser = null;
     let currentSection = 'mindguard';
-    let historyMonths = [];
-    let selectedMonthKey = null;
-    let userMetrics = null;
-    let userStats = { checkins_last_week: 0, streak: 0 };
+    let teamDashboardData = null;
+    let teamDashboardSelectedKey = null;
+    let teamDashboardEmployeeKey = null;
+    let teamDashboardCharts = {};
+    let advancedCharts = {};
+    let advancedData = null;
+    let telegramStatus = null;
     let teamHeatmap = null;
     let adminUsers = [];
     let adminSearch = '';
@@ -1154,14 +1908,6 @@
     let activePulseRoom = null;
     let pulseMessages = [];
     let pulseModerationQueue = [];
-
-    const categoryMap = {
-      Complaint: { label: 'Скарга', emoji: '😤' },
-      Suggestion: { label: 'Пропозиція', emoji: '💡' },
-      Celebration: { label: 'Успіх', emoji: '🎉' },
-      Question: { label: 'Питання', emoji: '❓' },
-      SupportNeeded: { label: 'Потрібна підтримка', emoji: '💙' }
-    };
 
     // ===== API HELPERS =====
     async function apiCall(endpoint, options = {}) {
@@ -1238,7 +1984,7 @@
     });
 
     // ===== NAVIGATION =====
-    document.querySelectorAll('.nav-link').forEach(link => {
+    document.querySelectorAll('.nav-link[data-section]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const section = link.dataset.section;
@@ -1247,7 +1993,7 @@
     });
 
     function switchSection(section) {
-      if (section === 'admin' && !isAdmin()) {
+      if ((section === 'admin' || section === 'advanced') && !isAdmin()) {
         return;
       }
       currentSection = section;
@@ -1263,17 +2009,16 @@
       // Load data
       if (section === 'mindguard') {
         loadMindguardData();
+      } else if (section === 'advanced') {
+        loadAdvancedAnalytics();
       } else if (section === 'pulse') {
         loadPulseRooms();
         if (isAdmin()) {
           loadPulseModeration();
         }
-      } else if (section === 'wall') {
-        loadWallPosts();
       } else if (section === 'admin') {
         loadTeamHeatmap();
         loadAdminUsers();
-        loadWallToxicitySummary();
       }
     }
 
@@ -1287,17 +2032,17 @@
       document.getElementById('user-role').textContent = currentUser?.role || '';
 
       const adminLink = document.getElementById('admin-link');
+      const advancedLink = document.getElementById('advanced-link');
       if (isAdmin()) {
         adminLink.classList.remove('hidden');
+        if (advancedLink) {
+          advancedLink.classList.remove('hidden');
+        }
       } else {
         adminLink.classList.add('hidden');
-      }
-
-      const anonToggle = document.getElementById('post-anonymous');
-      const anonPreview = document.getElementById('post-visibility-preview');
-      if (anonToggle && anonPreview) {
-        anonToggle.checked = true;
-        anonPreview.textContent = 'Анонімно';
+        if (advancedLink) {
+          advancedLink.classList.add('hidden');
+        }
       }
 
       // Load initial data
@@ -1316,22 +2061,7 @@
 
     // ===== MINDGUARD DATA =====
     async function loadMindguardData() {
-      const [metricsResponse, historyResponse] = await Promise.all([
-        apiCall('/dashboard/metrics'),
-        apiCall(`/dashboard/user/${currentUser.user_id}/history`)
-      ]);
-
-      userMetrics = metricsResponse?.metrics || null;
-      userStats = {
-        checkins_last_week: metricsResponse?.checkins_last_week || 0,
-        streak: metricsResponse?.streak || 0
-      };
-      historyMonths = historyResponse?.months || [];
-
-      renderMonthSelector();
-      renderMetrics();
-      renderTrends();
-      renderRiskSummary();
+      await loadTeamDashboardData();
       await loadTelegramStatus();
       await Promise.all([
         loadWellnessData(),
@@ -1344,211 +2074,1225 @@
       }
     }
 
-    function renderMonthSelector() {
-      const container = document.getElementById('month-selector');
-      container.innerHTML = '';
+    // ===== TEAM DASHBOARD =====
+    const MONTH_LABELS = {
+      1: 'Січень',
+      2: 'Лютий',
+      3: 'Березень',
+      4: 'Квітень',
+      5: 'Травень',
+      6: 'Червень',
+      7: 'Липень',
+      8: 'Серпень',
+      9: 'Вересень',
+      10: 'Жовтень',
+      11: 'Листопад',
+      12: 'Грудень',
+    };
 
-      if (!historyMonths.length) {
-        container.innerHTML = '<span class="form-hint">Немає історичних даних</span>';
+    const MONTH_LABELS_SHORT = {
+      1: 'Січ',
+      2: 'Лют',
+      3: 'Бер',
+      4: 'Квіт',
+      5: 'Трав',
+      6: 'Черв',
+      7: 'Лип',
+      8: 'Серп',
+      9: 'Вер',
+      10: 'Жовт',
+      11: 'Лист',
+      12: 'Груд',
+    };
+
+    const METRIC_HINTS = {
+      who5: 'WHO-5: 0-100, <50 — ризик низького благополуччя',
+      phq9: 'PHQ-9: 0-27, >10 — помірна/висока депресивна симптоматика',
+      gad7: 'GAD-7: 0-21, >10 — помірна/висока тривожність',
+      mbi: 'MBI: 0-100%, >40% — підвищений ризик вигорання',
+      sleepDuration: 'Тривалість сну: ціль 7-9 год',
+      sleepQuality: 'Якість сну: 1-10, <6 — погіршення',
+      workLifeBalance: 'Баланс: 1-10, <6 — дисбаланс',
+      stressLevel: 'Стрес: 0-40, >20 — підвищений',
+    };
+
+    function monthKeyFromParts(year, month) {
+      return `${year}-${String(month).padStart(2, '0')}`;
+    }
+
+    function parseMonthKey(key) {
+      const [year, month] = key.split('-').map(Number);
+      return { year, month };
+    }
+
+    function monthLabelFromKey(key, short = false) {
+      const { year, month } = parseMonthKey(key);
+      const label = short ? MONTH_LABELS_SHORT[month] : MONTH_LABELS[month];
+      return `${label || 'Місяць'} ${year}`;
+    }
+
+    function compareMonthKeys(a, b) {
+      const pa = parseMonthKey(a);
+      const pb = parseMonthKey(b);
+      if (pa.year !== pb.year) return pa.year - pb.year;
+      return pa.month - pb.month;
+    }
+
+    function getTeamMonthList() {
+      if (!teamDashboardData?.months) return [];
+      return [...teamDashboardData.months].sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+    }
+
+    function getTeamMonthByKey(key) {
+      const months = getTeamMonthList();
+      return months.find(m => monthKeyFromParts(m.year, m.month) === key) || null;
+    }
+
+    async function loadTeamDashboardData() {
+      const monthSelector = document.getElementById('team-month-selector');
+      const employeeBody = document.getElementById('employee-table-body');
+      try {
+        teamDashboardData = await apiCall('/api/team-data');
+      } catch (error) {
+        if (monthSelector) {
+          monthSelector.innerHTML = '<span class="form-hint">Не вдалося завантажити дані</span>';
+        }
+        if (employeeBody) {
+          employeeBody.innerHTML = '<tr><td colspan="10">Помилка завантаження</td></tr>';
+        }
         return;
       }
 
-      const monthKey = (m) => `${m.year}-${m.month}`;
-      if (!selectedMonthKey || !historyMonths.find(m => monthKey(m) === selectedMonthKey)) {
-        selectedMonthKey = monthKey(historyMonths[0]);
+      const months = getTeamMonthList();
+      if (!months.length) {
+        if (monthSelector) {
+          monthSelector.innerHTML = '<span class="form-hint">Немає даних</span>';
+        }
+        return;
       }
 
-      historyMonths.slice(0, 6).forEach((month) => {
-        const key = monthKey(month);
+      const latest = months[months.length - 1];
+      const latestKey = monthKeyFromParts(latest.year, latest.month);
+      if (!teamDashboardSelectedKey || !months.some(m => monthKeyFromParts(m.year, m.month) === teamDashboardSelectedKey)) {
+        teamDashboardSelectedKey = latestKey;
+      }
+      if (!teamDashboardEmployeeKey || !months.some(m => monthKeyFromParts(m.year, m.month) === teamDashboardEmployeeKey)) {
+        teamDashboardEmployeeKey = latestKey;
+      }
+
+      renderTeamMonthSelector();
+      renderEmployeeMonthSelector();
+      renderTeamMetrics();
+      renderTeamTrendChart();
+      renderEmployeeTable();
+      renderRiskAssessment();
+    }
+
+    function renderTeamMonthSelector() {
+      const container = document.getElementById('team-month-selector');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const months = getTeamMonthList();
+      const display = [...months].reverse();
+      display.forEach(month => {
+        const key = monthKeyFromParts(month.year, month.month);
         const button = document.createElement('button');
-        button.className = `month-btn${key === selectedMonthKey ? ' active' : ''}`;
-        button.textContent = `${month.month_name} ${month.year}`;
+        button.className = `month-btn${key === teamDashboardSelectedKey ? ' active' : ''}`;
+        button.textContent = monthLabelFromKey(key);
         button.addEventListener('click', () => {
-          selectedMonthKey = key;
-          renderMonthSelector();
-          renderMetrics();
+          teamDashboardSelectedKey = key;
+          renderTeamMonthSelector();
+          renderTeamMetrics();
+          renderRiskAssessment();
+        });
+        container.appendChild(button);
+      });
+
+      updateDashboardDecemberNotice();
+    }
+
+    function updateDashboardDecemberNotice() {
+      const notice = document.getElementById('dashboardDecemberNotice');
+      if (!notice || !teamDashboardSelectedKey) return;
+      const { month } = parseMonthKey(teamDashboardSelectedKey);
+      notice.style.display = month === 12 ? 'block' : 'none';
+    }
+
+    function renderEmployeeMonthSelector() {
+      const container = document.getElementById('employee-month-selector');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const months = getTeamMonthList();
+      const display = [...months].reverse();
+      display.forEach(month => {
+        const key = monthKeyFromParts(month.year, month.month);
+        const button = document.createElement('button');
+        button.className = `employee-month-btn${key === teamDashboardEmployeeKey ? ' active' : ''}`;
+        button.textContent = monthLabelFromKey(key);
+        button.addEventListener('click', () => {
+          teamDashboardEmployeeKey = key;
+          renderEmployeeMonthSelector();
+          renderEmployeeTable();
         });
         container.appendChild(button);
       });
     }
 
-    function getSelectedMonth() {
-      if (!selectedMonthKey) return null;
-      return historyMonths.find(m => `${m.year}-${m.month}` === selectedMonthKey) || null;
+    function getSelectedTeamMonth() {
+      if (!teamDashboardSelectedKey) return null;
+      return getTeamMonthByKey(teamDashboardSelectedKey);
     }
 
-    function renderMetrics() {
-      const selectedMonth = getSelectedMonth();
-      const fallback = userMetrics;
+    function getRiskLevel(metric, value) {
+      const thresholds = {
+        who5: { low: 50, medium: 75 },
+        phq9: { low: 5, medium: 10 },
+        gad7: { low: 5, medium: 10 },
+        mbi: { low: 25, medium: 50 },
+        sleepDuration: { low: 6, medium: 7 },
+        sleepQuality: { low: 4, medium: 7 },
+        workLifeBalance: { low: 4, medium: 7 },
+        stressLevel: { low: 14, medium: 27 },
+      };
 
-      const who5 = selectedMonth?.who5_score ?? fallback?.who5_score ?? null;
-      const phq9 = selectedMonth?.phq9_score ?? fallback?.phq9_score ?? null;
-      const gad7 = selectedMonth?.gad7_score ?? fallback?.gad7_score ?? null;
-      const burnout = selectedMonth?.burnout_percentage ?? fallback?.mbi_score ?? null;
+      const t = thresholds[metric];
+      if (!t || value === null || value === undefined) return 'low';
 
-      document.getElementById('wellbeing-value').textContent = who5 !== null ? who5.toFixed(1) : '—';
-      document.getElementById('depression-value').textContent = phq9 !== null ? phq9.toFixed(1) : '—';
-      document.getElementById('anxiety-value').textContent = gad7 !== null ? gad7.toFixed(1) : '—';
-      document.getElementById('burnout-value').textContent = burnout !== null ? `${burnout.toFixed(1)}%` : '—';
+      if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(metric)) {
+        if (value >= t.medium) return 'low';
+        if (value >= t.low) return 'medium';
+        return 'high';
+      }
 
-      document.getElementById('sleep-value').textContent = fallback?.sleep_duration !== undefined
-        ? fallback.sleep_duration.toFixed(1)
-        : '—';
-      document.getElementById('balance-value').textContent = fallback?.work_life_balance !== undefined
-        ? fallback.work_life_balance.toFixed(1)
-        : '—';
-      document.getElementById('stress-value').textContent = fallback?.stress_level !== undefined
-        ? fallback.stress_level.toFixed(1)
-        : '—';
-
-      updateBadges({ who5, phq9, gad7, burnout });
+      if (value < t.low) return 'low';
+      if (value < t.medium) return 'medium';
+      return 'high';
     }
 
-    function renderTrends() {
-      const container = document.getElementById('trend-container');
-      container.innerHTML = '';
+    function updateRiskIndicator(elementId, riskLevel) {
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      const labels = {
+        low: 'Низький ризик',
+        medium: 'Середній ризик',
+        high: 'Високий ризик',
+      };
+      element.textContent = labels[riskLevel] || 'Н/Д';
+      element.className = `risk-indicator risk-${riskLevel}`;
+    }
 
-      if (!historyMonths.length) {
-        container.innerHTML = '<div class="form-hint">Немає історичних даних для трендів</div>';
+    function renderTeamMetrics() {
+      const data = getSelectedTeamMonth();
+      if (!data || !data.averages) return;
+      const avg = data.averages;
+
+      document.getElementById('who5-value').textContent = avg.who5?.toFixed(1) ?? '—';
+      updateRiskIndicator('who5-risk', getRiskLevel('who5', avg.who5));
+
+      document.getElementById('phq9-value').textContent = avg.phq9?.toFixed(1) ?? '—';
+      updateRiskIndicator('phq9-risk', getRiskLevel('phq9', avg.phq9));
+
+      document.getElementById('gad7-value').textContent = avg.gad7?.toFixed(1) ?? '—';
+      updateRiskIndicator('gad7-risk', getRiskLevel('gad7', avg.gad7));
+
+      document.getElementById('mbi-value').textContent = avg.mbi !== undefined
+        ? `${avg.mbi.toFixed(1)}%`
+        : '—';
+      updateRiskIndicator('mbi-risk', getRiskLevel('mbi', avg.mbi));
+
+      document.getElementById('sleep-duration-value').textContent = avg.sleepDuration !== undefined
+        ? `${avg.sleepDuration.toFixed(1)} год`
+        : '—';
+      updateRiskIndicator('sleep-duration-risk', getRiskLevel('sleepDuration', avg.sleepDuration));
+
+      document.getElementById('sleep-quality-value').textContent = avg.sleepQuality?.toFixed(1) ?? '—';
+      updateRiskIndicator('sleep-quality-risk', getRiskLevel('sleepQuality', avg.sleepQuality));
+
+      document.getElementById('work-life-value').textContent = avg.workLifeBalance?.toFixed(1) ?? '—';
+      updateRiskIndicator('work-life-risk', getRiskLevel('workLifeBalance', avg.workLifeBalance));
+
+      document.getElementById('stress-value').textContent = avg.stressLevel?.toFixed(1) ?? '—';
+      updateRiskIndicator('stress-risk', getRiskLevel('stressLevel', avg.stressLevel));
+    }
+
+    function getScoreClass(metric, value) {
+      const risk = getRiskLevel(metric, value);
+      if (risk === 'low') return 'score-good';
+      if (risk === 'medium') return 'score-warning';
+      return 'score-danger';
+    }
+
+    function getRiskLabel(risk) {
+      const labels = {
+        low: 'Низький',
+        medium: 'Середній',
+        high: 'Високий',
+        critical: 'Критичний',
+      };
+      return labels[risk] || 'Невідомо';
+    }
+
+    function renderTeamTrendChart() {
+      const months = getTeamMonthList();
+      if (!months.length) return;
+
+      const labels = months.map(m => monthLabelFromKey(monthKeyFromParts(m.year, m.month), true));
+      const ctx = document.getElementById('teamTrendChart');
+      if (!ctx) return;
+
+      if (teamDashboardCharts.teamTrend) {
+        teamDashboardCharts.teamTrend.destroy();
+      }
+
+      teamDashboardCharts.teamTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'WHO-5',
+              metricKey: 'who5',
+              data: months.map(m => m.averages?.who5 ?? 0),
+              borderColor: '#1f8f3a',
+              tension: 0.35,
+              borderWidth: 3,
+            },
+            {
+              label: 'PHQ-9',
+              metricKey: 'phq9',
+              data: months.map(m => m.averages?.phq9 ?? 0),
+              borderColor: '#ffb000',
+              tension: 0.35,
+              borderWidth: 3,
+            },
+            {
+              label: 'GAD-7',
+              metricKey: 'gad7',
+              data: months.map(m => m.averages?.gad7 ?? 0),
+              borderColor: '#ff595e',
+              tension: 0.35,
+              borderWidth: 3,
+            },
+            {
+              label: 'MBI (%)',
+              metricKey: 'mbi',
+              data: months.map(m => m.averages?.mbi ?? 0),
+              borderColor: '#6a4c93',
+              tension: 0.35,
+              borderWidth: 3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: (context) => {
+                  const key = context.dataset.metricKey;
+                  const hint = METRIC_HINTS[key] || '';
+                  return `${context.dataset.label}: ${context.parsed.y}${hint ? ' (' + hint + ')' : ''}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true },
+          },
+        },
+      });
+    }
+
+    function renderEmployeeTable() {
+      const data = teamDashboardEmployeeKey ? getTeamMonthByKey(teamDashboardEmployeeKey) : null;
+      const tbody = document.getElementById('employee-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!data || !data.employees || data.employees.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10">Немає даних</td></tr>';
         return;
       }
 
-      const latest = historyMonths[0];
-      const previous = historyMonths[1];
+      data.employees.forEach(emp => {
+        const risks = [
+          getRiskLevel('who5', emp.who5),
+          getRiskLevel('phq9', emp.phq9),
+          getRiskLevel('gad7', emp.gad7),
+          getRiskLevel('mbi', emp.mbi),
+          getRiskLevel('sleepDuration', emp.sleepDuration),
+          getRiskLevel('sleepQuality', emp.sleepQuality),
+          getRiskLevel('workLifeBalance', emp.workLifeBalance),
+          getRiskLevel('stressLevel', emp.stressLevel),
+        ];
+
+        const highCount = risks.filter(r => r === 'high').length;
+        const mediumCount = risks.filter(r => r === 'medium').length;
+
+        let overallRisk = 'low';
+        if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
+          overallRisk = 'high';
+        } else if (highCount >= 1 || mediumCount >= 3) {
+          overallRisk = 'medium';
+        }
+
+        const row = document.createElement('tr');
+        const userId = emp.userId || emp.user_id || emp.id || '';
+        row.innerHTML = `
+          <td class="employee-name clickable" onclick="openEmployeeModal('${userId}')">${emp.name}</td>
+          <td class="score-cell ${getScoreClass('who5', emp.who5)}">${emp.who5.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('phq9', emp.phq9)}">${emp.phq9.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('gad7', emp.gad7)}">${emp.gad7.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('mbi', emp.mbi)}">${emp.mbi.toFixed(1)}%</td>
+          <td class="score-cell ${getScoreClass('sleepDuration', emp.sleepDuration)}">${emp.sleepDuration.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('sleepQuality', emp.sleepQuality)}">${emp.sleepQuality.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('workLifeBalance', emp.workLifeBalance)}">${emp.workLifeBalance.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('stressLevel', emp.stressLevel)}">${emp.stressLevel.toFixed(1)}</td>
+          <td class="score-cell"><span class="risk-indicator risk-${overallRisk}">${getRiskLabel(overallRisk)}</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderRiskAssessment() {
+      const data = getSelectedTeamMonth();
+      if (!data || !data.averages) return;
+
+      const container = document.getElementById('risk-items');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const avg = data.averages;
+      const risks = [];
+
+      if (avg.who5 < 50) {
+        risks.push({ level: 'high', title: 'Критично низький рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
+      } else if (avg.who5 < 75) {
+        risks.push({ level: 'medium', title: 'Знижений рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
+      }
+
+      if (avg.phq9 >= 10) {
+        risks.push({ level: 'high', title: 'Підвищений рівень депресії', description: `PHQ-9: ${avg.phq9.toFixed(1)}.` });
+      } else if (avg.phq9 >= 5) {
+        risks.push({ level: 'medium', title: 'Помірні ознаки депресії', description: `PHQ-9: ${avg.phq9.toFixed(1)}.` });
+      }
+
+      if (avg.gad7 >= 10) {
+        risks.push({ level: 'high', title: 'Високий рівень тривожності', description: `GAD-7: ${avg.gad7.toFixed(1)}.` });
+      } else if (avg.gad7 >= 5) {
+        risks.push({ level: 'medium', title: 'Підвищена тривожність', description: `GAD-7: ${avg.gad7.toFixed(1)}.` });
+      }
+
+      if (avg.mbi >= 50) {
+        risks.push({ level: 'high', title: 'Високий ризик вигорання', description: `MBI: ${avg.mbi.toFixed(1)}%.` });
+      } else if (avg.mbi >= 25) {
+        risks.push({ level: 'medium', title: 'Середній ризик вигорання', description: `MBI: ${avg.mbi.toFixed(1)}%.` });
+      }
+
+      if (avg.sleepDuration < 6) {
+        risks.push({ level: 'high', title: 'Недостатня тривалість сну', description: `Сон: ${avg.sleepDuration.toFixed(1)} год.` });
+      } else if (avg.sleepDuration < 7) {
+        risks.push({ level: 'medium', title: 'Знижена тривалість сну', description: `Сон: ${avg.sleepDuration.toFixed(1)} год.` });
+      }
+
+      if (avg.sleepQuality < 4) {
+        risks.push({ level: 'high', title: 'Погана якість сну', description: `Якість сну: ${avg.sleepQuality.toFixed(1)}.` });
+      } else if (avg.sleepQuality < 7) {
+        risks.push({ level: 'medium', title: 'Задовільна якість сну', description: `Якість сну: ${avg.sleepQuality.toFixed(1)}.` });
+      }
+
+      if (avg.workLifeBalance < 4) {
+        risks.push({ level: 'high', title: 'Критичний дисбаланс життя', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
+      } else if (avg.workLifeBalance < 7) {
+        risks.push({ level: 'medium', title: 'Потребує покращення балансу', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
+      }
+
+      if (avg.stressLevel >= 27) {
+        risks.push({ level: 'high', title: 'Високий рівень стресу', description: `Стрес: ${avg.stressLevel.toFixed(1)}.` });
+      } else if (avg.stressLevel >= 14) {
+        risks.push({ level: 'medium', title: 'Помірний рівень стресу', description: `Стрес: ${avg.stressLevel.toFixed(1)}.` });
+      }
+
+      if (!risks.length) {
+        risks.push({ level: 'low', title: 'Команда в хорошому стані', description: 'Всі показники в межах норми.' });
+      }
+
+      risks.sort((a, b) => {
+        const order = { high: 0, medium: 1, low: 2 };
+        return order[a.level] - order[b.level];
+      });
+
+      risks.forEach(risk => {
+        const item = document.createElement('div');
+        item.className = `risk-item ${risk.level}`;
+        item.innerHTML = `
+          <div class="risk-item-title">${risk.title}</div>
+          <div class="risk-item-description">${risk.description}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    async function openEmployeeModal(employeeId) {
+      if (!employeeId) return;
+      try {
+        if (!advancedData) {
+          advancedData = await apiCall('/api/employee-data');
+        }
+      } catch (error) {
+        return;
+      }
+
+      const employee = advancedData?.employees?.find(e => e.userId === employeeId || e.user_id === employeeId || e.id === employeeId);
+      if (!employee) return;
+
+      document.getElementById('modalEmployeeName').textContent = employee.name;
+
+      const metricsHtml = `
+        <div class="modal-metric"><span class="metric-label">WHO-5</span><span class="metric-value ${getScoreClass('who5', employee.metrics.who5)}">${employee.metrics.who5.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">PHQ-9</span><span class="metric-value ${getScoreClass('phq9', employee.metrics.phq9)}">${employee.metrics.phq9.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">GAD-7</span><span class="metric-value ${getScoreClass('gad7', employee.metrics.gad7)}">${employee.metrics.gad7.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">MBI</span><span class="metric-value ${getScoreClass('mbi', employee.metrics.mbi)}">${employee.metrics.mbi.toFixed(1)}%</span></div>
+        <div class="modal-metric"><span class="metric-label">Сон</span><span class="metric-value ${getScoreClass('sleepDuration', employee.metrics.sleepDuration)}">${employee.metrics.sleepDuration.toFixed(1)} год</span></div>
+        <div class="modal-metric"><span class="metric-label">Якість сну</span><span class="metric-value ${getScoreClass('sleepQuality', employee.metrics.sleepQuality)}">${employee.metrics.sleepQuality.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">Баланс</span><span class="metric-value ${getScoreClass('workLifeBalance', employee.metrics.workLifeBalance)}">${employee.metrics.workLifeBalance.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">Стрес</span><span class="metric-value ${getScoreClass('stressLevel', employee.metrics.stressLevel)}">${employee.metrics.stressLevel.toFixed(1)}</span></div>
+      `;
+      document.getElementById('modalMetrics').innerHTML = metricsHtml;
+
+      const riskLevel = employee.riskLevel || 'low';
+      document.getElementById('modalRiskLevel').innerHTML = `<span class="risk-indicator risk-${riskLevel}">${getRiskLabel(riskLevel)}</span>`;
+      document.getElementById('modalNotes').textContent = employee.notes || 'Нотатки недоступні';
+
+      createModalTrendChart(employee);
+      document.getElementById('employeeModal').style.display = 'flex';
+    }
+
+    function closeEmployeeModal() {
+      const modal = document.getElementById('employeeModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    function createModalTrendChart(employee) {
+      const ctx = document.getElementById('modalTrendChart');
+      if (!ctx) return;
+
+      if (teamDashboardCharts.modalTrend) {
+        teamDashboardCharts.modalTrend.destroy();
+      }
+
+      const months = getTeamMonthList();
+      const recent = months.slice(Math.max(0, months.length - 4));
+      const labels = recent.map(m => monthLabelFromKey(monthKeyFromParts(m.year, m.month), true));
+
+      const history = employee.history || {};
+      const values = (key) => recent.map(m => {
+        const monthKey = monthKeyFromParts(m.year, m.month);
+        return history[monthKey]?.[key] ?? 0;
+      });
+
+      teamDashboardCharts.modalTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'WHO-5', data: values('who5'), borderColor: '#1f8f3a', tension: 0.35, borderWidth: 2 },
+            { label: 'PHQ-9', data: values('phq9'), borderColor: '#ffb000', tension: 0.35, borderWidth: 2 },
+            { label: 'GAD-7', data: values('gad7'), borderColor: '#ff595e', tension: 0.35, borderWidth: 2 },
+            { label: 'MBI', data: values('mbi'), borderColor: '#6a4c93', tension: 0.35, borderWidth: 2 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+        },
+      });
+    }
+
+    // ===== ADVANCED ANALYTICS =====
+    async function loadAdvancedAnalytics() {
+      if (!isAdmin()) return;
+      const container = document.getElementById('advanced-section');
+      try {
+        advancedData = await apiCall('/api/employee-data');
+      } catch (error) {
+        if (container) {
+          const banner = document.createElement('div');
+          banner.className = 'error-message';
+          banner.textContent = 'Не вдалося завантажити advanced аналітику.';
+          container.prepend(banner);
+        }
+        return;
+      }
+
+      checkAndShowDecemberNotice();
+      calculateTeamHealthScore();
+      updateBenchmarking();
+      renderTrajectoryChart();
+      renderRiskBubbleChart();
+      calculateForecast();
+      analyzeSleepDebt();
+      renderEmployeeInsights();
+      renderPlaybooks();
+      generateRecommendations();
+    }
+
+    function getAdvancedMonthKeys() {
+      if (!advancedData?.teamAverages) return [];
+      return Object.keys(advancedData.teamAverages)
+        .filter(key => key !== 'current')
+        .sort(compareMonthKeys);
+    }
+
+    function getLatestMonthKey() {
+      const months = getAdvancedMonthKeys();
+      return months.length ? months[months.length - 1] : null;
+    }
+
+    function getPrevMonthKey() {
+      const months = getAdvancedMonthKeys();
+      if (!months.length) return null;
+      return months.length >= 2 ? months[months.length - 2] : months[0];
+    }
+
+    function getRecentMonths(limit) {
+      const months = getAdvancedMonthKeys();
+      return months.slice(Math.max(0, months.length - limit));
+    }
+
+    function labelFromKey(key) {
+      return monthLabelFromKey(key, true);
+    }
+
+    function getLatestAverage() {
+      const latestKey = getLatestMonthKey();
+      if (latestKey && advancedData.teamAverages[latestKey]) {
+        return advancedData.teamAverages[latestKey];
+      }
+      return advancedData.teamAverages.current || null;
+    }
+
+    function checkAndShowDecemberNotice() {
+      const noticeEl = document.getElementById('decemberNotice');
+      if (!noticeEl || !advancedData) return;
+      const months = getAdvancedMonthKeys();
+      const hasDecember = months.some(key => parseMonthKey(key).month === 12);
+      noticeEl.style.display = hasDecember ? 'block' : 'none';
+    }
+
+    function calculateTeamHealthScore() {
+      if (!advancedData?.employees?.length) return;
+
+      let totalScore = 0;
+      advancedData.employees.forEach(emp => {
+        const m = emp.metrics;
+        const who5Score = m.who5;
+        const phq9Score = 100 - (m.phq9 / 27 * 100);
+        const gad7Score = 100 - (m.gad7 / 21 * 100);
+        const mbiScore = 100 - m.mbi;
+        const sleepScore = (m.sleepDuration / 9) * 100;
+        const qualityScore = (m.sleepQuality / 10) * 100;
+        const balanceScore = (m.workLifeBalance / 10) * 100;
+        const stressScore = 100 - (m.stressLevel / 40 * 100);
+
+        const empScore = (who5Score + phq9Score + gad7Score + mbiScore + sleepScore + qualityScore + balanceScore + stressScore) / 8;
+        totalScore += empScore;
+      });
+
+      const healthScore = Math.round(totalScore / advancedData.employees.length);
+      const scoreEl = document.getElementById('healthScore');
+      if (scoreEl) scoreEl.textContent = healthScore;
+
+      let indicator = '';
+      if (healthScore >= 70) {
+        indicator = '🟢 Відмінно';
+      } else if (healthScore >= 50) {
+        indicator = '🟡 Задовільно';
+      } else {
+        indicator = '🔴 Потребує уваги';
+      }
+      const indicatorEl = document.getElementById('healthIndicator');
+      if (indicatorEl) indicatorEl.textContent = indicator;
+    }
+
+    function updateBenchmarking() {
+      if (!advancedData) return;
+      const avg = getLatestAverage();
+      if (!avg) return;
+      const benchmarks = {
+        who5: { your: avg.who5, industry: 62, higherIsBetter: true, max: 100 },
+        phq9: { your: avg.phq9, industry: 6.8, higherIsBetter: false, max: 27 },
+        gad7: { your: avg.gad7, industry: 7.5, higherIsBetter: false, max: 21 },
+        mbi: { your: avg.mbi, industry: 42, higherIsBetter: false, max: 100 },
+        stress: { your: avg.stressLevel, industry: 18, higherIsBetter: false, max: 40 },
+      };
+
+      Object.keys(benchmarks).forEach(key => {
+        const data = benchmarks[key];
+        const yourValue = data.your?.toFixed(1) ?? '—';
+
+        document.getElementById(key + 'YourValue').textContent = yourValue;
+
+        const yourWidth = Math.min(100, (data.your / data.max) * 100);
+        const industryWidth = Math.min(100, (data.industry / data.max) * 100);
+
+        document.getElementById(key + 'Your').style.width = yourWidth + '%';
+        document.getElementById(key + 'Industry').style.width = industryWidth + '%';
+
+        let status = '';
+        if (data.higherIsBetter) {
+          if (data.your >= data.industry * 0.95) status = '✅ краще';
+          else if (data.your >= data.industry * 0.85) status = '≈ середнє';
+          else status = '📉 гірше';
+        } else {
+          if (data.your <= data.industry * 1.05) status = '✅ краще';
+          else if (data.your <= data.industry * 1.15) status = '≈ середнє';
+          else status = '📉 гірше';
+        }
+
+        document.getElementById(key + 'Status').textContent = status;
+      });
+    }
+
+    function calculateEmployeeRisk(metrics) {
+      if (metrics.who5 < 28 || metrics.phq9 > 15 || metrics.gad7 > 15) return 'critical';
+      if (metrics.who5 < 50 || metrics.phq9 > 10 || metrics.gad7 > 10 || metrics.mbi > 40) return 'high';
+      if (metrics.mbi > 30 || metrics.stressLevel > 20) return 'medium';
+      return 'low';
+    }
+
+    function renderTrajectoryChart() {
+      if (!advancedData) return;
+      const ctxEl = document.getElementById('trajectoryChart');
+      if (!ctxEl) return;
+
+      const months = getRecentMonths(4);
+      if (!months.length) return;
+      const averages = advancedData.teamAverages;
+      const labels = months.map(labelFromKey);
+
+      const who5 = months.map(m => averages[m]?.who5 ?? 0);
+      const stressRaw = months.map(m => averages[m]?.stressLevel ?? 0);
+      const stress = stressRaw.map(v => (v / 40) * 100);
+      const sleepRaw = months.map(m => averages[m]?.sleepDuration ?? 0);
+      const sleep = sleepRaw.map(v => (v / 9) * 100);
+
+      if (advancedCharts.trajectory) advancedCharts.trajectory.destroy();
+
+      advancedCharts.trajectory = new Chart(ctxEl, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'WHO-5', data: who5, borderColor: '#1f8f3a', tension: 0.3, borderWidth: 3 },
+            { label: 'Стрес', data: stress, borderColor: '#ffb000', tension: 0.3, borderWidth: 2, borderDash: [6, 6] },
+            { label: 'Сон', data: sleep, borderColor: '#2b59c3', tension: 0.3, borderWidth: 2 },
+          ],
+        },
+        options: { responsive: true, maintainAspectRatio: false },
+      });
+
+      const latestKey = getLatestMonthKey();
+      const prevKey = getPrevMonthKey();
+      if (!latestKey || !prevKey) return;
+      const latestIdx = months.indexOf(latestKey);
+      const prevIdx = Math.max(0, latestIdx - 1);
+      const whoDelta = who5[latestIdx] - who5[prevIdx];
+      const stressDelta = stressRaw[latestIdx] - stressRaw[prevIdx];
+      const sleepDelta = sleepRaw[latestIdx] - sleepRaw[prevIdx];
+      const comment = `Останній місяць (${labelFromKey(latestKey)}): WHO-5 ${who5[latestIdx]?.toFixed(1)}, сон ${sleepRaw[latestIdx]?.toFixed(1)} год, стрес ${stressRaw[latestIdx]?.toFixed(1)}/40. Δ vs ${labelFromKey(prevKey)}: WHO-5 ${(whoDelta>=0?'+':'') + whoDelta.toFixed(1)}, сон ${(sleepDelta>=0?'+':'') + sleepDelta.toFixed(1)} год, стрес ${(stressDelta>=0?'+':'') + stressDelta.toFixed(1)}.`;
+      const commentEl = document.getElementById('trajectoryComment');
+      if (commentEl) commentEl.textContent = comment;
+
+      const modalMetrics = [
+        { key: 'who5', label: 'WHO-5', value: who5[latestIdx]?.toFixed(1) ?? '—' },
+        { key: 'sleep', label: 'Сон (год)', value: sleepRaw[latestIdx]?.toFixed(1) ?? '—' },
+        { key: 'stress', label: 'Стрес (0-40)', value: stressRaw[latestIdx]?.toFixed(1) ?? '—' },
+      ];
+      fillMetricsGrid('trajectoryMetrics', modalMetrics);
+      const summary = document.getElementById('trajectorySummary');
+      if (summary) summary.textContent = 'Фокус: зміни благополуччя, сну та стресу за останній місяць.';
+    }
+
+    function renderRiskBubbleChart() {
+      if (!advancedData) return;
+      const ctxEl = document.getElementById('riskBubbleChart');
+      if (!ctxEl) return;
+
+      if (advancedCharts.riskBubble) advancedCharts.riskBubble.destroy();
+
+      const points = advancedData.employees.map(emp => {
+        const risk = calculateEmployeeRisk(emp.metrics);
+        return {
+          x: emp.metrics.stressLevel,
+          y: emp.metrics.mbi,
+          r: Math.min(26, Math.max(10, emp.metrics.phq9 * 1.2)),
+          name: emp.name,
+          risk,
+          phq9: emp.metrics.phq9,
+        };
+      });
+
+      advancedCharts.riskBubble = new Chart(ctxEl, {
+        type: 'bubble',
+        data: {
+          datasets: [{
+            data: points,
+            backgroundColor: points.map(p => p.risk === 'critical' ? 'rgba(239, 68, 68, 0.8)'
+              : p.risk === 'high' ? 'rgba(239, 68, 68, 0.6)'
+              : p.risk === 'medium' ? 'rgba(251, 191, 36, 0.6)'
+              : 'rgba(34, 197, 94, 0.6)'),
+            borderColor: points.map(p => p.risk === 'critical' ? '#dc2626'
+              : p.risk === 'high' ? '#ef4444'
+              : p.risk === 'medium' ? '#f59e0b'
+              : '#22c55e'),
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+          },
+          scales: {
+            x: { beginAtZero: true, max: 40 },
+            y: { beginAtZero: true, max: 100 },
+          },
+        },
+      });
+
+      const counts = points.reduce((acc, p) => {
+        acc[p.risk] = (acc[p.risk] || 0) + 1;
+        return acc;
+      }, {});
+      const topRisk = points.slice().sort((a, b) => (b.y + b.x) - (a.y + a.x))[0];
+      const riskComment = `Ризики: high ${counts.high || 0}, medium ${counts.medium || 0}, low ${counts.low || 0}. Найвищий ризик: ${topRisk?.name || '—'}.`;
+      const riskEl = document.getElementById('riskComment');
+      if (riskEl) riskEl.textContent = riskComment;
+
+      const modalMetrics = [
+        { key: 'mbi', label: 'High', value: counts.high || 0 },
+        { key: 'mbi', label: 'Medium', value: counts.medium || 0 },
+        { key: 'mbi', label: 'Low', value: counts.low || 0 },
+        { key: 'mbi', label: 'Найвищий ризик', value: topRisk ? `${topRisk.name} · MBI ${topRisk.y.toFixed(0)}%, стрес ${topRisk.x}/40` : '—' },
+      ];
+      fillMetricsGrid('riskMetrics', modalMetrics);
+      const riskSummary = document.getElementById('riskSummary');
+      if (riskSummary) riskSummary.textContent = 'Матриця поєднує стрес, вигорання та PHQ-9 для швидкого пріоритизування 1:1.';
+    }
+
+    function calculateForecast() {
+      if (!advancedData) return;
+      const history = advancedData.teamAverages;
+      const latestKey = getLatestMonthKey();
+      const prevKey = getPrevMonthKey();
+      if (!latestKey || !prevKey) return;
       const metrics = [
-        { key: 'who5_score', label: 'WHO-5', max: 100, higherIsBetter: true },
-        { key: 'phq9_score', label: 'PHQ-9', max: 27, higherIsBetter: false },
-        { key: 'gad7_score', label: 'GAD-7', max: 21, higherIsBetter: false },
-        { key: 'burnout_percentage', label: 'Burnout', max: 100, higherIsBetter: false },
-        { key: 'stress_level', label: 'Стрес', max: 40, higherIsBetter: false },
+        { key: 'who5', name: 'WHO-5 Благополуччя' },
+        { key: 'phq9', name: 'PHQ-9 Депресія' },
+        { key: 'mbi', name: 'MBI Вигорання' },
       ];
 
-      metrics.slice(0, 4).forEach(metric => {
-        const value = latest?.[metric.key];
-        const prev = previous?.[metric.key];
-        const delta = value !== undefined && prev !== undefined ? value - prev : null;
-        const improving = delta !== null
-          ? (metric.higherIsBetter ? delta > 0 : delta < 0)
-          : null;
-        const deltaSymbol = delta === null
-          ? '—'
-          : (Math.abs(delta) < 0.5 ? '→' : (delta > 0 ? '↑' : '↓'));
-        const deltaColor = improving === null ? 'var(--gray)' : (improving ? 'var(--success)' : 'var(--danger)');
+      const forecastGrid = document.getElementById('forecastGrid');
+      if (!forecastGrid) return;
+      forecastGrid.innerHTML = '';
+
+      metrics.forEach(metric => {
+        const prev = history[prevKey]?.[metric.key] ?? history[latestKey]?.[metric.key] ?? 0;
+        const curr = history[latestKey]?.[metric.key] ?? prev;
+        const trend = curr - prev;
+        const forecast = curr + trend;
+
+        const trendArrow = trend > 0 ? '📈' : trend < 0 ? '📉' : '➡️';
+        const trendText = trend > 0 ? 'Зростання' : trend < 0 ? 'Зниження' : 'Стабільно';
 
         const card = document.createElement('div');
-        card.className = 'metric-card';
-
-        const displayValue = value !== undefined && value !== null ? value.toFixed(1) : '—';
-        const percent = value !== undefined && value !== null
-          ? Math.min(100, Math.max(0, (value / metric.max) * 100))
-          : 0;
-
+        card.className = 'forecast-card';
         card.innerHTML = `
-          <div class="metric-label">${metric.label}</div>
-          <div class="metric-value">${displayValue}</div>
-          <div class="form-hint" style="color: ${deltaColor}; font-weight: 700;">
-            ${deltaSymbol} ${delta !== null ? delta.toFixed(1) : ''}
+          <h3>${metric.name}</h3>
+          <div class="forecast-value">${forecast.toFixed(1)}</div>
+          <div class="forecast-trend">${trendArrow} ${trendText} (${labelFromKey(prevKey)} → ${labelFromKey(latestKey)})</div>
+          <div class="forecast-change">Зміна: ${(trend > 0 ? '+' : '') + trend.toFixed(1)}</div>
+        `;
+        forecastGrid.appendChild(card);
+      });
+    }
+
+    function analyzeSleepDebt() {
+      if (!advancedData) return;
+      const employees = advancedData.employees || [];
+      const optimalSleep = 7.5;
+      let totalDebt = 0;
+      let atRisk = 0;
+
+      const debtData = employees.map(emp => {
+        const debt = Math.max(0, (optimalSleep - emp.metrics.sleepDuration) * 7);
+        totalDebt += debt;
+        if (emp.metrics.sleepDuration < 6.5) atRisk += 1;
+        return { name: emp.name, debt };
+      });
+
+      const avgDebt = employees.length ? totalDebt / employees.length : 0;
+
+      document.getElementById('totalSleepDebt').textContent = totalDebt.toFixed(0);
+      document.getElementById('avgSleepDebt').textContent = avgDebt.toFixed(1);
+      document.getElementById('atRiskCount').textContent = atRisk;
+
+      const ctx = document.getElementById('sleepDebtChart');
+      if (!ctx) return;
+      if (advancedCharts.sleepDebt) advancedCharts.sleepDebt.destroy();
+
+      advancedCharts.sleepDebt = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: debtData.map(d => d.name.split(' ')[0]),
+          datasets: [{
+            label: 'Борг сну (год/тиждень)',
+            data: debtData.map(d => d.debt),
+            backgroundColor: debtData.map(d => d.debt > 10 ? 'rgba(239, 68, 68, 0.8)' : d.debt > 5 ? 'rgba(251, 191, 36, 0.8)' : 'rgba(34, 197, 94, 0.8)'),
+            borderColor: debtData.map(d => d.debt > 10 ? '#ef4444' : d.debt > 5 ? '#fbbf24' : '#22c55e'),
+            borderWidth: 2,
+          }],
+        },
+        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' },
+      });
+    }
+
+    function renderEmployeeInsights() {
+      if (!advancedData) return;
+      const grid = document.getElementById('insightGrid');
+      if (!grid) return;
+      const employees = advancedData.employees || [];
+
+      const latestKey = getLatestMonthKey();
+      const prevKey = getPrevMonthKey();
+      if (!latestKey || !prevKey) return;
+
+      const riskSorted = [...employees].sort((a, b) =>
+        (b.metrics.mbi + b.metrics.phq9) - (a.metrics.mbi + a.metrics.phq9)
+      );
+      const topRiskNames = riskSorted.slice(0, 2)
+        .map(e => `${e.name.split(' ')[0]} (MBI ${e.metrics.mbi.toFixed(0)}%, PHQ-9 ${e.metrics.phq9})`)
+        .join(', ');
+
+      const improvements = employees.map(emp => {
+        const prev = emp.history?.[prevKey]?.who5 ?? emp.metrics.who5;
+        const latest = emp.history?.[latestKey]?.who5 ?? emp.metrics.who5;
+        return { name: emp.name, delta: latest - prev };
+      }).sort((a, b) => b.delta - a.delta);
+
+      const topRecovery = improvements.filter(i => i.delta > 0).slice(0, 2)
+        .map(i => `${i.name.split(' ')[0]} (+${i.delta.toFixed(0)} WHO-5)`).join(', ');
+
+      const declines = improvements.filter(i => i.delta < 0).slice(0, 2)
+        .map(i => `${i.name.split(' ')[0]} (${i.delta.toFixed(0)})`).join(', ');
+
+      const sleepDebt = employees.map(emp => {
+        const debt = Math.max(0, (7.5 - emp.metrics.sleepDuration) * 7);
+        return { name: emp.name, debt };
+      }).sort((a, b) => b.debt - a.debt).slice(0, 2);
+
+      const balanced = [...employees].sort((a, b) =>
+        b.metrics.workLifeBalance - a.metrics.workLifeBalance
+      ).slice(0, 2);
+
+      const cards = [
+        {
+          pill: 'CRITICAL',
+          title: 'Терміновий фокус 1:1',
+          body: topRiskNames || 'Немає червоних прапорців цього місяця.',
+          bullets: [
+            topRiskNames ? 'Фокус на працівниках з найвищим MBI/PHQ-9.' : 'Команда без критичних тригерів.',
+            'Уточнити, чи є ранні симптоми (сон <6.5 год, PHQ-9>10).'
+          ],
+          plan: 'План: короткі check-in з групою ризику та фіксація 1-2 конкретних змін.'
+        },
+        {
+          pill: 'RECOVERY',
+          title: 'Найбільше відновлення',
+          body: topRecovery || 'Різких підйомів не зафіксовано.',
+          bullets: [
+            topRecovery ? 'Є історії відновлення — потенційні best practices.' : 'Без стрибків — моніторити стабільність.',
+            'Зафіксувати, що саме спрацювало.'
+          ],
+          plan: 'План: короткий peer sharing та збір практик відновлення.'
+        },
+        {
+          pill: 'DROP',
+          title: 'Негативна динаміка',
+          body: declines || 'Немає різких спадів.',
+          bullets: [
+            declines ? 'Є падіння WHO-5 — локальні проблеми.' : 'Без суттєвих спадів — тримати моніторинг.',
+            'Ймовірні причини: пікове навантаження або недосип.'
+          ],
+          plan: 'План: перевірити пріоритети та знизити навантаження для групи ризику.'
+        },
+        {
+          pill: 'SLEEP',
+          title: 'Борг сну та енергія',
+          body: sleepDebt.length
+            ? sleepDebt.map(d => `${d.name.split(' ')[0]} (+${d.debt.toFixed(0)} год/тижд)`).join(', ')
+            : 'Борг сну в нормі.',
+          bullets: [
+            sleepDebt.length ? 'Є помітний борг сну — ризик падіння продуктивності.' : 'Сон стабільний — підтримувати режим.',
+            'Недосип корелює з вигоранням і PHQ-9.'
+          ],
+          plan: 'План: правило «без пінгів після 19:00» + гнучкий старт для групи ризику.'
+        },
+        {
+          pill: 'BALANCE',
+          title: 'Еталонний баланс',
+          body: balanced.map(b =>
+            `${b.name.split(' ')[0]} (баланс ${b.metrics.workLifeBalance}/10, стрес ${b.metrics.stressLevel}/40)`
+          ).join(', '),
+          bullets: [
+            'Є еталонні практики work-life balance.',
+            'Ці люди можуть бути buddy для групи ризику.'
+          ],
+          plan: 'План: запросити як buddy та задокументувати ритуали.'
+        }
+      ];
+
+      grid.innerHTML = '';
+      cards.forEach(card => {
+        const el = document.createElement('div');
+        el.className = 'insight-card lift';
+        el.innerHTML = `
+          <span class="insight-pill">★ ${card.pill}</span>
+          <div class="insight-title">${card.title}</div>
+          <div class="insight-body">${card.body}</div>
+          <ul class="insight-list">${(card.bullets || []).map(b => `<li>${b}</li>`).join('')}</ul>
+          <div class="insight-plan">${card.plan}</div>
+        `;
+        grid.appendChild(el);
+      });
+    }
+
+    function renderPlaybooks() {
+      const container = document.getElementById('playbooks-grid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!advancedData?.employees?.length) {
+        container.innerHTML = '<div class="form-hint">Немає даних для плейбуків</div>';
+        return;
+      }
+
+      const ranked = [...advancedData.employees]
+        .sort((a, b) => (b.metrics.mbi + b.metrics.phq9 + b.metrics.gad7) - (a.metrics.mbi + a.metrics.phq9 + a.metrics.gad7))
+        .slice(0, 3);
+
+      ranked.forEach(emp => {
+        const level = calculateEmployeeRisk(emp.metrics);
+        const card = document.createElement('div');
+        card.className = 'playbook-card';
+        card.innerHTML = `
+          <h3 class="playbook-employee-name">${emp.name}</h3>
+          <div class="playbook-risk-level">Ризик: ${getRiskLabel(level)} · PHQ-9 ${emp.metrics.phq9} · MBI ${emp.metrics.mbi.toFixed(1)}%</div>
+          <div class="playbook-section">
+            <h4>📞 Сценарій розмови</h4>
+            <ul class="playbook-bullets">
+              <li>Запитайте про самопочуття та ключові стресори.</li>
+              <li>Уточніть, що допоможе знизити навантаження цього тижня.</li>
+              <li>Домовтесь про 1-2 зміни та follow-up через 7 днів.</li>
+            </ul>
           </div>
-          <div style="margin-top: 0.75rem;">
-            <div style="height: 10px; border: 2px solid var(--dark); background: var(--gray-light);">
-              <div style="height: 100%; width: ${percent}%; background: var(--primary);"></div>
-            </div>
+          <div class="playbook-section">
+            <h4>📋 План на 7 днів</h4>
+            <ul class="playbook-microactions">
+              <li>Скоротити 1-2 не критичні задачі або мітинги.</li>
+              <li>Додати 2 блоки фокусу без пінгів.</li>
+              <li>Зафіксувати підтримку (buddy/коуч) і час контакту.</li>
+            </ul>
           </div>
         `;
-
         container.appendChild(card);
       });
     }
 
-    function updateBadges({ who5, phq9, gad7, burnout }) {
-      setBadge('wellbeing-badge', who5, [
-        { max: 35, label: 'КРИТИЧНО', cls: 'badge-danger' },
-        { max: 50, label: 'НИЗЬКИЙ', cls: 'badge-warning' },
-        { max: 75, label: 'НОРМА', cls: 'badge-success' },
-        { max: 100, label: 'ВІДМІННО', cls: 'badge-success' },
-      ], true);
+    function generateRecommendations() {
+      if (!advancedData) return;
+      const employees = advancedData.employees || [];
+      const plans = employees.map(buildRecommendationPlan).filter(Boolean);
 
-      setBadge('depression-badge', phq9, [
-        { max: 5, label: 'МІНІМАЛЬНА', cls: 'badge-success' },
-        { max: 10, label: 'ЛЕГКА', cls: 'badge-warning' },
-        { max: 15, label: 'ПОМІРНА', cls: 'badge-warning' },
-        { max: 100, label: 'ВИСОКА', cls: 'badge-danger' },
-      ], false);
+      const grid = document.getElementById('recommendationsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
 
-      setBadge('anxiety-badge', gad7, [
-        { max: 5, label: 'МІНІМАЛЬНА', cls: 'badge-success' },
-        { max: 10, label: 'ЛЕГКА', cls: 'badge-warning' },
-        { max: 15, label: 'ПОМІРНА', cls: 'badge-warning' },
-        { max: 100, label: 'ВИСОКА', cls: 'badge-danger' },
-      ], false);
-
-      setBadge('burnout-badge', burnout, [
-        { max: 35, label: 'НИЗЬКИЙ', cls: 'badge-success' },
-        { max: 50, label: 'СЕРЕДНІЙ', cls: 'badge-warning' },
-        { max: 70, label: 'ВИСОКИЙ', cls: 'badge-warning' },
-        { max: 100, label: 'КРИТИЧНИЙ', cls: 'badge-danger' },
-      ], false);
-    }
-
-    function setBadge(id, value, levels) {
-      const badge = document.getElementById(id);
-      if (!badge) return;
-      badge.classList.remove('badge-success', 'badge-warning', 'badge-danger');
-
-      if (value === null || value === undefined) {
-        badge.textContent = 'Н/Д';
-        badge.classList.add('badge-warning');
+      if (!plans.length) {
+        grid.innerHTML = '<p style="color: var(--gray); text-align: center; padding: 2rem;">Всі показники в нормі! 🎉</p>';
         return;
       }
 
-      const level = levels.find(l => value <= l.max) || levels[levels.length - 1];
-      badge.textContent = level.label;
-      badge.classList.add(level.cls);
+      plans.forEach(plan => {
+        const kitId = 'call-kit-' + plan.id;
+        const card = document.createElement('div');
+        card.className = 'recommendation-card lift';
+
+        card.innerHTML = `
+          <div class="rec-header">
+            <div>
+              <span class="rec-category">${plan.category}</span>
+              <div class="rec-insight">${plan.subtitle}</div>
+            </div>
+            <strong>${plan.employee}</strong>
+          </div>
+          <div class="rec-message">${plan.message}</div>
+          <div class="rec-actions">
+            <button class="copy-btn" onclick="toggleCallKit('${kitId}')">План 1:1 (${plan.duration} хв)</button>
+            <span class="rec-action">${plan.action}</span>
+          </div>
+          <div class="call-kit" id="${kitId}">
+            ${plan.callKit}
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
     }
 
-    function computeRisk(metrics) {
-      if (!metrics) {
-        return { label: 'Немає даних', color: 'var(--gray)', emoji: '⚪' };
-      }
-      if (metrics.who5_score < 50 || metrics.phq9_score >= 15 || metrics.gad7_score >= 15 || metrics.mbi_score >= 70) {
-        return { label: 'Критичний', color: 'var(--danger)', emoji: '🔴' };
-      }
-      if (metrics.who5_score < 60 || metrics.phq9_score >= 10 || metrics.gad7_score >= 10 || metrics.mbi_score >= 50) {
-        return { label: 'Високий', color: 'var(--warning)', emoji: '🟠' };
-      }
-      if (metrics.who5_score < 70 || metrics.phq9_score >= 5 || metrics.gad7_score >= 5 || metrics.mbi_score >= 35) {
-        return { label: 'Середній', color: '#ffb800', emoji: '🟡' };
-      }
-      return { label: 'Низький', color: 'var(--success)', emoji: '🟢' };
+    function buildRecommendationPlan(emp) {
+      const m = emp.metrics;
+      const focusAreas = [];
+
+      if (m.phq9 > 10 || m.gad7 > 10) focusAreas.push('mood');
+      if (m.mbi > 35 || m.stressLevel > 17) focusAreas.push('burnout');
+      if (m.sleepDuration < 6.5 || m.sleepQuality < 6) focusAreas.push('sleep');
+      if (m.workLifeBalance < 6) focusAreas.push('load');
+
+      const latestKey = getLatestMonthKey();
+      const prevKey = getPrevMonthKey();
+      if (!latestKey || !prevKey) return null;
+      const who5Delta = (emp.history?.[latestKey]?.who5 ?? m.who5) - (emp.history?.[prevKey]?.who5 ?? m.who5);
+      if (who5Delta >= 15) focusAreas.push('recovery');
+
+      if (focusAreas.length === 0) return null;
+
+      const severity = focusAreas.some(a => a === 'burnout' || a === 'mood') ? 'risk'
+        : focusAreas.includes('recovery') && focusAreas.length === 1 ? 'positive'
+        : 'focus';
+
+      const category = severity === 'risk' ? '🚨 Ризик 1:1'
+        : severity === 'positive' ? '🌟 Масштабувати успіх'
+        : '🛠 Профілактика';
+
+      const triggers = [];
+      if (focusAreas.includes('burnout')) triggers.push(`MBI ${m.mbi.toFixed(0)}% + стрес ${m.stressLevel}/40`);
+      if (focusAreas.includes('mood')) triggers.push(`PHQ-9 ${m.phq9}/27, GAD-7 ${m.gad7}/21`);
+      if (focusAreas.includes('sleep')) triggers.push(`сон ${m.sleepDuration} год, якість ${m.sleepQuality}/10`);
+      if (focusAreas.includes('load')) triggers.push(`баланс ${m.workLifeBalance}/10`);
+      if (focusAreas.includes('recovery')) triggers.push(`відновлення WHO-5 +${who5Delta.toFixed(0)}`);
+
+      const message = `
+        <div class="rec-insight">Тригери: ${triggers.join(' · ')}</div>
+        <div>Фокус 1:1: ${focusAreas.includes('recovery') ? 'закріпити успіх і масштабувати' : 'знизити стрес, відновити сон та баланс'}</div>
+      `.trim();
+
+      const action = severity === 'risk'
+        ? 'Признач 1:1 протягом 48 годин та зафіксуй 2 зміни'
+        : 'Провести 1:1 цього тижня з 7-денним планом';
+
+      return {
+        id: emp.userId || emp.user_id || emp.id,
+        employee: emp.name,
+        category,
+        subtitle: `Стрес ${m.stressLevel}/40 · Сон ${m.sleepDuration.toFixed(1)} год · Баланс ${m.workLifeBalance}/10`,
+        message,
+        action,
+        duration: severity === 'risk' ? 15 : 12,
+        callKit: buildCallKit(emp, focusAreas, who5Delta),
+      };
     }
 
-    function renderRiskSummary() {
-      const riskCountEl = document.getElementById('risk-count');
-      const criticalCountEl = document.getElementById('critical-count');
-      const riskLabelEl = document.getElementById('risk-primary-label');
-      const secondaryLabelEl = document.getElementById('risk-secondary-label');
+    function buildCallKit(emp, focusAreas, who5Delta) {
+      const firstName = emp.name.split(' ')[0];
+      const m = emp.metrics;
 
-      if (isAdmin() && teamHeatmap?.users?.length) {
-        const critical = teamHeatmap.users.filter(u => u.status === 'CRITICAL').length;
-        const concerning = teamHeatmap.users.filter(u => u.status === 'CONCERNING').length;
-        const atRisk = critical + concerning;
+      const questions = [
+        'Як ти зараз по шкалі 0-10?',
+        'Що забирає найбільше енергії цього тижня?',
+        'Що можемо прибрати/делегувати вже зараз?',
+        'Яка одна звичка допоможе відновитись цього тижня?'
+      ];
 
-        riskCountEl.textContent = atRisk;
-        riskCountEl.style.color = 'var(--warning)';
-        criticalCountEl.textContent = critical;
-        criticalCountEl.style.color = 'var(--danger)';
-        riskLabelEl.textContent = 'У зоні ризику';
-        secondaryLabelEl.textContent = 'Критичний стан';
-        return;
+      if (focusAreas.includes('sleep')) questions.push('Що заважає лягати раніше? Як команда може це підтримати?');
+      if (focusAreas.includes('load')) questions.push('Які задачі найменш критичні та виснажують?');
+      if (focusAreas.includes('recovery') && who5Delta > 0) questions.push(`Що дало +${who5Delta.toFixed(0)} до WHO-5? Як це повторити?`);
+
+      const microActions = [];
+      if (focusAreas.includes('burnout')) microActions.push('Вилучити 1 не-критичний мітинг і додати 2х2 год фокусу без пінгів.');
+      if (focusAreas.includes('mood')) microActions.push('Запропонувати консультацію психолога/коуча з конкретним слотом.');
+      if (focusAreas.includes('sleep')) microActions.push('2 вечори без робочих чатів після 19:00 + пізній стендап 1 раз на тиждень.');
+      if (focusAreas.includes('load')) microActions.push('Перерозподілити 1 задачку та заморозити 1 low-prio до наступного спринту.');
+      if (focusAreas.includes('recovery')) microActions.push('Задокументувати практику та поділитись на тім-міті (5 хв).');
+
+      return `
+        <h4>Флоу 1:1 для ${firstName}</h4>
+        <div class="rec-insight">Фокус: ${focusAreas.join(' • ')}</div>
+        <div class="call-kit-grid">
+          <div class="call-block"><strong>12-15 хв</strong>
+            <ul>
+              <li>1 хв: нормалізуй і запроси чесність.</li>
+              <li>3 хв: відзеркаль дані (стрес ${m.stressLevel}/40, MBI ${m.mbi.toFixed(0)}%, сон ${m.sleepDuration} год).</li>
+              <li>5 хв: досліджуй корінь проблеми питаннями.</li>
+              <li>3-4 хв: оберіть 1-2 зміни на тиждень.</li>
+              <li>1 хв: зафіксуй наступний чекпойнт.</li>
+            </ul>
+          </div>
+          <div class="call-block"><strong>Питання</strong>
+            <ul>${questions.map(q => '<li>' + q + '</li>').join('')}</ul>
+          </div>
+          <div class="call-block"><strong>Мікродії</strong>
+            <ul>${microActions.map(a => '<li>' + a + '</li>').join('')}</ul>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleCallKit(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle('open');
+    }
+
+    function openChartModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeChartModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.style.display = 'none';
+    }
+
+    function modalBgClick(event, id) {
+      if (event.target.id === id) {
+        closeChartModal(id);
       }
+    }
 
-      const risk = computeRisk(userMetrics);
-      riskCountEl.textContent = `${risk.emoji} ${risk.label}`;
-      riskCountEl.style.color = risk.color;
-      criticalCountEl.textContent = `${userStats.streak} днів`;
-      criticalCountEl.style.color = 'var(--dark)';
-      riskLabelEl.textContent = 'Рівень ризику';
-      secondaryLabelEl.textContent = 'Streak';
+    function fillMetricsGrid(id, metrics) {
+      const grid = document.getElementById(id);
+      if (!grid) return;
+      grid.innerHTML = metrics.map(item => {
+        const hint = METRIC_HINTS[item.key] || '';
+        const tooltip = hint ? `<span class="info-icon" data-tooltip="${hint}">i</span>` : '';
+        return `<div class="modal-metric"><span class="metric-label">${item.label} ${tooltip}</span><span class="metric-value">${item.value}</span></div>`;
+      }).join('');
     }
 
     // ===== WELLNESS =====
@@ -1751,20 +3495,41 @@
       const receivedContainer = document.getElementById('kudos-received');
       const sentContainer = document.getElementById('kudos-sent');
       const insightsContainer = document.getElementById('kudos-insights');
+      const summaryContainer = document.getElementById('kudos-summary');
 
       if (receivedContainer) receivedContainer.innerHTML = '';
       if (sentContainer) sentContainer.innerHTML = '';
       if (insightsContainer) insightsContainer.innerHTML = '';
+      if (summaryContainer) summaryContainer.textContent = '';
 
       if (!kudosData) return;
 
       const topSenders = kudosData.insights?.top_senders || [];
       const topKeywords = kudosData.insights?.top_keywords || [];
+      const receivedCount = kudosData.insights?.received_count_30d || 0;
+      const sentCount = kudosData.insights?.sent_count_30d || 0;
+      const summary = kudosData.insights?.summary || '';
+
+      if (summaryContainer) {
+        summaryContainer.textContent = summary;
+      }
 
       if (insightsContainer) {
-        if (topSenders.length === 0 && topKeywords.length === 0) {
+        if (receivedCount === 0 && sentCount === 0 && topSenders.length === 0 && topKeywords.length === 0) {
           insightsContainer.innerHTML = '<span class="form-hint">Немає даних для інсайтів</span>';
         } else {
+          if (receivedCount > 0) {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.textContent = `Отримано за 30 днів: ${receivedCount}`;
+            insightsContainer.appendChild(chip);
+          }
+          if (sentCount > 0) {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.textContent = `Надіслано за 30 днів: ${sentCount}`;
+            insightsContainer.appendChild(chip);
+          }
           topSenders.forEach(name => {
             const chip = document.createElement('span');
             chip.className = 'tag-chip';
@@ -1898,8 +3663,11 @@
         card.className = `pulse-message${message.status === 'PENDING' ? ' pending' : ''}`;
         const created = message.created_at ? new Date(message.created_at).toLocaleString('uk-UA') : 'Нещодавно';
         const status = message.status === 'PENDING' ? ' · На модерації' : '';
+        const author = message.is_anonymous
+          ? 'Анонім'
+          : (message.author_name || 'Учасник');
         card.innerHTML = `
-          <div class="plan-meta">${created}${status}</div>
+          <div class="plan-meta">${created}${status} · ${author}</div>
           <div class="plan-title">${message.content}</div>
         `;
         container.appendChild(card);
@@ -1940,10 +3708,12 @@
         const card = document.createElement('div');
         card.className = 'moderation-card';
         const created = item.created_at ? new Date(item.created_at).toLocaleString('uk-UA') : 'Нещодавно';
+        const reason = item.moderation_reason ? `<div class="form-hint">Причина: ${item.moderation_reason}</div>` : '';
         card.innerHTML = `
           <div class="plan-title">${item.room_title}</div>
           <div class="plan-meta">${created} · ${item.room_slug}</div>
           <div style="margin-top:0.5rem;">${item.content}</div>
+          ${reason}
           <div class="toggle-row" style="margin-top:0.75rem;">
             <button class="btn btn-secondary" data-action="approve" data-id="${item.id}">Approve</button>
             <button class="btn btn-secondary" data-action="reject" data-id="${item.id}">Reject</button>
@@ -1952,168 +3722,6 @@
         container.appendChild(card);
       });
     }
-
-    // ===== WALL TOXICITY =====
-    async function loadWallToxicitySummary() {
-      if (!isAdmin()) return;
-      try {
-        const data = await apiCall('/admin/wall/toxicity');
-        renderWallToxicitySummary(data);
-      } catch (error) {
-        const container = document.getElementById('wall-toxicity-summary');
-        if (container) {
-          container.innerHTML = '<div class="form-hint">Не вдалося завантажити summary</div>';
-        }
-      }
-    }
-
-    function renderWallToxicitySummary(data) {
-      const container = document.getElementById('wall-toxicity-summary');
-      if (!container) return;
-      container.innerHTML = '';
-      if (!data) {
-        container.innerHTML = '<div class="form-hint">Немає даних</div>';
-        return;
-      }
-
-      const stats = document.createElement('div');
-      stats.className = 'insight-item';
-      stats.innerHTML = `
-        <div class="insight-title">Пости: ${data.total_posts} · Flagged: ${data.flagged_posts}</div>
-        <div class="insight-meta">Середня severity: ${data.avg_severity.toFixed(1)}</div>
-      `;
-      container.appendChild(stats);
-
-      const themes = document.createElement('div');
-      themes.className = 'insight-item';
-      const themeChips = (data.top_themes || [])
-        .map(t => `<span class="tag-chip">${t.theme} (${t.count})</span>`)
-        .join('');
-      themes.innerHTML = `
-        <div class="insight-title">Теми</div>
-        <div class="tag-row">${themeChips || '<span class="form-hint">Немає тем</span>'}</div>
-      `;
-      container.appendChild(themes);
-
-      const keywords = document.createElement('div');
-      keywords.className = 'insight-item';
-      const keywordChips = (data.keywords || [])
-        .map(k => `<span class="tag-chip">#${k}</span>`)
-        .join('');
-      keywords.innerHTML = `
-        <div class="insight-title">Ключові слова</div>
-        <div class="tag-row">${keywordChips || '<span class="form-hint">Немає ключових слів</span>'}</div>
-      `;
-      container.appendChild(keywords);
-    }
-
-    // ===== WALL POSTS =====
-    async function loadWallPosts() {
-      const container = document.getElementById('wall-posts-container');
-      container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Завантаження постів...</div></div>';
-
-      try {
-        const posts = await apiCall('/feedback/wall');
-        renderWallPosts(posts || []);
-      } catch (error) {
-        container.innerHTML = `
-          <div style="text-align: center; padding: 2rem; color: var(--gray);">
-            Немає постів для відображення
-          </div>
-        `;
-      }
-    }
-
-    function renderWallPosts(posts) {
-      const container = document.getElementById('wall-posts-container');
-
-      if (!posts || posts.length === 0) {
-        container.innerHTML = `
-          <div style="text-align: center; padding: 3rem; color: var(--gray);">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
-            <div style="font-size: 1.25rem; font-weight: 700;">Поки що немає постів</div>
-            <div style="margin-top: 0.5rem;">Будьте першим хто поділиться фідбеком!</div>
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = '';
-
-      posts.forEach(post => {
-        const card = document.createElement('div');
-        card.className = 'wall-post fade-in';
-
-        const header = document.createElement('div');
-        header.className = 'wall-post-header';
-
-        const meta = document.createElement('div');
-        meta.className = 'wall-post-meta';
-
-        const date = document.createElement('span');
-        const created = post.created_at ? new Date(post.created_at) : null;
-        date.className = 'wall-post-date';
-        date.textContent = created && !isNaN(created)
-          ? created.toLocaleString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-          : 'Нещодавно';
-
-        const author = document.createElement('span');
-        author.className = 'wall-author';
-        author.textContent = post.is_anonymous || !post.author_name ? 'Анонімно' : post.author_name;
-
-        meta.appendChild(date);
-        meta.appendChild(author);
-
-        const category = document.createElement('span');
-        const info = categoryMap[post.category] || { label: 'Без категорії', emoji: '💬' };
-        category.className = `wall-category${post.ai_categorized ? ' wall-ai' : ''}`;
-        category.textContent = `${info.emoji} ${info.label}`;
-
-        header.appendChild(meta);
-        header.appendChild(category);
-
-        const content = document.createElement('div');
-        content.className = 'wall-post-content';
-        content.textContent = post.content;
-
-        card.appendChild(header);
-        card.appendChild(content);
-
-        container.appendChild(card);
-      });
-    }
-
-    // ===== WALL POST FORM =====
-    document.getElementById('wall-post-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const content = document.getElementById('post-content').value.trim();
-      const isAnonymous = document.getElementById('post-anonymous').checked;
-      const statusEl = document.getElementById('wall-post-status');
-      if (!content) return;
-
-      try {
-        statusEl.textContent = 'Публікація...';
-        await apiCall('/feedback/wall', {
-          method: 'POST',
-          body: JSON.stringify({ content, is_anonymous: isAnonymous }),
-        });
-
-        document.getElementById('post-content').value = '';
-        statusEl.textContent = '✅ Пост успішно опубліковано!';
-
-        // Reload posts
-        await loadWallPosts();
-
-      } catch (error) {
-        statusEl.textContent = '❌ Помилка: ' + error.message;
-      }
-    });
-
-    document.getElementById('post-anonymous').addEventListener('change', (e) => {
-      const preview = document.getElementById('post-visibility-preview');
-      preview.textContent = e.target.checked ? 'Анонімно' : `Публічно: ${currentUser?.name || 'User'}`;
-    });
 
     // ===== WELLNESS GOALS =====
     const wellnessGoalsForm = document.getElementById('wellness-goals-form');
@@ -2263,44 +3871,122 @@
     async function loadTelegramStatus() {
       const status = await apiCall('/telegram/status');
       if (!status) return;
+      telegramStatus = status;
 
       const connection = document.getElementById('telegram-connection-status');
       const pinInfo = document.getElementById('telegram-pin-info');
-      const pinExpiry = document.getElementById('pin-expiry');
 
       if (status.connected) {
         connection.textContent = `✅ Підключено (ID ${status.telegram_id})`;
-        pinInfo.textContent = '';
-        pinExpiry.textContent = '';
+        pinInfo.textContent = 'Telegram уже привʼязаний. Для входу використовуйте /weblogin.';
       } else {
         connection.textContent = '⛔ Не підключено';
-        if (status.active_pin) {
-          pinInfo.textContent = `Активний PIN: ${status.active_pin}`;
-          pinExpiry.textContent = 'Діє 5 хв';
-        } else {
-          pinInfo.textContent = 'PIN не згенеровано';
-          pinExpiry.textContent = '';
-        }
+        pinInfo.textContent = 'Для привʼязки надішліть у боті /start email@opslab.uk 1234.';
       }
 
       document.getElementById('reminder-time').value =
         `${String(status.reminder_hour).padStart(2, '0')}:${String(status.reminder_minute).padStart(2, '0')}`;
       document.getElementById('timezone-input').value = status.timezone || 'UTC';
       document.getElementById('notifications-enabled').checked = !!status.notification_enabled;
+
+      renderOnboarding();
     }
 
-    document.getElementById('generate-pin-btn').addEventListener('click', async () => {
-      const pinInfo = document.getElementById('telegram-pin-info');
-      const pinExpiry = document.getElementById('pin-expiry');
-      try {
-        const data = await apiCall('/telegram/generate-pin', { method: 'POST' });
-        pinInfo.textContent = `Активний PIN: ${data.pin_code}`;
-        pinExpiry.textContent = 'Діє 5 хв';
-      } catch (error) {
-        pinInfo.textContent = '❌ Не вдалося згенерувати PIN';
-        pinExpiry.textContent = '';
+    function renderOnboarding() {
+      const card = document.getElementById('onboarding-card');
+      if (!card || !telegramStatus) return;
+
+      if (telegramStatus.onboarding_completed) {
+        card.classList.add('hidden');
+        return;
       }
-    });
+
+      card.classList.remove('hidden');
+
+      const step2 = document.getElementById('onboarding-step-2');
+      const step3 = document.getElementById('onboarding-step-3');
+      const statusChip = document.getElementById('onboarding-telegram-status');
+      const reminderPreview = document.getElementById('onboarding-reminder-preview');
+      const completeBtn = document.getElementById('complete-onboarding-btn');
+
+      if (telegramStatus.connected) {
+        if (statusChip) {
+          statusChip.textContent = 'Telegram привʼязано';
+          statusChip.className = 'status-chip';
+        }
+        if (step2) step2.classList.add('complete');
+      } else {
+        if (statusChip) {
+          statusChip.textContent = 'Не привʼязано';
+          statusChip.className = 'status-chip';
+        }
+        if (step2) step2.classList.remove('complete');
+      }
+
+      if (reminderPreview) {
+        const time = `${String(telegramStatus.reminder_hour).padStart(2, '0')}:${String(telegramStatus.reminder_minute).padStart(2, '0')}`;
+        reminderPreview.textContent = `Поточні налаштування: ${time} · ${telegramStatus.timezone}`;
+      }
+
+      if (step3) {
+        step3.classList.add('complete');
+      }
+
+      if (completeBtn) {
+        completeBtn.disabled = !telegramStatus.connected;
+      }
+    }
+
+    const onboardingScrollBtn = document.getElementById('onboarding-scroll-settings');
+    if (onboardingScrollBtn) {
+      onboardingScrollBtn.addEventListener('click', () => {
+        const target = document.getElementById('telegram-settings-card');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+
+    const onboardingRefreshBtn = document.getElementById('onboarding-refresh');
+    if (onboardingRefreshBtn) {
+      onboardingRefreshBtn.addEventListener('click', async () => {
+        await loadTelegramStatus();
+      });
+    }
+
+    const onboardingCompleteBtn = document.getElementById('complete-onboarding-btn');
+    if (onboardingCompleteBtn) {
+      onboardingCompleteBtn.addEventListener('click', async () => {
+        const statusEl = document.getElementById('onboarding-status');
+        if (statusEl) statusEl.textContent = 'Перевіряємо...';
+        if (!telegramStatus?.connected) {
+          if (statusEl) statusEl.textContent = 'Спочатку привʼяжіть Telegram у боті.';
+          return;
+        }
+
+        const reminderTime = document.getElementById('reminder-time')?.value;
+        const timezone = document.getElementById('timezone-input')?.value?.trim();
+        const notificationsEnabled = document.getElementById('notifications-enabled')?.checked ?? true;
+
+        const payload = {
+          onboarding_complete: true,
+          notification_enabled: notificationsEnabled,
+        };
+        if (reminderTime) payload.reminder_time = reminderTime;
+        if (timezone) payload.timezone = timezone;
+
+        try {
+          await apiCall('/telegram/preferences', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          if (statusEl) statusEl.textContent = '✅ Онбординг завершено';
+          await loadTelegramStatus();
+        } catch (error) {
+          if (statusEl) statusEl.textContent = `❌ ${error.message}`;
+        }
+      });
+    }
 
     document.getElementById('telegram-settings-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -2340,7 +4026,6 @@
       const data = await apiCall('/admin/heatmap');
       teamHeatmap = data;
       renderTeamHeatmap(data);
-      renderRiskSummary();
     }
 
     function renderTeamHeatmap(data) {
@@ -2396,7 +4081,7 @@
       } catch (error) {
         const tbody = document.getElementById('admin-users-table');
         if (tbody) {
-          tbody.innerHTML = '<tr><td colspan="6">Не вдалося завантажити користувачів</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7">Не вдалося завантажити користувачів</td></tr>';
         }
       }
     }
@@ -2415,7 +4100,7 @@
       tbody.innerHTML = '';
 
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="6">Немає користувачів за цим фільтром</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7">Немає користувачів за цим фільтром</td></tr>';
         return;
       }
 
@@ -2459,6 +4144,10 @@
         statusChip.className = 'status-chip';
         statusChip.textContent = user.is_active ? 'Активний' : 'Неактивний';
         statusCell.appendChild(statusChip);
+
+        const telegramCell = document.createElement('td');
+        telegramCell.dataset.label = 'Telegram';
+        telegramCell.textContent = user.telegram_id ? 'Привʼязано' : '—';
 
         const createdCell = document.createElement('td');
         createdCell.dataset.label = 'Створено';
@@ -2509,9 +4198,18 @@
         if (!canManage) resetBtn.disabled = true;
         actionsCell.appendChild(resetBtn);
 
+        const resetTelegramBtn = document.createElement('button');
+        resetTelegramBtn.className = 'btn btn-secondary';
+        resetTelegramBtn.textContent = 'Скинути Telegram';
+        resetTelegramBtn.dataset.action = 'reset-telegram';
+        resetTelegramBtn.dataset.id = user.id;
+        if (!canManage || !user.telegram_id) resetTelegramBtn.disabled = true;
+        actionsCell.appendChild(resetTelegramBtn);
+
         tr.appendChild(userCell);
         tr.appendChild(roleCell);
         tr.appendChild(statusCell);
+        tr.appendChild(telegramCell);
         tr.appendChild(createdCell);
         tr.appendChild(offboardedCell);
         tr.appendChild(actionsCell);
@@ -2615,6 +4313,12 @@
               body: JSON.stringify({ code: code.trim() }),
             });
             alert('Код оновлено');
+          } else if (action === 'reset-telegram') {
+            if (!confirm('Скинути Telegram привʼязку?')) return;
+            await apiCall(`/admin/users/${userId}/reset-telegram`, {
+              method: 'POST',
+            });
+            alert('Telegram привʼязку очищено');
           }
 
           await loadAdminUsers();
