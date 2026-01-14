@@ -421,15 +421,6 @@ pub async fn link_telegram_by_email_code(
         return Ok(TelegramLinkOutcome::InvalidCredentials);
     };
 
-    let parsed_hash = PasswordHash::new(&user.hash)
-        .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
-    if Argon2::default()
-        .verify_password(code.as_bytes(), &parsed_hash)
-        .is_err()
-    {
-        return Ok(TelegramLinkOutcome::InvalidCredentials);
-    }
-
     if let Some(existing) = user.telegram_id {
         return Ok(TelegramLinkOutcome::AlreadyLinked {
             user_id: user.id,
@@ -439,6 +430,59 @@ pub async fn link_telegram_by_email_code(
 
     if find_user_by_telegram(pool, telegram_id).await?.is_some() {
         return Ok(TelegramLinkOutcome::TelegramIdInUse);
+    }
+
+    let pin = sqlx::query!(
+        r#"
+        SELECT id
+        FROM telegram_pins
+        WHERE user_id = $1
+          AND pin_code = $2
+          AND used = false
+          AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+        user.id,
+        code
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(pin) = pin {
+        sqlx::query!(
+            r#"
+            UPDATE telegram_pins
+            SET used = true, used_at = NOW()
+            WHERE id = $1
+            "#,
+            pin.id
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query!(
+            r#"
+            UPDATE users
+            SET telegram_id = $1, updated_at = NOW()
+            WHERE id = $2
+            "#,
+            telegram_id,
+            user.id
+        )
+        .execute(pool)
+        .await?;
+
+        return Ok(TelegramLinkOutcome::Linked(user.id));
+    }
+
+    let parsed_hash = PasswordHash::new(&user.hash)
+        .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+    if Argon2::default()
+        .verify_password(code.as_bytes(), &parsed_hash)
+        .is_err()
+    {
+        return Ok(TelegramLinkOutcome::InvalidCredentials);
     }
 
     sqlx::query!(
@@ -1620,4 +1664,259 @@ pub async fn insert_wall_toxic_signal(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+// ---------- Analytics Storage ----------
+
+#[derive(Debug, Clone, FromRow)]
+pub struct MonthlyMetricRow {
+    pub user_id: Uuid,
+    pub period: NaiveDate,
+    pub who5: f64,
+    pub phq9: f64,
+    pub gad7: f64,
+    pub mbi: f64,
+    pub sleep_duration: f64,
+    pub sleep_quality: f64,
+    pub work_life_balance: f64,
+    pub stress_level: f64,
+    pub source: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MonthlyMetricInput {
+    pub who5: f64,
+    pub phq9: f64,
+    pub gad7: f64,
+    pub mbi: f64,
+    pub sleep_duration: f64,
+    pub sleep_quality: f64,
+    pub work_life_balance: f64,
+    pub stress_level: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalyticsMetadataRow {
+    pub company: String,
+    pub data_collection_period: Option<String>,
+    pub update_frequency: Option<String>,
+    pub next_assessment: Option<NaiveDate>,
+    pub participation_rate: Option<String>,
+    pub assessment_tools: Vec<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct IndustryBenchmarkRow {
+    pub sector: String,
+    pub who5: Option<f64>,
+    pub phq9: Option<f64>,
+    pub gad7: Option<f64>,
+    pub mbi: Option<f64>,
+    pub sleep_duration: Option<f64>,
+    pub work_life_balance: Option<f64>,
+    pub stress_level: Option<f64>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct AnalyticsAlertRow {
+    pub severity: String,
+    pub employee_name: String,
+    pub message: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalyticsRecommendationRow {
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub affected_employees: Vec<String>,
+    pub priority: String,
+}
+
+pub async fn get_monthly_metric_overrides(
+    pool: &PgPool,
+    user_ids: &[Uuid],
+) -> Result<Vec<MonthlyMetricRow>> {
+    if user_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let rows = sqlx::query_as::<_, MonthlyMetricRow>(
+        r#"
+        SELECT
+            user_id,
+            period,
+            who5,
+            phq9,
+            gad7,
+            mbi,
+            sleep_duration,
+            sleep_quality,
+            work_life_balance,
+            stress_level,
+            source
+        FROM analytics_monthly_metrics
+        WHERE user_id = ANY($1)
+        ORDER BY period ASC
+        "#,
+    )
+    .bind(user_ids)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn upsert_monthly_metric(
+    pool: &PgPool,
+    user_id: Uuid,
+    period: NaiveDate,
+    metrics: &MonthlyMetricInput,
+    source: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO analytics_monthly_metrics (
+            user_id,
+            period,
+            who5,
+            phq9,
+            gad7,
+            mbi,
+            sleep_duration,
+            sleep_quality,
+            work_life_balance,
+            stress_level,
+            source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (user_id, period) DO UPDATE
+        SET who5 = EXCLUDED.who5,
+            phq9 = EXCLUDED.phq9,
+            gad7 = EXCLUDED.gad7,
+            mbi = EXCLUDED.mbi,
+            sleep_duration = EXCLUDED.sleep_duration,
+            sleep_quality = EXCLUDED.sleep_quality,
+            work_life_balance = EXCLUDED.work_life_balance,
+            stress_level = EXCLUDED.stress_level,
+            source = EXCLUDED.source,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(period)
+    .bind(metrics.who5)
+    .bind(metrics.phq9)
+    .bind(metrics.gad7)
+    .bind(metrics.mbi)
+    .bind(metrics.sleep_duration)
+    .bind(metrics.sleep_quality)
+    .bind(metrics.work_life_balance)
+    .bind(metrics.stress_level)
+    .bind(source)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_analytics_metadata(pool: &PgPool) -> Result<Option<AnalyticsMetadataRow>> {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            company,
+            data_collection_period,
+            update_frequency,
+            next_assessment,
+            participation_rate,
+            assessment_tools,
+            updated_at
+        FROM analytics_metadata
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    let tools_value: Option<serde_json::Value> = row.try_get("assessment_tools")?;
+    let assessment_tools = tools_value
+        .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+        .unwrap_or_default();
+
+    Ok(Some(AnalyticsMetadataRow {
+        company: row.try_get("company")?,
+        data_collection_period: row.try_get("data_collection_period")?,
+        update_frequency: row.try_get("update_frequency")?,
+        next_assessment: row.try_get("next_assessment")?,
+        participation_rate: row.try_get("participation_rate")?,
+        assessment_tools,
+        updated_at: row.try_get("updated_at")?,
+    }))
+}
+
+pub async fn get_industry_benchmarks(pool: &PgPool) -> Result<Vec<IndustryBenchmarkRow>> {
+    let rows = sqlx::query_as::<_, IndustryBenchmarkRow>(
+        r#"
+        SELECT
+            sector,
+            who5,
+            phq9,
+            gad7,
+            mbi,
+            sleep_duration,
+            work_life_balance,
+            stress_level
+        FROM analytics_industry_benchmarks
+        ORDER BY sector ASC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn get_analytics_alerts(pool: &PgPool) -> Result<Vec<AnalyticsAlertRow>> {
+    let rows = sqlx::query_as::<_, AnalyticsAlertRow>(
+        r#"
+        SELECT severity, employee_name, message, timestamp
+        FROM analytics_alerts
+        ORDER BY timestamp DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn get_analytics_recommendations(
+    pool: &PgPool,
+) -> Result<Vec<AnalyticsRecommendationRow>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT category, title, description, affected_employees, priority
+        FROM analytics_recommendations
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        let affected: Option<serde_json::Value> = row.try_get("affected_employees")?;
+        let affected_employees = affected
+            .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+            .unwrap_or_default();
+        out.push(AnalyticsRecommendationRow {
+            category: row.try_get("category")?,
+            title: row.try_get("title")?,
+            description: row.try_get("description")?,
+            affected_employees,
+            priority: row.try_get("priority")?,
+        });
+    }
+    Ok(out)
 }

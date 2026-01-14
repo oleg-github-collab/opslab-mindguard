@@ -35,12 +35,26 @@ fn normalize_base_url(raw: &str) -> String {
 }
 
 fn app_base_url() -> String {
-    let raw = env::var("APP_BASE_URL")
-        .or_else(|_| env::var("PUBLIC_BASE_URL"))
-        .or_else(|_| env::var("RAILWAY_PUBLIC_DOMAIN"))
-        .or_else(|_| env::var("RAILWAY_STATIC_URL"))
-        .unwrap_or_else(|_| "https://backend-production-e745.up.railway.app".to_string());
-    normalize_base_url(&raw)
+    let candidates = [
+        "APP_BASE_URL",
+        "PUBLIC_BASE_URL",
+        "RAILWAY_PUBLIC_DOMAIN",
+        "RAILWAY_STATIC_URL",
+    ];
+    for key in candidates {
+        if let Ok(raw) = env::var(key) {
+            let normalized = normalize_base_url(&raw);
+            if !is_local_url(&normalized) {
+                return normalized;
+            }
+        }
+    }
+    "https://backend-production-e745.up.railway.app".to_string()
+}
+
+fn is_local_url(url: &str) -> bool {
+    let lower = url.to_lowercase();
+    lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("0.0.0.0")
 }
 
 fn env_chat_id(keys: &[&str]) -> Option<i64> {
@@ -77,6 +91,7 @@ fn is_group_command(text: &str, bot_name: Option<&str>) -> bool {
         "/pulse",
         "/insight",
         "/wall",
+        "/feedback",
         "/link",
     ];
     if commands.iter().any(|cmd| trimmed.starts_with(cmd)) {
@@ -149,6 +164,28 @@ fn parse_plain_link(text: &str) -> Option<(String, String)> {
     let code = parts.next()?;
     if is_valid_email(email) && is_valid_code(code) {
         return Some((email.to_string(), code.to_string()));
+    }
+    None
+}
+
+fn parse_email_only(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.contains(' ') {
+        return None;
+    }
+    if is_valid_email(trimmed) {
+        return Some(trimmed.to_string());
+    }
+    None
+}
+
+fn parse_code_only(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.contains(' ') {
+        return None;
+    }
+    if is_valid_code(trimmed) {
+        return Some(trimmed.to_string());
     }
     None
 }
@@ -511,6 +548,34 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
                 return handle_link_by_code(bot, &state, msg.chat.id, telegram_id, &email, &code)
                     .await;
             }
+            if let Some(email) = parse_email_only(text) {
+                bot.send_message(
+                    msg.chat.id,
+                    mdv2(format!(
+                        "👍 Дякую! Тепер надішли 4-значний код доступу.\n\n\
+                        Формат:\n\
+                        {} 1234\n\n\
+                        Код видає адміністратор.",
+                        email
+                    )),
+                )
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+                return Ok(());
+            }
+            if parse_code_only(text).is_some() {
+                bot.send_message(
+                    msg.chat.id,
+                    mdv2(
+                        "✉️ Будь ласка, надішли email разом із 4-значним кодом доступу.\n\n\
+                        Формат:\n\
+                        email@opslab.uk 1234",
+                    ),
+                )
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+                return Ok(());
+            }
             if let Some(cmd) = command.as_ref() {
                 if cmd.name == "/start" || cmd.name == "/link" {
                     let base_url = app_base_url();
@@ -576,7 +641,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
                 /checkin - Пройти щоденний чекін\n\
                 /status - Подивитись свій стан\n\
                 /weblogin - Отримати посилання для входу\n\
-                /wall - OpsLab Feedback (зовнішній)\n\n\
+                /feedback - OpsLab Feedback (зовнішній)\n\n\
                 Веб-платформа: {0}",
                 base_url
             )),
@@ -667,9 +732,9 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             send_user_status(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
             }
-            "/wall" => {
-            send_wall_info(bot, msg.chat.id).await?;
-            return Ok(());
+            "/wall" | "/feedback" => {
+                send_wall_info(bot, msg.chat.id).await?;
+                return Ok(());
             }
             "/weblogin" => {
             send_web_login_link(bot, &state, msg.chat.id, user.id).await?;
@@ -734,7 +799,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             "📱 Команди бота:\n\n\
             /checkin - Щоденний чекін (2-3 хв)\n\
             /status - Ваш поточний стан\n\
-            /wall - OpsLab Feedback\n\
+            /feedback - OpsLab Feedback\n\
             /settings - Налаштування\n\
             /settime - Встановити час чекіну ⏰\n\
             /timezone - Часовий пояс\n\
@@ -867,7 +932,7 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
             Мʼяко допомагаю відстежувати ментальне здоров'я й тримати баланс:\n\n\
             🔹 Щоденні чекіни (2-3 хв) у ваш час\n\
             🔹 Голосова підтримка з AI-аналізом\n\
-            🔹 OpsLab Feedback — окремий сервіс для фідбеку\n\
+            🔹 OpsLab Feedback — зовнішній сервіс для фідбеку\n\
             🔹 Web dashboard — повна аналітика\n\n\
             Якщо ви ще не привʼязані:\n\
             надішліть email та 4-значний код доступу (це не пароль від пошти):\n\
@@ -877,7 +942,7 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
             /checkin - Пройти чекін зараз\n\
             /status - Мій поточний стан\n\
             /weblogin - Отримати посилання для входу в dashboard\n\
-            /wall - OpsLab Feedback\n\
+            /feedback - OpsLab Feedback\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
             /pulse - Pulse rooms\n\
@@ -934,7 +999,7 @@ async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
             "📱 Команди бота:\n\n\
             /checkin - Щоденний чекін\n\
             /status - Поточний стан\n\
-            /wall - OpsLab Feedback\n\
+            /feedback - OpsLab Feedback\n\
             /weblogin - Вхід у web dashboard\n\
             /settime - Час нагадувань\n\
             /timezone - Часовий пояс\n\
@@ -1586,7 +1651,7 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
 
         let trimmed = text.trim();
         if is_command {
-            if trimmed.starts_with("/wall") {
+            if trimmed.starts_with("/wall") || trimmed.starts_with("/feedback") {
                 send_wall_info(bot, msg.chat.id).await?;
                 return Ok(());
             }

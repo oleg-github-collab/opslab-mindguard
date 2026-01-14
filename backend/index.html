@@ -54,9 +54,14 @@
       margin: 0 auto;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 2rem;
-      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
     }
 
     .nav-logo {
@@ -69,20 +74,72 @@
       gap: 0.5rem;
     }
 
+    .nav-tagline {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--gray);
+      border-left: 3px solid var(--dark);
+      padding-left: 0.75rem;
+    }
+
+    .nav-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      flex: 1;
+      min-width: 0;
+    }
+
     .nav-menu {
       display: flex;
-      gap: 1rem;
+      gap: 0.75rem;
       list-style: none;
-      flex: 1;
-      justify-content: center;
       flex-wrap: wrap;
+      justify-content: center;
+      flex: 1;
+      min-width: 0;
     }
 
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.75rem;
       flex-wrap: wrap;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    #user-name {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nav-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--dark);
+      background: var(--white);
+      font-weight: 800;
+      box-shadow: 4px 4px 0 var(--dark);
+      cursor: pointer;
+    }
+
+    .nav-toggle:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
     }
 
     .nav-link {
@@ -95,6 +152,7 @@
       cursor: pointer;
       transition: all 0.2s;
       box-shadow: 4px 4px 0 var(--dark);
+      white-space: nowrap;
     }
 
     .nav-link:hover {
@@ -517,6 +575,22 @@
     .risk-item.high { background: #ffd6d6; }
     .risk-item.medium { background: #fff1c2; }
     .risk-item.low { background: #e8f9e8; }
+    .risk-item.critical { background: #ffb3b3; }
+
+    .data-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .data-pill {
+      border: 2px solid var(--dark);
+      padding: 0.4rem 0.75rem;
+      background: var(--white);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
 
     /* ===== MODAL ===== */
     .modal {
@@ -589,7 +663,10 @@
     .sleep-debt-summary,
     .insight-grid,
     .recommendations-grid,
-    .playbooks-grid {
+    .playbooks-grid,
+    .alerts-grid,
+    .priority-grid,
+    .metadata-grid {
       display: grid;
       gap: 1rem;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -605,6 +682,82 @@
       box-shadow: 6px 6px 0 var(--dark);
       padding: 1rem;
       background: var(--white);
+    }
+
+    .alert-card {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .alert-card.critical { background: #ffe0e0; }
+    .alert-card.positive { background: #e7ffe7; }
+    .alert-card.info { background: #fff7d6; }
+
+    .alert-pill,
+    .priority-pill {
+      display: inline-block;
+      border: 2px solid var(--dark);
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      background: var(--white);
+    }
+
+    .alert-title {
+      font-weight: 800;
+      margin: 0.5rem 0;
+    }
+
+    .alert-meta {
+      font-size: 0.8rem;
+      color: var(--gray);
+    }
+
+    .priority-card {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .priority-card.critical { background: #ffe5e5; }
+    .priority-card.high { background: #fff1c2; }
+
+    .priority-title {
+      font-weight: 800;
+      margin: 0.5rem 0;
+    }
+
+    .priority-list {
+      margin-top: 0.5rem;
+      padding-left: 1.2rem;
+    }
+
+    .metadata-card {
+      border: 3px solid var(--dark);
+      box-shadow: 6px 6px 0 var(--dark);
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .metadata-title {
+      font-weight: 800;
+      margin-bottom: 0.35rem;
+    }
+
+    .metadata-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .metadata-list {
+      margin-top: 0.5rem;
+      padding-left: 1.2rem;
+      color: var(--dark);
     }
 
     .benchmark-bar {
@@ -1016,9 +1169,26 @@
     .fade-in { animation: fadeIn 0.5s ease-out; }
 
     /* ===== RESPONSIVE ===== */
+    @media (max-width: 980px) {
+      .nav-container { flex-wrap: wrap; }
+      .nav-tagline { display: none; }
+      .nav-toggle { display: inline-flex; }
+      .nav-panel {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+        border-top: 3px solid var(--dark);
+        padding-top: 1rem;
+      }
+      .nav-panel.open { display: flex; }
+      .nav-menu { flex-direction: column; align-items: stretch; }
+      .nav-actions { justify-content: space-between; }
+      .nav-link { width: 100%; text-align: center; }
+    }
+
     @media (max-width: 768px) {
-      .nav-container { flex-direction: column; align-items: flex-start; }
-      .nav-menu { width: 100%; justify-content: flex-start; }
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
       .month-selector { justify-content: center; }
       .login-container { padding: 2rem; }
@@ -1027,12 +1197,15 @@
       .admin-table tr { display: block; margin-bottom: 1rem; }
       .admin-table td { display: flex; justify-content: space-between; gap: 1rem; }
       .admin-table td::before { content: attr(data-label); font-weight: 700; }
+      #employee-table { font-size: 0.8rem; }
+      #employee-table th, #employee-table td { padding: 0.45rem; }
     }
 
     @media (max-width: 560px) {
-      .nav-menu { flex-direction: column; }
-      .nav-link { width: 100%; text-align: center; }
       .container { padding: 1.25rem; }
+      .nav { padding: 0.85rem 1rem; }
+      .nav-logo { font-size: 1.2rem; }
+      .btn { padding: 0.6rem 1rem; }
     }
 
     /* ===== LOADING ===== */
@@ -1091,20 +1264,29 @@
     <!-- Navigation -->
     <nav class="nav">
       <div class="nav-container">
-        <a href="#" class="nav-logo">🧠 OpsLab Mindguard</a>
+        <div class="nav-left">
+          <a href="#" class="nav-logo">🧠 OpsLab Mindguard</a>
+          <span class="nav-tagline">TeamPulse Analytics</span>
+        </div>
 
-        <ul class="nav-menu">
-          <li><a href="#" class="nav-link active" data-section="mindguard">📊 Mindguard</a></li>
-          <li><a href="#" class="nav-link hidden" data-section="advanced" id="advanced-link">🧠 Advanced</a></li>
-          <li><a href="#" class="nav-link" data-section="pulse">🗣 Pulse Rooms</a></li>
-          <li><a href="https://opslab-feedback-production.up.railway.app/" class="nav-link nav-link-external" target="_blank" rel="noopener">💬 OpsLab Feedback</a></li>
-          <li><a href="#" class="nav-link hidden" data-section="admin" id="admin-link">🧩 Команда</a></li>
-        </ul>
+        <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel" aria-label="Меню навігації">☰</button>
 
-        <div class="nav-actions">
-          <span id="user-name" class="mono"></span>
-          <span id="user-role" class="status-chip"></span>
-          <button id="logout-btn" class="btn btn-secondary">Вийти</button>
+        <div class="nav-panel" id="nav-panel">
+          <ul class="nav-menu">
+            <li><a href="#" class="nav-link active" data-section="mindguard">📊 Mindguard</a></li>
+            <li><a href="#" class="nav-link hidden" data-section="advanced" id="advanced-link">🧠 Advanced</a></li>
+            <li><a href="#" class="nav-link" data-section="pulse">🗣 Pulse Rooms</a></li>
+            <li><a href="https://opslab-feedback-production.up.railway.app/" class="nav-link nav-link-external" target="_blank" rel="noopener">💬 OpsLab Feedback</a></li>
+            <li><a href="#" class="nav-link hidden" data-section="admin" id="admin-link">🧩 Команда</a></li>
+          </ul>
+
+          <div class="nav-actions">
+            <div class="nav-user">
+              <span id="user-name" class="mono"></span>
+              <span id="user-role" class="status-chip"></span>
+            </div>
+            <button id="logout-btn" class="btn btn-secondary">Вийти</button>
+          </div>
         </div>
       </div>
     </nav>
@@ -1150,6 +1332,7 @@
           <p style="color: var(--gray); margin-bottom: 1.5rem;">
             Повна аналітика ментального здоров'я за всі місяці з деталями по ключових метриках.
           </p>
+          <div class="data-meta" id="team-data-meta"></div>
 
           <div id="team-month-selector" class="month-selector"></div>
           <div class="december-notice" id="dashboardDecemberNotice" style="display: none;">
@@ -1315,7 +1498,7 @@
             </div>
 
             <div class="modal-chart">
-              <h3>Динаміка за 4 місяці</h3>
+              <h3>Динаміка за місяцями</h3>
               <div class="chart-container" style="position: relative; height: 300px; max-height: 300px;">
                 <canvas id="modalTrendChart"></canvas>
               </div>
@@ -1451,7 +1634,7 @@
                 <li class="mono" style="margin: 0.5rem 0;">✅ /checkin - Щоденний чекін</li>
                 <li class="mono" style="margin: 0.5rem 0;">📊 /status - Ваш стан</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔗 /weblogin - Вхід в платформу</li>
-                <li class="mono" style="margin: 0.5rem 0;">💬 /wall - OpsLab Feedback</li>
+                <li class="mono" style="margin: 0.5rem 0;">💬 /feedback - OpsLab Feedback</li>
                 <li class="mono" style="margin: 0.5rem 0;">⏰ /settime - Час нагадувань</li>
                 <li class="mono" style="margin: 0.5rem 0;">🌍 /timezone - Часовий пояс</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔔 /notify - Нагадування on/off</li>
@@ -1535,6 +1718,22 @@
           </div>
         </section>
 
+        <section class="alerts-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Алерти та сигнали</h2>
+            <p class="section-subtitle">Критичні ризики й позитивні зрушення по команді.</p>
+          </div>
+          <div class="alerts-grid" id="alertsGrid"></div>
+        </section>
+
+        <section class="priority-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Пріоритетні рекомендації</h2>
+            <p class="section-subtitle">Фокусовані дії для керівника та HR.</p>
+          </div>
+          <div class="priority-grid" id="priorityGrid"></div>
+        </section>
+
         <section class="benchmarking-section dashboard-block">
           <h2 class="section-title">Порівняння з індустрією</h2>
           <div class="benchmark-grid">
@@ -1550,7 +1749,7 @@
                 </div>
                 <div class="benchmark-values">
                   <span>Ви: <strong id="who5YourValue">—</strong></span>
-                  <span>Індустрія: <strong>62</strong></span>
+                  <span>Індустрія: <strong id="who5IndustryValue">—</strong></span>
                 </div>
               </div>
             </div>
@@ -1567,7 +1766,7 @@
                 </div>
                 <div class="benchmark-values">
                   <span>Ви: <strong id="phq9YourValue">—</strong></span>
-                  <span>Індустрія: <strong>6.8</strong></span>
+                  <span>Індустрія: <strong id="phq9IndustryValue">—</strong></span>
                 </div>
               </div>
             </div>
@@ -1584,7 +1783,7 @@
                 </div>
                 <div class="benchmark-values">
                   <span>Ви: <strong id="gad7YourValue">—</strong></span>
-                  <span>Індустрія: <strong>7.5</strong></span>
+                  <span>Індустрія: <strong id="gad7IndustryValue">—</strong></span>
                 </div>
               </div>
             </div>
@@ -1601,7 +1800,7 @@
                 </div>
                 <div class="benchmark-values">
                   <span>Ви: <strong id="mbiYourValue">—</strong></span>
-                  <span>Індустрія: <strong>42</strong></span>
+                  <span>Індустрія: <strong id="mbiIndustryValue">—</strong></span>
                 </div>
               </div>
             </div>
@@ -1618,7 +1817,7 @@
                 </div>
                 <div class="benchmark-values">
                   <span>Ви: <strong id="stressYourValue">—</strong></span>
-                  <span>Індустрія: <strong>18</strong></span>
+                  <span>Індустрія: <strong id="stressIndustryValue">—</strong></span>
                 </div>
               </div>
             </div>
@@ -1720,6 +1919,14 @@
             <p class="section-subtitle">Згенеровано на основі метрик та трендів.</p>
           </div>
           <div class="recommendations-grid" id="recommendationsGrid"></div>
+        </section>
+
+        <section class="metadata-section dashboard-block">
+          <div class="section-heading">
+            <h2 class="section-title">Дані та методологія</h2>
+            <p class="section-subtitle">Контекст збору, частота оновлення та інструменти оцінювання.</p>
+          </div>
+          <div class="metadata-grid" id="metadataGrid"></div>
         </section>
 
         <div id="trajectoryModal" class="modal" onclick="modalBgClick(event, 'trajectoryModal')">
@@ -1984,11 +2191,50 @@
     });
 
     // ===== NAVIGATION =====
+    const navToggle = document.getElementById('nav-toggle');
+    const navPanel = document.getElementById('nav-panel');
+
+    function setNavPanel(open) {
+      if (!navPanel || !navToggle) return;
+      navPanel.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function closeNavPanel() {
+      setNavPanel(false);
+    }
+
+    if (navToggle && navPanel) {
+      navToggle.addEventListener('click', () => {
+        const isOpen = navPanel.classList.contains('open');
+        setNavPanel(!isOpen);
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!navPanel || !navToggle) return;
+      if (!navPanel.contains(event.target) && !navToggle.contains(event.target)) {
+        closeNavPanel();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980) {
+        closeNavPanel();
+      }
+    });
+
     document.querySelectorAll('.nav-link[data-section]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const section = link.dataset.section;
         switchSection(section);
+      });
+    });
+
+    document.querySelectorAll('.nav-link-external').forEach(link => {
+      link.addEventListener('click', () => {
+        closeNavPanel();
       });
     });
 
@@ -2001,6 +2247,7 @@
       // Update nav
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
       document.querySelector(`[data-section="${section}"]`).classList.add('active');
+      closeNavPanel();
 
       // Update sections
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -2063,7 +2310,7 @@
     async function loadMindguardData() {
       await loadTeamDashboardData();
       await loadTelegramStatus();
-      await Promise.all([
+      await Promise.allSettled([
         loadWellnessData(),
         loadInsights(),
         loadKudos(),
@@ -2138,6 +2385,20 @@
       return pa.month - pb.month;
     }
 
+    function formatDate(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
     function getTeamMonthList() {
       if (!teamDashboardData?.months) return [];
       return [...teamDashboardData.months].sort((a, b) => {
@@ -2189,6 +2450,7 @@
       renderTeamTrendChart();
       renderEmployeeTable();
       renderRiskAssessment();
+      renderTeamMeta();
     }
 
     function renderTeamMonthSelector() {
@@ -2250,28 +2512,30 @@
 
     function getRiskLevel(metric, value) {
       const thresholds = {
-        who5: { low: 50, medium: 75 },
-        phq9: { low: 5, medium: 10 },
-        gad7: { low: 5, medium: 10 },
-        mbi: { low: 25, medium: 50 },
-        sleepDuration: { low: 6, medium: 7 },
-        sleepQuality: { low: 4, medium: 7 },
-        workLifeBalance: { low: 4, medium: 7 },
-        stressLevel: { low: 14, medium: 27 },
+        who5: { critical: 35, low: 50, medium: 75 },
+        phq9: { critical: 15, low: 5, medium: 10 },
+        gad7: { critical: 15, low: 5, medium: 10 },
+        mbi: { critical: 70, low: 25, medium: 50 },
+        sleepDuration: { critical: 5.5, low: 6, medium: 7 },
+        sleepQuality: { critical: 3, low: 4, medium: 7 },
+        workLifeBalance: { critical: 3, low: 4, medium: 7 },
+        stressLevel: { critical: 30, low: 14, medium: 27 },
       };
 
       const t = thresholds[metric];
       if (!t || value === null || value === undefined) return 'low';
 
       if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(metric)) {
-        if (value >= t.medium) return 'low';
-        if (value >= t.low) return 'medium';
-        return 'high';
+        if (value < t.critical) return 'critical';
+        if (value < t.low) return 'high';
+        if (value < t.medium) return 'medium';
+        return 'low';
       }
 
-      if (value < t.low) return 'low';
-      if (value < t.medium) return 'medium';
-      return 'high';
+      if (value >= t.critical) return 'critical';
+      if (value >= t.medium) return 'high';
+      if (value >= t.low) return 'medium';
+      return 'low';
     }
 
     function updateRiskIndicator(elementId, riskLevel) {
@@ -2437,11 +2701,14 @@
           getRiskLevel('stressLevel', emp.stressLevel),
         ];
 
+        const criticalCount = risks.filter(r => r === 'critical').length;
         const highCount = risks.filter(r => r === 'high').length;
         const mediumCount = risks.filter(r => r === 'medium').length;
 
         let overallRisk = 'low';
-        if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
+        if (criticalCount >= 1) {
+          overallRisk = 'critical';
+        } else if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
           overallRisk = 'high';
         } else if (highCount >= 1 || mediumCount >= 3) {
           overallRisk = 'medium';
@@ -2476,49 +2743,65 @@
       const avg = data.averages;
       const risks = [];
 
-      if (avg.who5 < 50) {
-        risks.push({ level: 'high', title: 'Критично низький рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
+      if (avg.who5 < 35) {
+        risks.push({ level: 'critical', title: 'Критично низький рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
+      } else if (avg.who5 < 50) {
+        risks.push({ level: 'high', title: 'Низький рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
       } else if (avg.who5 < 75) {
         risks.push({ level: 'medium', title: 'Знижений рівень благополуччя', description: `WHO-5: ${avg.who5.toFixed(1)}.` });
       }
 
-      if (avg.phq9 >= 10) {
+      if (avg.phq9 >= 15) {
+        risks.push({ level: 'critical', title: 'Критичний рівень депресії', description: `PHQ-9: ${avg.phq9.toFixed(1)}.` });
+      } else if (avg.phq9 >= 10) {
         risks.push({ level: 'high', title: 'Підвищений рівень депресії', description: `PHQ-9: ${avg.phq9.toFixed(1)}.` });
       } else if (avg.phq9 >= 5) {
         risks.push({ level: 'medium', title: 'Помірні ознаки депресії', description: `PHQ-9: ${avg.phq9.toFixed(1)}.` });
       }
 
-      if (avg.gad7 >= 10) {
+      if (avg.gad7 >= 15) {
+        risks.push({ level: 'critical', title: 'Критичний рівень тривожності', description: `GAD-7: ${avg.gad7.toFixed(1)}.` });
+      } else if (avg.gad7 >= 10) {
         risks.push({ level: 'high', title: 'Високий рівень тривожності', description: `GAD-7: ${avg.gad7.toFixed(1)}.` });
       } else if (avg.gad7 >= 5) {
         risks.push({ level: 'medium', title: 'Підвищена тривожність', description: `GAD-7: ${avg.gad7.toFixed(1)}.` });
       }
 
-      if (avg.mbi >= 50) {
+      if (avg.mbi >= 70) {
+        risks.push({ level: 'critical', title: 'Критичний ризик вигорання', description: `MBI: ${avg.mbi.toFixed(1)}%.` });
+      } else if (avg.mbi >= 50) {
         risks.push({ level: 'high', title: 'Високий ризик вигорання', description: `MBI: ${avg.mbi.toFixed(1)}%.` });
       } else if (avg.mbi >= 25) {
         risks.push({ level: 'medium', title: 'Середній ризик вигорання', description: `MBI: ${avg.mbi.toFixed(1)}%.` });
       }
 
-      if (avg.sleepDuration < 6) {
+      if (avg.sleepDuration < 5.5) {
+        risks.push({ level: 'critical', title: 'Критично низька тривалість сну', description: `Сон: ${avg.sleepDuration.toFixed(1)} год.` });
+      } else if (avg.sleepDuration < 6) {
         risks.push({ level: 'high', title: 'Недостатня тривалість сну', description: `Сон: ${avg.sleepDuration.toFixed(1)} год.` });
       } else if (avg.sleepDuration < 7) {
         risks.push({ level: 'medium', title: 'Знижена тривалість сну', description: `Сон: ${avg.sleepDuration.toFixed(1)} год.` });
       }
 
-      if (avg.sleepQuality < 4) {
+      if (avg.sleepQuality < 3) {
+        risks.push({ level: 'critical', title: 'Критично погана якість сну', description: `Якість сну: ${avg.sleepQuality.toFixed(1)}.` });
+      } else if (avg.sleepQuality < 4) {
         risks.push({ level: 'high', title: 'Погана якість сну', description: `Якість сну: ${avg.sleepQuality.toFixed(1)}.` });
       } else if (avg.sleepQuality < 7) {
         risks.push({ level: 'medium', title: 'Задовільна якість сну', description: `Якість сну: ${avg.sleepQuality.toFixed(1)}.` });
       }
 
-      if (avg.workLifeBalance < 4) {
-        risks.push({ level: 'high', title: 'Критичний дисбаланс життя', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
+      if (avg.workLifeBalance < 3) {
+        risks.push({ level: 'critical', title: 'Критичний дисбаланс життя', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
+      } else if (avg.workLifeBalance < 4) {
+        risks.push({ level: 'high', title: 'Сильний дисбаланс життя', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
       } else if (avg.workLifeBalance < 7) {
         risks.push({ level: 'medium', title: 'Потребує покращення балансу', description: `Баланс: ${avg.workLifeBalance.toFixed(1)}.` });
       }
 
-      if (avg.stressLevel >= 27) {
+      if (avg.stressLevel >= 30) {
+        risks.push({ level: 'critical', title: 'Критично високий рівень стресу', description: `Стрес: ${avg.stressLevel.toFixed(1)}.` });
+      } else if (avg.stressLevel >= 27) {
         risks.push({ level: 'high', title: 'Високий рівень стресу', description: `Стрес: ${avg.stressLevel.toFixed(1)}.` });
       } else if (avg.stressLevel >= 14) {
         risks.push({ level: 'medium', title: 'Помірний рівень стресу', description: `Стрес: ${avg.stressLevel.toFixed(1)}.` });
@@ -2529,7 +2812,7 @@
       }
 
       risks.sort((a, b) => {
-        const order = { high: 0, medium: 1, low: 2 };
+        const order = { critical: 0, high: 1, medium: 2, low: 3 };
         return order[a.level] - order[b.level];
       });
 
@@ -2542,6 +2825,33 @@
         `;
         container.appendChild(item);
       });
+    }
+
+    function formatFrequency(value) {
+      if (!value) return '—';
+      if (value === 'monthly') return 'Щомісяця';
+      if (value === 'weekly') return 'Щотижня';
+      return value;
+    }
+
+    function renderTeamMeta() {
+      const metaEl = document.getElementById('team-data-meta');
+      if (!metaEl) return;
+
+      const meta = teamDashboardData?.metadata || {};
+      const updated = teamDashboardData?.lastUpdated || teamDashboardData?.last_updated;
+      const items = [];
+
+      if (teamDashboardData?.company) items.push({ label: 'Компанія', value: teamDashboardData.company });
+      if (updated) items.push({ label: 'Оновлено', value: formatDate(updated) });
+      if (meta.dataCollectionPeriod) items.push({ label: 'Період', value: meta.dataCollectionPeriod });
+      if (meta.participationRate) items.push({ label: 'Участь', value: meta.participationRate });
+      if (meta.nextAssessment) items.push({ label: 'Наступна оцінка', value: formatDate(meta.nextAssessment) });
+      if (meta.updateFrequency) items.push({ label: 'Оновлення', value: formatFrequency(meta.updateFrequency) });
+
+      metaEl.innerHTML = items.length
+        ? items.map(item => `<div class="data-pill">${item.label}: <span class="mono">${item.value}</span></div>`).join('')
+        : '<div class="form-hint">Метадані недоступні</div>';
     }
 
     async function openEmployeeModal(employeeId) {
@@ -2595,7 +2905,7 @@
       }
 
       const months = getTeamMonthList();
-      const recent = months.slice(Math.max(0, months.length - 4));
+      const recent = months.length ? months : [];
       const labels = recent.map(m => monthLabelFromKey(monthKeyFromParts(m.year, m.month), true));
 
       const history = employee.history || {};
@@ -2639,6 +2949,8 @@
       }
 
       checkAndShowDecemberNotice();
+      renderAlerts();
+      renderPriorityRecommendations();
       calculateTeamHealthScore();
       updateBenchmarking();
       renderTrajectoryChart();
@@ -2648,6 +2960,7 @@
       renderEmployeeInsights();
       renderPlaybooks();
       generateRecommendations();
+      renderMetadata();
     }
 
     function getAdvancedMonthKeys() {
@@ -2732,13 +3045,44 @@
       if (!advancedData) return;
       const avg = getLatestAverage();
       if (!avg) return;
-      const benchmarks = {
-        who5: { your: avg.who5, industry: 62, higherIsBetter: true, max: 100 },
-        phq9: { your: avg.phq9, industry: 6.8, higherIsBetter: false, max: 27 },
-        gad7: { your: avg.gad7, industry: 7.5, higherIsBetter: false, max: 21 },
-        mbi: { your: avg.mbi, industry: 42, higherIsBetter: false, max: 100 },
-        stress: { your: avg.stressLevel, industry: 18, higherIsBetter: false, max: 40 },
+      const industry = advancedData?.industryBenchmarks?.techSector || {};
+      const industryDefaults = {
+        who5: 62,
+        phq9: 6.8,
+        gad7: 7.5,
+        mbi: 42,
+        stressLevel: 18,
       };
+      const industryValues = {
+        who5: industry.who5 ?? industryDefaults.who5,
+        phq9: industry.phq9 ?? industryDefaults.phq9,
+        gad7: industry.gad7 ?? industryDefaults.gad7,
+        mbi: industry.mbi ?? industryDefaults.mbi,
+        stressLevel: industry.stressLevel ?? industryDefaults.stressLevel,
+      };
+
+      const benchmarks = {
+        who5: { your: avg.who5, industry: industryValues.who5, higherIsBetter: true, max: 100 },
+        phq9: { your: avg.phq9, industry: industryValues.phq9, higherIsBetter: false, max: 27 },
+        gad7: { your: avg.gad7, industry: industryValues.gad7, higherIsBetter: false, max: 21 },
+        mbi: { your: avg.mbi, industry: industryValues.mbi, higherIsBetter: false, max: 100 },
+        stress: { your: avg.stressLevel, industry: industryValues.stressLevel, higherIsBetter: false, max: 40 },
+      };
+
+      const industryLabels = {
+        who5: 'who5IndustryValue',
+        phq9: 'phq9IndustryValue',
+        gad7: 'gad7IndustryValue',
+        mbi: 'mbiIndustryValue',
+        stress: 'stressIndustryValue',
+      };
+
+      Object.keys(industryLabels).forEach(key => {
+        const el = document.getElementById(industryLabels[key]);
+        if (el && benchmarks[key]) {
+          el.textContent = benchmarks[key].industry.toFixed(1);
+        }
+      });
 
       Object.keys(benchmarks).forEach(key => {
         const data = benchmarks[key];
@@ -2767,8 +3111,125 @@
       });
     }
 
+    function renderAlerts() {
+      const grid = document.getElementById('alertsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const alerts = (advancedData?.alerts || []).slice().sort((a, b) => {
+        const order = { critical: 0, high: 1, alert: 2, positive: 3 };
+        const scoreA = order[a.severity] ?? 9;
+        const scoreB = order[b.severity] ?? 9;
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+      });
+      if (!alerts.length) {
+        grid.innerHTML = '<div class="form-hint">Немає активних алертів.</div>';
+        return;
+      }
+
+      alerts.forEach(alert => {
+        const severity = alert.severity || 'info';
+        const label = severity === 'critical' ? 'CRITICAL'
+          : severity === 'positive' ? 'POSITIVE'
+          : 'ALERT';
+        const card = document.createElement('div');
+        card.className = `alert-card ${severity}`;
+        const timestamp = formatDateTime(alert.timestamp);
+        card.innerHTML = `
+          <span class="alert-pill">${label}</span>
+          <div class="alert-title">${alert.employee}</div>
+          <div>${alert.message}</div>
+          <div class="alert-meta">${timestamp}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderPriorityRecommendations() {
+      const grid = document.getElementById('priorityGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const recommendations = (advancedData?.recommendations || []).slice().sort((a, b) => {
+        const order = { critical: 0, high: 1, medium: 2, low: 3 };
+        return (order[a.priority] ?? 9) - (order[b.priority] ?? 9);
+      });
+      if (!recommendations.length) {
+        grid.innerHTML = '<div class="form-hint">Рекомендацій поки немає.</div>';
+        return;
+      }
+
+      recommendations.forEach(rec => {
+        const priority = rec.priority || 'high';
+        const card = document.createElement('div');
+        card.className = `priority-card ${priority}`;
+        const affected = Array.isArray(rec.affectedEmployees) ? rec.affectedEmployees : [];
+        const affectedLabel = affected.includes('all') ? 'Вся команда' : affected.join(', ');
+        card.innerHTML = `
+          <span class="priority-pill">${rec.category || 'action'}</span>
+          <div class="priority-title">${rec.title}</div>
+          <div>${rec.description}</div>
+          <ul class="priority-list">
+            <li><strong>Пріоритет:</strong> ${priority}</li>
+            <li><strong>Охоплення:</strong> ${affectedLabel || '—'}</li>
+          </ul>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderMetadata() {
+      const grid = document.getElementById('metadataGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const meta = advancedData?.metadata || {};
+      const tools = Array.isArray(meta.assessmentTools) ? meta.assessmentTools : [];
+      const cards = [
+        {
+          title: 'Період збору',
+          value: meta.dataCollectionPeriod || '—',
+        },
+        {
+          title: 'Наступна оцінка',
+          value: meta.nextAssessment ? formatDate(meta.nextAssessment) : '—',
+        },
+        {
+          title: 'Частота оновлення',
+          value: formatFrequency(meta.updateFrequency),
+        },
+        {
+          title: 'Рівень участі',
+          value: meta.participationRate || '—',
+        },
+      ];
+
+      cards.forEach(card => {
+        const el = document.createElement('div');
+        el.className = 'metadata-card';
+        el.innerHTML = `
+          <div class="metadata-title">${card.title}</div>
+          <div class="metadata-value">${card.value}</div>
+        `;
+        grid.appendChild(el);
+      });
+
+      if (tools.length) {
+        const el = document.createElement('div');
+        el.className = 'metadata-card';
+        el.innerHTML = `
+          <div class="metadata-title">Інструменти оцінювання</div>
+          <ul class="metadata-list">${tools.map(tool => `<li>${tool}</li>`).join('')}</ul>
+        `;
+        grid.appendChild(el);
+      }
+    }
+
     function calculateEmployeeRisk(metrics) {
-      if (metrics.who5 < 28 || metrics.phq9 > 15 || metrics.gad7 > 15) return 'critical';
+      if (metrics.who5 < 28 || metrics.phq9 > 15 || metrics.gad7 > 15 || metrics.mbi >= 70 || metrics.stressLevel >= 30) {
+        return 'critical';
+      }
       if (metrics.who5 < 50 || metrics.phq9 > 10 || metrics.gad7 > 10 || metrics.mbi > 40) return 'high';
       if (metrics.mbi > 30 || metrics.stressLevel > 20) return 'medium';
       return 'low';
@@ -2779,7 +3240,7 @@
       const ctxEl = document.getElementById('trajectoryChart');
       if (!ctxEl) return;
 
-      const months = getRecentMonths(4);
+      const months = getAdvancedMonthKeys();
       if (!months.length) return;
       const averages = advancedData.teamAverages;
       const labels = months.map(labelFromKey);
@@ -2809,6 +3270,7 @@
       const prevKey = getPrevMonthKey();
       if (!latestKey || !prevKey) return;
       const latestIdx = months.indexOf(latestKey);
+      if (latestIdx < 0) return;
       const prevIdx = Math.max(0, latestIdx - 1);
       const whoDelta = who5[latestIdx] - who5[prevIdx];
       const stressDelta = stressRaw[latestIdx] - stressRaw[prevIdx];
@@ -3869,7 +4331,16 @@
 
     // ===== TELEGRAM SETTINGS =====
     async function loadTelegramStatus() {
-      const status = await apiCall('/telegram/status');
+      let status = null;
+      try {
+        status = await apiCall('/telegram/status');
+      } catch (error) {
+        const connection = document.getElementById('telegram-connection-status');
+        if (connection) {
+          connection.textContent = '⚠️ Не вдалося завантажити Telegram статус';
+        }
+        return;
+      }
       if (!status) return;
       telegramStatus = status;
 
@@ -4023,9 +4494,16 @@
     // ===== ADMIN HEATMAP =====
     async function loadTeamHeatmap() {
       if (!isAdmin()) return;
-      const data = await apiCall('/admin/heatmap');
-      teamHeatmap = data;
-      renderTeamHeatmap(data);
+      try {
+        const data = await apiCall('/admin/heatmap');
+        teamHeatmap = data;
+        renderTeamHeatmap(data);
+      } catch (error) {
+        const container = document.getElementById('team-heatmap');
+        if (container) {
+          container.innerHTML = '<div class="form-hint">Не вдалося завантажити heatmap</div>';
+        }
+      }
     }
 
     function renderTeamHeatmap(data) {
