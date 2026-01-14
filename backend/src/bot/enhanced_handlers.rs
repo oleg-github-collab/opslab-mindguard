@@ -1429,7 +1429,7 @@ async fn send_web_login_link(
 /// Відправка критичного алерту адмінам
 async fn send_critical_alert(
     bot: &teloxide::Bot,
-    state: &SharedState,
+    _state: &SharedState,
     user_id: Uuid,
     metrics: &Metrics,
 ) -> Result<()> {

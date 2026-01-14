@@ -30,21 +30,29 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Custom middleware to add cache-busting headers
 async fn add_cache_headers(req: Request<Body>, next: Next) -> Response<Body> {
+    let path = req.uri().path().to_string();
     let mut response = next.run(req).await;
     let headers = response.headers_mut();
 
-    headers.insert(
-        header::CACHE_CONTROL,
-        header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
-    );
-    headers.insert(
-        header::PRAGMA,
-        header::HeaderValue::from_static("no-cache"),
-    );
-    headers.insert(
-        header::EXPIRES,
-        header::HeaderValue::from_static("0"),
-    );
+    if path.starts_with("/static/") {
+        headers.insert(
+            header::CACHE_CONTROL,
+            header::HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+    } else {
+        headers.insert(
+            header::CACHE_CONTROL,
+            header::HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate"),
+        );
+        headers.insert(
+            header::PRAGMA,
+            header::HeaderValue::from_static("no-cache"),
+        );
+        headers.insert(
+            header::EXPIRES,
+            header::HeaderValue::from_static("0"),
+        );
+    }
     headers.insert(
         header::HeaderName::from_static("x-mindguard-version"),
         header::HeaderValue::from_static("2026-01-12"),

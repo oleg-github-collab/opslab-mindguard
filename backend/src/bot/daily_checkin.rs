@@ -526,14 +526,6 @@ impl MetricsCalculator {
             }
         };
 
-        let inv_avg = |vals: &[f64]| -> f64 {
-            if vals.is_empty() {
-                0.0
-            } else {
-                vals.iter().map(|v| 10.0 - v).sum::<f64>() / vals.len() as f64
-            }
-        };
-
         // WHO-5 Well-Being Index (0-100)
         let who5_components: Vec<f64> = mood_values
             .iter()
@@ -572,7 +564,6 @@ impl MetricsCalculator {
 
         // Sleep
         let sleep_duration = avg(&sleep_values);
-        let sleep_quality = avg(&sleep_values);
 
         // Work-Life Balance
         let work_life_balance = 10.0 - avg(&workload_values);
@@ -585,7 +576,7 @@ impl MetricsCalculator {
             phq9_score: phq9 as f64,
             gad7_score: gad7 as f64,
             mbi_score: mbi,
-            sleep_duration: sleep_quality,
+            sleep_duration,
             work_life_balance,
             stress_level,
         })

@@ -60,7 +60,7 @@ echo 'DATABASE_URL="postgresql://localhost/mindguard_test"' >> .env
 1. ✅ Генерує `Cargo.lock` (детермінована збірка)
 2. ✅ Встановлює sqlx-cli (якщо немає)
 3. ✅ Створює БД та запускає міграції
-4. ✅ Генерує `sqlx-data.json` (offline SQLx metadata)
+4. ✅ Генерує `.sqlx` (offline SQLx metadata)
 5. ✅ Перевіряє offline build
 
 **Очікуваний вивід:**
@@ -71,10 +71,10 @@ SUCCESS! Ready for production deploy
 
 Files generated:
   ✓ Cargo.lock - ~250K
-  ✓ sqlx-data.json - ~15K
+  ✓ .sqlx - ~15K
 
 Next steps:
-  1. git add Cargo.lock sqlx-data.json
+  1. git add Cargo.lock .sqlx
   2. git commit -m 'Add build artifacts for production'
   3. git push origin main
 ```
@@ -85,13 +85,13 @@ Next steps:
 
 ```bash
 # Видаліть placeholder файли
-rm -f Cargo.lock.PLACEHOLDER sqlx-data.json.PLACEHOLDER
+rm -f Cargo.lock.PLACEHOLDER
 
 # Додайте згенеровані файли
-git add Cargo.lock sqlx-data.json
+git add Cargo.lock .sqlx
 
 # Commit
-git commit -m "Add production build artifacts (Cargo.lock + sqlx-data.json)"
+git commit -m "Add production build artifacts (Cargo.lock + .sqlx)"
 
 # Push на GitHub
 git push origin main
@@ -256,14 +256,14 @@ curl -X POST https://your-app.up.railway.app/feedback/wall \
 ## ⚠️ Важливо
 
 **ПЕРЕД ДЕПЛОЄМ на Railway обов'язково:**
-1. Згенеруйте `Cargo.lock` та `sqlx-data.json`
+1. Згенеруйте `Cargo.lock` та `.sqlx`
 2. Закомітьте їх на GitHub
 3. Інакше Railway build провалиться через SQLX_OFFLINE
 
 **Команда:**
 ```bash
 ./GENERATE_LOCKFILE.sh && \
-git add Cargo.lock sqlx-data.json && \
+git add Cargo.lock .sqlx && \
 git commit -m "Add build artifacts" && \
 git push origin main
 ```
@@ -305,11 +305,11 @@ psql $DATABASE_URL -c "SELECT 1"
 ### Railway build fails
 ```bash
 # Перевірте, що файли є в repo:
-git ls-files | grep -E "Cargo.lock|sqlx-data"
+git ls-files | grep -E "Cargo.lock|\\.sqlx"
 
 # Якщо немає - згенеруйте та закомітьте
 ./GENERATE_LOCKFILE.sh
-git add Cargo.lock sqlx-data.json
+git add Cargo.lock .sqlx
 git commit -m "Add build artifacts"
 git push origin main
 ```

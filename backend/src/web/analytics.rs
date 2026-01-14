@@ -188,7 +188,7 @@ async fn employee_data(
     let mut recommendations = Vec::new();
 
     let mut employees = Vec::new();
-    for user in users {
+    for user in &users {
         let history = analytics
             .user_history
             .get(&user.id)
@@ -691,7 +691,7 @@ fn resolve_last_updated(month_keys: &[String], meta_updated_at: Option<DateTime<
         let (year, month) = parse_month_key(last_key);
         if let Some(date) = month_end_date(year, month) {
             if let Some(datetime) = date.and_hms_opt(0, 0, 0) {
-                return DateTime::<Utc>::from_utc(datetime, Utc);
+                return DateTime::<Utc>::from_naive_utc_and_offset(datetime, Utc);
             }
         }
     }
@@ -699,7 +699,6 @@ fn resolve_last_updated(month_keys: &[String], meta_updated_at: Option<DateTime<
 }
 
 fn month_end_date(year: i32, month: i32) -> Option<NaiveDate> {
-    let first = NaiveDate::from_ymd_opt(year, month as u32, 1)?;
     let next = if month == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1)?
     } else {

@@ -15,7 +15,8 @@ BEGIN
     SELECT id INTO admin_id FROM users WHERE email = 'work.olegkaminskyi@gmail.com';
 
     IF admin_id IS NULL THEN
-        RAISE EXCEPTION 'Admin user not found';
+        RAISE NOTICE 'Admin user not found; skipping wall data import';
+        RETURN;
     END IF;
 
     -- Insert post 1: Negative feedback about hiring

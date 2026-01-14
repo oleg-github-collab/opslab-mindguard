@@ -1,10 +1,10 @@
 FROM rust:latest AS builder
 WORKDIR /app
 
-# Copy manifests; Cargo.lock/sqlx-data.json are optional and can be added later
+# Copy manifests; Cargo.lock is optional and can be added later
 COPY Cargo.toml ./
 COPY Cargo.lock* ./
-COPY sqlx-data.json* ./
+COPY .sqlx ./.sqlx
 
 # Prime dependency cache
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -13,9 +13,6 @@ RUN rm -rf src
 
 # Copy full source
 COPY . .
-
-# Show what we copied (for debugging)
-RUN ls -la index.html && head -7 index.html
 
 # Build application (offline SQLx to avoid DB requirement in CI/build)
 RUN SQLX_OFFLINE=true cargo build --release
@@ -29,9 +26,6 @@ COPY --from=builder /app/target/release/opslab_mindguard /usr/local/bin/opslab-m
 COPY --from=builder /app/migrations migrations
 COPY --from=builder /app/index.html index.html
 COPY --from=builder /app/static static
-
-# Show what we have in runtime
-RUN ls -la && head -7 index.html
 
 ENV RUST_LOG=info
 EXPOSE 3000

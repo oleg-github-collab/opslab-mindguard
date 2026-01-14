@@ -45,7 +45,7 @@ sqlx migrate run
 psql $DATABASE_URL -c "\dt"
 ```
 
-#### Крок 3: Згенерувати sqlx-data.json
+#### Крок 3: Згенерувати .sqlx
 
 ```bash
 # This creates .sqlx/ directory with query metadata
