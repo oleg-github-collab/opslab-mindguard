@@ -384,6 +384,16 @@
       color: var(--dark);
     }
 
+    .month-btn.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .month-btn.disabled:hover {
+      transform: none;
+      box-shadow: 4px 4px 0 var(--dark);
+    }
+
     /* ===== DASHBOARD / ADVANCED UI ===== */
     .dashboard-block {
       background: var(--white);
@@ -465,6 +475,16 @@
       color: var(--dark);
     }
 
+    .employee-month-btn.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .employee-month-btn.disabled:hover {
+      transform: none;
+      box-shadow: 4px 4px 0 var(--dark);
+    }
+
     .info-icon {
       width: 20px;
       height: 20px;
@@ -516,6 +536,7 @@
     .risk-medium { background: var(--warning); }
     .risk-high { background: var(--danger); color: var(--white); }
     .risk-critical { background: var(--danger); color: var(--white); }
+    .risk-unknown { background: #e5e7eb; color: #111827; }
 
     .chart-container {
       border: 3px solid var(--dark);
@@ -559,6 +580,7 @@
     .score-good { background: #e8f9e8; }
     .score-warning { background: #fff0c2; }
     .score-danger { background: #ffd6d6; }
+    .score-muted { background: #f1f5f9; color: var(--gray); }
 
     .risk-items {
       display: grid;
@@ -1331,8 +1353,10 @@
           <div class="card-header">📊 TeamPulse Mindguard Analytics</div>
           <p style="color: var(--gray); margin-bottom: 1.5rem;">
             Повна аналітика ментального здоров'я за всі місяці з деталями по ключових метриках.
+            Дані оновлюються після щоденних чекінів та відображають історію по місяцях.
           </p>
           <div class="data-meta" id="team-data-meta"></div>
+          <div class="data-meta" id="team-data-coverage"></div>
 
           <div id="team-month-selector" class="month-selector"></div>
           <div class="december-notice" id="dashboardDecemberNotice" style="display: none;">
@@ -1581,9 +1605,17 @@
 
         <div class="card" id="kudos-card">
           <div class="card-header">🎉 Kudos + Recognition</div>
-          <p style="color: var(--gray); margin-bottom: 1rem;">
-            Підтримуйте одне одного. Подяка підсилює мотивацію й культуру.
+          <p style="color: var(--gray); margin-bottom: 0.75rem;">
+            Kudos — це коротка подяка за конкретну дію або підтримку. Вона підсилює довіру та допомагає бачити внесок один одного.
           </p>
+          <div class="form-hint" style="margin-bottom: 1rem;">
+            <strong>Як працює:</strong>
+            <ul style="margin: 0.5rem 0 0 1.2rem;">
+              <li>Напишіть 1-2 речення: що зробив колега і який був ефект.</li>
+              <li>Отримувач бачить kudos у вебі та в тижневому підсумку.</li>
+              <li>Це не оцінювання — лише вдячність і підтримка.</li>
+            </ul>
+          </div>
           <div class="grid grid-2">
             <form id="kudos-form">
               <div class="form-group">
@@ -1592,7 +1624,8 @@
               </div>
               <div class="form-group">
                 <label for="kudos-message">Повідомлення</label>
-                <textarea id="kudos-message" rows="3" maxlength="500" placeholder="Дякую за підтримку..."></textarea>
+                <textarea id="kudos-message" rows="3" maxlength="500" placeholder="Дякую за підтримку на демо — це допомогло швидко закрити рішення." required></textarea>
+                <div class="form-hint">Пишіть коротко і конкретно: дія → вплив.</div>
               </div>
               <div class="toggle-row">
                 <button type="submit" class="btn btn-success">Надіслати kudos</button>
@@ -1639,10 +1672,10 @@
                 <li class="mono" style="margin: 0.5rem 0;">🌍 /timezone - Часовий пояс</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔔 /notify - Нагадування on/off</li>
                 <li class="mono" style="margin: 0.5rem 0;">⚙️ /settings - Налаштування</li>
-                <li class="mono" style="margin: 0.5rem 0;">🎉 /kudos - Подяка колезі</li>
+                <li class="mono" style="margin: 0.5rem 0;">🎉 /kudos - Подяка колезі (1-2 речення)</li>
                 <li class="mono" style="margin: 0.5rem 0;">🌿 /plan - План Wellness OS</li>
                 <li class="mono" style="margin: 0.5rem 0;">🎯 /goals - Персональні цілі</li>
-                <li class="mono" style="margin: 0.5rem 0;">🗣 /pulse - Pulse rooms</li>
+                <li class="mono" style="margin: 0.5rem 0;">🗣 /pulse - Анонімні кімнати для фідбеку</li>
                 <li class="mono" style="margin: 0.5rem 0;">✨ /insight - Персональний інсайт</li>
               </ul>
             </div>
@@ -1964,15 +1997,24 @@
       <div class="container">
         <div class="card">
           <div class="card-header">🗣 Pulse Rooms</div>
-          <p style="color: var(--gray); margin-bottom: 1.5rem;">
-            Анонімні командні pulse-кімнати з модерацією для чесних обговорень.
+          <p style="color: var(--gray); margin-bottom: 0.75rem;">
+            Pulse rooms — тематичні простори для командного фідбеку, ідей та важливих сигналів. Пишіть чесно й коротко, можна анонімно.
           </p>
+          <div class="form-hint" style="margin-bottom: 1.5rem;">
+            <strong>Як працює:</strong>
+            <ul style="margin: 0.5rem 0 0 1.2rem;">
+              <li>Оберіть кімнату з темою (процеси, підтримка, культура).</li>
+              <li>Повідомлення можуть пройти модерацію, якщо кімната цього потребує або є токсичні індикатори.</li>
+              <li>Анонімність приховує імʼя для інших учасників.</li>
+            </ul>
+          </div>
           <div id="pulse-rooms" class="grid grid-3"></div>
         </div>
 
         <div class="card">
           <div class="card-header">💬 Обговорення кімнати</div>
           <div id="pulse-room-meta" class="form-hint">Оберіть кімнату для перегляду</div>
+          <div id="pulse-room-guidance" class="form-hint"></div>
           <div id="pulse-messages" class="pulse-list"></div>
           <form id="pulse-message-form" style="margin-top: 1rem;">
             <div class="form-group">
@@ -1982,6 +2024,7 @@
                 <input type="checkbox" id="pulse-anonymous" checked />
                 <label for="pulse-anonymous">Надсилати анонімно</label>
               </div>
+              <div class="form-hint" id="pulse-anonymity-hint">Можна писати анонімно — імʼя не показується іншим учасникам.</div>
             </div>
             <div class="toggle-row">
               <button type="submit" class="btn btn-success">Надіслати</button>
@@ -2363,6 +2406,48 @@
       stressLevel: 'Стрес: 0-40, >20 — підвищений',
     };
 
+    const METRIC_KEYS = [
+      'who5',
+      'phq9',
+      'gad7',
+      'mbi',
+      'sleepDuration',
+      'sleepQuality',
+      'workLifeBalance',
+      'stressLevel',
+    ];
+
+    function hasMetricData(metrics) {
+      if (!metrics) return false;
+      return METRIC_KEYS.some(key => Number.isFinite(metrics[key]) && metrics[key] !== 0);
+    }
+
+    function hasMonthData(month) {
+      if (!month) return false;
+      const participants = Number.isFinite(month.participants) ? month.participants : null;
+      const responses = Number.isFinite(month.responses) ? month.responses : null;
+      if (participants !== null) {
+        if (participants > 0) return true;
+        if (responses !== null) return responses > 0;
+        return false;
+      }
+      if (responses !== null) return responses > 0;
+      return hasMetricData(month.averages);
+    }
+
+    function metricOrDash(value, suffix = '', digits = 1) {
+      if (!Number.isFinite(value)) return '—';
+      return `${value.toFixed(digits)}${suffix}`;
+    }
+
+    function hasEmployeeData(employee) {
+      if (!employee) return false;
+      if (employee.hasData !== undefined) return employee.hasData;
+      if (employee.has_data !== undefined) return employee.has_data;
+      const metrics = employee.metrics || employee;
+      return hasMetricData(metrics);
+    }
+
     function monthKeyFromParts(year, month) {
       return `${year}-${String(month).padStart(2, '0')}`;
     }
@@ -2410,6 +2495,26 @@
     function getTeamMonthByKey(key) {
       const months = getTeamMonthList();
       return months.find(m => monthKeyFromParts(m.year, m.month) === key) || null;
+    }
+
+    function getCoverageMap() {
+      const map = {};
+      const months = getTeamMonthList();
+      months.forEach(m => {
+        const key = monthKeyFromParts(m.year, m.month);
+        map[key] = {
+          participants: Number.isFinite(m.participants) ? m.participants : 0,
+          responses: Number.isFinite(m.responses) ? m.responses : 0,
+        };
+      });
+      return map;
+    }
+
+    function hasCoverageForKey(key) {
+      const coverage = getCoverageMap();
+      const entry = coverage[key];
+      if (!entry) return false;
+      return entry.participants > 0 || entry.responses > 0;
     }
 
     async function loadTeamDashboardData() {
@@ -2462,8 +2567,12 @@
       const display = [...months].reverse();
       display.forEach(month => {
         const key = monthKeyFromParts(month.year, month.month);
+        const hasData = hasMonthData(month);
         const button = document.createElement('button');
-        button.className = `month-btn${key === teamDashboardSelectedKey ? ' active' : ''}`;
+        button.className = `month-btn${key === teamDashboardSelectedKey ? ' active' : ''}${hasData ? '' : ' disabled'}`;
+        if (!hasData) {
+          button.title = 'Немає даних за місяць';
+        }
         button.textContent = monthLabelFromKey(key);
         button.addEventListener('click', () => {
           teamDashboardSelectedKey = key;
@@ -2493,8 +2602,12 @@
       const display = [...months].reverse();
       display.forEach(month => {
         const key = monthKeyFromParts(month.year, month.month);
+        const hasData = hasMonthData(month);
         const button = document.createElement('button');
-        button.className = `employee-month-btn${key === teamDashboardEmployeeKey ? ' active' : ''}`;
+        button.className = `employee-month-btn${key === teamDashboardEmployeeKey ? ' active' : ''}${hasData ? '' : ' disabled'}`;
+        if (!hasData) {
+          button.title = 'Немає даних за місяць';
+        }
         button.textContent = monthLabelFromKey(key);
         button.addEventListener('click', () => {
           teamDashboardEmployeeKey = key;
@@ -2523,7 +2636,7 @@
       };
 
       const t = thresholds[metric];
-      if (!t || value === null || value === undefined) return 'low';
+      if (!t || value === null || value === undefined || !Number.isFinite(value)) return 'unknown';
 
       if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(metric)) {
         if (value < t.critical) return 'critical';
@@ -2545,49 +2658,103 @@
         low: 'Низький ризик',
         medium: 'Середній ризик',
         high: 'Високий ризик',
+        critical: 'Критичний ризик',
+        unknown: 'Н/Д',
       };
-      element.textContent = labels[riskLevel] || 'Н/Д';
-      element.className = `risk-indicator risk-${riskLevel}`;
+      const level = riskLevel || 'unknown';
+      element.textContent = labels[level] || 'Н/Д';
+      element.className = `risk-indicator risk-${level}`;
     }
 
     function renderTeamMetrics() {
       const data = getSelectedTeamMonth();
       if (!data || !data.averages) return;
       const avg = data.averages;
+      const hasData = hasMonthData(data);
 
-      document.getElementById('who5-value').textContent = avg.who5?.toFixed(1) ?? '—';
-      updateRiskIndicator('who5-risk', getRiskLevel('who5', avg.who5));
+      if (!hasData) {
+        document.getElementById('who5-value').textContent = '—';
+        updateRiskIndicator('who5-risk', 'unknown');
 
-      document.getElementById('phq9-value').textContent = avg.phq9?.toFixed(1) ?? '—';
-      updateRiskIndicator('phq9-risk', getRiskLevel('phq9', avg.phq9));
+        document.getElementById('phq9-value').textContent = '—';
+        updateRiskIndicator('phq9-risk', 'unknown');
 
-      document.getElementById('gad7-value').textContent = avg.gad7?.toFixed(1) ?? '—';
-      updateRiskIndicator('gad7-risk', getRiskLevel('gad7', avg.gad7));
+        document.getElementById('gad7-value').textContent = '—';
+        updateRiskIndicator('gad7-risk', 'unknown');
 
-      document.getElementById('mbi-value').textContent = avg.mbi !== undefined
-        ? `${avg.mbi.toFixed(1)}%`
-        : '—';
-      updateRiskIndicator('mbi-risk', getRiskLevel('mbi', avg.mbi));
+        document.getElementById('mbi-value').textContent = '—';
+        updateRiskIndicator('mbi-risk', 'unknown');
 
-      document.getElementById('sleep-duration-value').textContent = avg.sleepDuration !== undefined
-        ? `${avg.sleepDuration.toFixed(1)} год`
-        : '—';
-      updateRiskIndicator('sleep-duration-risk', getRiskLevel('sleepDuration', avg.sleepDuration));
+        document.getElementById('sleep-duration-value').textContent = '—';
+        updateRiskIndicator('sleep-duration-risk', 'unknown');
 
-      document.getElementById('sleep-quality-value').textContent = avg.sleepQuality?.toFixed(1) ?? '—';
-      updateRiskIndicator('sleep-quality-risk', getRiskLevel('sleepQuality', avg.sleepQuality));
+        document.getElementById('sleep-quality-value').textContent = '—';
+        updateRiskIndicator('sleep-quality-risk', 'unknown');
 
-      document.getElementById('work-life-value').textContent = avg.workLifeBalance?.toFixed(1) ?? '—';
-      updateRiskIndicator('work-life-risk', getRiskLevel('workLifeBalance', avg.workLifeBalance));
+        document.getElementById('work-life-value').textContent = '—';
+        updateRiskIndicator('work-life-risk', 'unknown');
 
-      document.getElementById('stress-value').textContent = avg.stressLevel?.toFixed(1) ?? '—';
-      updateRiskIndicator('stress-risk', getRiskLevel('stressLevel', avg.stressLevel));
+        document.getElementById('stress-value').textContent = '—';
+        updateRiskIndicator('stress-risk', 'unknown');
+      } else {
+        document.getElementById('who5-value').textContent = metricOrDash(avg.who5);
+        updateRiskIndicator('who5-risk', getRiskLevel('who5', avg.who5));
+
+        document.getElementById('phq9-value').textContent = metricOrDash(avg.phq9);
+        updateRiskIndicator('phq9-risk', getRiskLevel('phq9', avg.phq9));
+
+        document.getElementById('gad7-value').textContent = metricOrDash(avg.gad7);
+        updateRiskIndicator('gad7-risk', getRiskLevel('gad7', avg.gad7));
+
+        document.getElementById('mbi-value').textContent = metricOrDash(avg.mbi, '%');
+        updateRiskIndicator('mbi-risk', getRiskLevel('mbi', avg.mbi));
+
+        document.getElementById('sleep-duration-value').textContent = metricOrDash(avg.sleepDuration, ' год');
+        updateRiskIndicator('sleep-duration-risk', getRiskLevel('sleepDuration', avg.sleepDuration));
+
+        document.getElementById('sleep-quality-value').textContent = metricOrDash(avg.sleepQuality);
+        updateRiskIndicator('sleep-quality-risk', getRiskLevel('sleepQuality', avg.sleepQuality));
+
+        document.getElementById('work-life-value').textContent = metricOrDash(avg.workLifeBalance);
+        updateRiskIndicator('work-life-risk', getRiskLevel('workLifeBalance', avg.workLifeBalance));
+
+        document.getElementById('stress-value').textContent = metricOrDash(avg.stressLevel);
+        updateRiskIndicator('stress-risk', getRiskLevel('stressLevel', avg.stressLevel));
+      }
+
+      renderTeamCoverage();
+    }
+
+    function renderTeamCoverage() {
+      const coverageEl = document.getElementById('team-data-coverage');
+      if (!coverageEl) return;
+      const data = getSelectedTeamMonth();
+      if (!data) {
+        coverageEl.innerHTML = '';
+        return;
+      }
+
+      const total = data.employees?.length ?? 0;
+      const participants = Number.isFinite(data.participants) ? data.participants : 0;
+      const responses = Number.isFinite(data.responses) ? data.responses : 0;
+
+      if (!hasMonthData(data)) {
+        coverageEl.innerHTML = '<div class="data-pill">Немає даних за цей місяць</div>';
+        return;
+      }
+
+      const responsesLabel = responses > 0 ? responses : '—';
+      coverageEl.innerHTML = `
+        <div class="data-pill">Учасників: <span class="mono">${participants}/${total}</span></div>
+        <div class="data-pill">Відповідей: <span class="mono">${responsesLabel}</span></div>
+      `;
     }
 
     function getScoreClass(metric, value) {
       const risk = getRiskLevel(metric, value);
       if (risk === 'low') return 'score-good';
       if (risk === 'medium') return 'score-warning';
+      if (risk === 'unknown') return 'score-muted';
       return 'score-danger';
     }
 
@@ -2597,6 +2764,7 @@
         medium: 'Середній',
         high: 'Високий',
         critical: 'Критичний',
+        unknown: 'Н/Д',
       };
       return labels[risk] || 'Невідомо';
     }
@@ -2613,6 +2781,8 @@
         teamDashboardCharts.teamTrend.destroy();
       }
 
+      const values = (key) => months.map(m => (hasMonthData(m) ? (m.averages?.[key] ?? null) : null));
+
       teamDashboardCharts.teamTrend = new Chart(ctx, {
         type: 'line',
         data: {
@@ -2621,7 +2791,7 @@
             {
               label: 'WHO-5',
               metricKey: 'who5',
-              data: months.map(m => m.averages?.who5 ?? 0),
+              data: values('who5'),
               borderColor: '#1f8f3a',
               tension: 0.35,
               borderWidth: 3,
@@ -2629,7 +2799,7 @@
             {
               label: 'PHQ-9',
               metricKey: 'phq9',
-              data: months.map(m => m.averages?.phq9 ?? 0),
+              data: values('phq9'),
               borderColor: '#ffb000',
               tension: 0.35,
               borderWidth: 3,
@@ -2637,7 +2807,7 @@
             {
               label: 'GAD-7',
               metricKey: 'gad7',
-              data: months.map(m => m.averages?.gad7 ?? 0),
+              data: values('gad7'),
               borderColor: '#ff595e',
               tension: 0.35,
               borderWidth: 3,
@@ -2645,7 +2815,7 @@
             {
               label: 'MBI (%)',
               metricKey: 'mbi',
-              data: months.map(m => m.averages?.mbi ?? 0),
+              data: values('mbi'),
               borderColor: '#6a4c93',
               tension: 0.35,
               borderWidth: 3,
@@ -2666,7 +2836,8 @@
                 label: (context) => {
                   const key = context.dataset.metricKey;
                   const hint = METRIC_HINTS[key] || '';
-                  return `${context.dataset.label}: ${context.parsed.y}${hint ? ' (' + hint + ')' : ''}`;
+                  const value = Number.isFinite(context.parsed.y) ? context.parsed.y.toFixed(1) : '—';
+                  return `${context.dataset.label}: ${value}${hint ? ' (' + hint + ')' : ''}`;
                 }
               }
             }
@@ -2690,15 +2861,25 @@
       }
 
       data.employees.forEach(emp => {
+        const hasData = emp.hasData ?? emp.has_data ?? hasMetricData(emp);
+        const who5 = hasData ? emp.who5 : null;
+        const phq9 = hasData ? emp.phq9 : null;
+        const gad7 = hasData ? emp.gad7 : null;
+        const mbi = hasData ? emp.mbi : null;
+        const sleepDuration = hasData ? emp.sleepDuration : null;
+        const sleepQuality = hasData ? emp.sleepQuality : null;
+        const workLifeBalance = hasData ? emp.workLifeBalance : null;
+        const stressLevel = hasData ? emp.stressLevel : null;
+
         const risks = [
-          getRiskLevel('who5', emp.who5),
-          getRiskLevel('phq9', emp.phq9),
-          getRiskLevel('gad7', emp.gad7),
-          getRiskLevel('mbi', emp.mbi),
-          getRiskLevel('sleepDuration', emp.sleepDuration),
-          getRiskLevel('sleepQuality', emp.sleepQuality),
-          getRiskLevel('workLifeBalance', emp.workLifeBalance),
-          getRiskLevel('stressLevel', emp.stressLevel),
+          getRiskLevel('who5', who5),
+          getRiskLevel('phq9', phq9),
+          getRiskLevel('gad7', gad7),
+          getRiskLevel('mbi', mbi),
+          getRiskLevel('sleepDuration', sleepDuration),
+          getRiskLevel('sleepQuality', sleepQuality),
+          getRiskLevel('workLifeBalance', workLifeBalance),
+          getRiskLevel('stressLevel', stressLevel),
         ];
 
         const criticalCount = risks.filter(r => r === 'critical').length;
@@ -2706,7 +2887,9 @@
         const mediumCount = risks.filter(r => r === 'medium').length;
 
         let overallRisk = 'low';
-        if (criticalCount >= 1) {
+        if (!hasData) {
+          overallRisk = 'unknown';
+        } else if (criticalCount >= 1) {
           overallRisk = 'critical';
         } else if (highCount >= 3 || (highCount >= 2 && mediumCount >= 3)) {
           overallRisk = 'high';
@@ -2718,14 +2901,14 @@
         const userId = emp.userId || emp.user_id || emp.id || '';
         row.innerHTML = `
           <td class="employee-name clickable" onclick="openEmployeeModal('${userId}')">${emp.name}</td>
-          <td class="score-cell ${getScoreClass('who5', emp.who5)}">${emp.who5.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('phq9', emp.phq9)}">${emp.phq9.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('gad7', emp.gad7)}">${emp.gad7.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('mbi', emp.mbi)}">${emp.mbi.toFixed(1)}%</td>
-          <td class="score-cell ${getScoreClass('sleepDuration', emp.sleepDuration)}">${emp.sleepDuration.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('sleepQuality', emp.sleepQuality)}">${emp.sleepQuality.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('workLifeBalance', emp.workLifeBalance)}">${emp.workLifeBalance.toFixed(1)}</td>
-          <td class="score-cell ${getScoreClass('stressLevel', emp.stressLevel)}">${emp.stressLevel.toFixed(1)}</td>
+          <td class="score-cell ${getScoreClass('who5', who5)}">${metricOrDash(who5)}</td>
+          <td class="score-cell ${getScoreClass('phq9', phq9)}">${metricOrDash(phq9)}</td>
+          <td class="score-cell ${getScoreClass('gad7', gad7)}">${metricOrDash(gad7)}</td>
+          <td class="score-cell ${getScoreClass('mbi', mbi)}">${metricOrDash(mbi, '%')}</td>
+          <td class="score-cell ${getScoreClass('sleepDuration', sleepDuration)}">${metricOrDash(sleepDuration)}</td>
+          <td class="score-cell ${getScoreClass('sleepQuality', sleepQuality)}">${metricOrDash(sleepQuality)}</td>
+          <td class="score-cell ${getScoreClass('workLifeBalance', workLifeBalance)}">${metricOrDash(workLifeBalance)}</td>
+          <td class="score-cell ${getScoreClass('stressLevel', stressLevel)}">${metricOrDash(stressLevel)}</td>
           <td class="score-cell"><span class="risk-indicator risk-${overallRisk}">${getRiskLabel(overallRisk)}</span></td>
         `;
         tbody.appendChild(row);
@@ -2739,6 +2922,16 @@
       const container = document.getElementById('risk-items');
       if (!container) return;
       container.innerHTML = '';
+
+      if (!hasMonthData(data)) {
+        container.innerHTML = `
+          <div class="risk-item low">
+            <div class="risk-item-title">Немає даних за обраний місяць</div>
+            <div class="risk-item-description">Додайте чекіни, щоб отримати оцінку ризиків.</div>
+          </div>
+        `;
+        return;
+      }
 
       const avg = data.averages;
       const risks = [];
@@ -2869,21 +3062,25 @@
 
       document.getElementById('modalEmployeeName').textContent = employee.name;
 
+      const hasData = hasEmployeeData(employee);
+      const m = hasData ? employee.metrics : {};
       const metricsHtml = `
-        <div class="modal-metric"><span class="metric-label">WHO-5</span><span class="metric-value ${getScoreClass('who5', employee.metrics.who5)}">${employee.metrics.who5.toFixed(1)}</span></div>
-        <div class="modal-metric"><span class="metric-label">PHQ-9</span><span class="metric-value ${getScoreClass('phq9', employee.metrics.phq9)}">${employee.metrics.phq9.toFixed(1)}</span></div>
-        <div class="modal-metric"><span class="metric-label">GAD-7</span><span class="metric-value ${getScoreClass('gad7', employee.metrics.gad7)}">${employee.metrics.gad7.toFixed(1)}</span></div>
-        <div class="modal-metric"><span class="metric-label">MBI</span><span class="metric-value ${getScoreClass('mbi', employee.metrics.mbi)}">${employee.metrics.mbi.toFixed(1)}%</span></div>
-        <div class="modal-metric"><span class="metric-label">Сон</span><span class="metric-value ${getScoreClass('sleepDuration', employee.metrics.sleepDuration)}">${employee.metrics.sleepDuration.toFixed(1)} год</span></div>
-        <div class="modal-metric"><span class="metric-label">Якість сну</span><span class="metric-value ${getScoreClass('sleepQuality', employee.metrics.sleepQuality)}">${employee.metrics.sleepQuality.toFixed(1)}</span></div>
-        <div class="modal-metric"><span class="metric-label">Баланс</span><span class="metric-value ${getScoreClass('workLifeBalance', employee.metrics.workLifeBalance)}">${employee.metrics.workLifeBalance.toFixed(1)}</span></div>
-        <div class="modal-metric"><span class="metric-label">Стрес</span><span class="metric-value ${getScoreClass('stressLevel', employee.metrics.stressLevel)}">${employee.metrics.stressLevel.toFixed(1)}</span></div>
+        <div class="modal-metric"><span class="metric-label">WHO-5</span><span class="metric-value ${getScoreClass('who5', m.who5)}">${metricOrDash(m.who5)}</span></div>
+        <div class="modal-metric"><span class="metric-label">PHQ-9</span><span class="metric-value ${getScoreClass('phq9', m.phq9)}">${metricOrDash(m.phq9)}</span></div>
+        <div class="modal-metric"><span class="metric-label">GAD-7</span><span class="metric-value ${getScoreClass('gad7', m.gad7)}">${metricOrDash(m.gad7)}</span></div>
+        <div class="modal-metric"><span class="metric-label">MBI</span><span class="metric-value ${getScoreClass('mbi', m.mbi)}">${metricOrDash(m.mbi, '%')}</span></div>
+        <div class="modal-metric"><span class="metric-label">Сон</span><span class="metric-value ${getScoreClass('sleepDuration', m.sleepDuration)}">${metricOrDash(m.sleepDuration, ' год')}</span></div>
+        <div class="modal-metric"><span class="metric-label">Якість сну</span><span class="metric-value ${getScoreClass('sleepQuality', m.sleepQuality)}">${metricOrDash(m.sleepQuality)}</span></div>
+        <div class="modal-metric"><span class="metric-label">Баланс</span><span class="metric-value ${getScoreClass('workLifeBalance', m.workLifeBalance)}">${metricOrDash(m.workLifeBalance)}</span></div>
+        <div class="modal-metric"><span class="metric-label">Стрес</span><span class="metric-value ${getScoreClass('stressLevel', m.stressLevel)}">${metricOrDash(m.stressLevel)}</span></div>
       `;
       document.getElementById('modalMetrics').innerHTML = metricsHtml;
 
-      const riskLevel = employee.riskLevel || 'low';
+      const riskLevel = hasData ? (employee.riskLevel || 'low') : 'unknown';
       document.getElementById('modalRiskLevel').innerHTML = `<span class="risk-indicator risk-${riskLevel}">${getRiskLabel(riskLevel)}</span>`;
-      document.getElementById('modalNotes').textContent = employee.notes || 'Нотатки недоступні';
+      document.getElementById('modalNotes').textContent = hasData
+        ? (employee.notes || 'Нотатки недоступні')
+        : 'Немає даних за обраний період.';
 
       createModalTrendChart(employee);
       document.getElementById('employeeModal').style.display = 'flex';
@@ -2911,7 +3108,8 @@
       const history = employee.history || {};
       const values = (key) => recent.map(m => {
         const monthKey = monthKeyFromParts(m.year, m.month);
-        return history[monthKey]?.[key] ?? 0;
+        const value = history[monthKey]?.[key];
+        return Number.isFinite(value) ? value : null;
       });
 
       teamDashboardCharts.modalTrend = new Chart(ctx, {
@@ -3007,10 +3205,17 @@
     }
 
     function calculateTeamHealthScore() {
-      if (!advancedData?.employees?.length) return;
+      const employees = (advancedData?.employees || []).filter(hasEmployeeData);
+      if (!employees.length) {
+        const scoreEl = document.getElementById('healthScore');
+        if (scoreEl) scoreEl.textContent = '—';
+        const indicatorEl = document.getElementById('healthIndicator');
+        if (indicatorEl) indicatorEl.textContent = 'Н/Д';
+        return;
+      }
 
       let totalScore = 0;
-      advancedData.employees.forEach(emp => {
+      employees.forEach(emp => {
         const m = emp.metrics;
         const who5Score = m.who5;
         const phq9Score = 100 - (m.phq9 / 27 * 100);
@@ -3025,7 +3230,7 @@
         totalScore += empScore;
       });
 
-      const healthScore = Math.round(totalScore / advancedData.employees.length);
+      const healthScore = Math.round(totalScore / employees.length);
       const scoreEl = document.getElementById('healthScore');
       if (scoreEl) scoreEl.textContent = healthScore;
 
@@ -3244,12 +3449,19 @@
       if (!months.length) return;
       const averages = advancedData.teamAverages;
       const labels = months.map(labelFromKey);
+      const monthHasData = months.map(key => hasCoverageForKey(key));
+      const commentEl = document.getElementById('trajectoryComment');
+      if (!monthHasData.some(Boolean)) {
+        if (advancedCharts.trajectory) advancedCharts.trajectory.destroy();
+        if (commentEl) commentEl.textContent = 'Недостатньо даних для побудови траєкторії.';
+        return;
+      }
 
-      const who5 = months.map(m => averages[m]?.who5 ?? 0);
-      const stressRaw = months.map(m => averages[m]?.stressLevel ?? 0);
-      const stress = stressRaw.map(v => (v / 40) * 100);
-      const sleepRaw = months.map(m => averages[m]?.sleepDuration ?? 0);
-      const sleep = sleepRaw.map(v => (v / 9) * 100);
+      const who5 = months.map((m, idx) => (monthHasData[idx] ? (averages[m]?.who5 ?? null) : null));
+      const stressRaw = months.map((m, idx) => (monthHasData[idx] ? (averages[m]?.stressLevel ?? null) : null));
+      const stress = stressRaw.map(v => (Number.isFinite(v) ? (v / 40) * 100 : null));
+      const sleepRaw = months.map((m, idx) => (monthHasData[idx] ? (averages[m]?.sleepDuration ?? null) : null));
+      const sleep = sleepRaw.map(v => (Number.isFinite(v) ? (v / 9) * 100 : null));
 
       if (advancedCharts.trajectory) advancedCharts.trajectory.destroy();
 
@@ -3269,20 +3481,20 @@
       const latestKey = getLatestMonthKey();
       const prevKey = getPrevMonthKey();
       if (!latestKey || !prevKey) return;
+      if (!hasCoverageForKey(latestKey) || !hasCoverageForKey(prevKey)) return;
       const latestIdx = months.indexOf(latestKey);
       if (latestIdx < 0) return;
       const prevIdx = Math.max(0, latestIdx - 1);
       const whoDelta = who5[latestIdx] - who5[prevIdx];
       const stressDelta = stressRaw[latestIdx] - stressRaw[prevIdx];
       const sleepDelta = sleepRaw[latestIdx] - sleepRaw[prevIdx];
-      const comment = `Останній місяць (${labelFromKey(latestKey)}): WHO-5 ${who5[latestIdx]?.toFixed(1)}, сон ${sleepRaw[latestIdx]?.toFixed(1)} год, стрес ${stressRaw[latestIdx]?.toFixed(1)}/40. Δ vs ${labelFromKey(prevKey)}: WHO-5 ${(whoDelta>=0?'+':'') + whoDelta.toFixed(1)}, сон ${(sleepDelta>=0?'+':'') + sleepDelta.toFixed(1)} год, стрес ${(stressDelta>=0?'+':'') + stressDelta.toFixed(1)}.`;
-      const commentEl = document.getElementById('trajectoryComment');
+      const comment = `Останній місяць (${labelFromKey(latestKey)}): WHO-5 ${Number.isFinite(who5[latestIdx]) ? who5[latestIdx].toFixed(1) : '—'}, сон ${Number.isFinite(sleepRaw[latestIdx]) ? sleepRaw[latestIdx].toFixed(1) : '—'} год, стрес ${Number.isFinite(stressRaw[latestIdx]) ? stressRaw[latestIdx].toFixed(1) : '—'}/40. Δ vs ${labelFromKey(prevKey)}: WHO-5 ${(whoDelta>=0?'+':'') + whoDelta.toFixed(1)}, сон ${(sleepDelta>=0?'+':'') + sleepDelta.toFixed(1)} год, стрес ${(stressDelta>=0?'+':'') + stressDelta.toFixed(1)}.`;
       if (commentEl) commentEl.textContent = comment;
 
       const modalMetrics = [
-        { key: 'who5', label: 'WHO-5', value: who5[latestIdx]?.toFixed(1) ?? '—' },
-        { key: 'sleep', label: 'Сон (год)', value: sleepRaw[latestIdx]?.toFixed(1) ?? '—' },
-        { key: 'stress', label: 'Стрес (0-40)', value: stressRaw[latestIdx]?.toFixed(1) ?? '—' },
+        { key: 'who5', label: 'WHO-5', value: Number.isFinite(who5[latestIdx]) ? who5[latestIdx].toFixed(1) : '—' },
+        { key: 'sleep', label: 'Сон (год)', value: Number.isFinite(sleepRaw[latestIdx]) ? sleepRaw[latestIdx].toFixed(1) : '—' },
+        { key: 'stress', label: 'Стрес (0-40)', value: Number.isFinite(stressRaw[latestIdx]) ? stressRaw[latestIdx].toFixed(1) : '—' },
       ];
       fillMetricsGrid('trajectoryMetrics', modalMetrics);
       const summary = document.getElementById('trajectorySummary');
@@ -3296,7 +3508,8 @@
 
       if (advancedCharts.riskBubble) advancedCharts.riskBubble.destroy();
 
-      const points = advancedData.employees.map(emp => {
+      const employees = (advancedData.employees || []).filter(hasEmployeeData);
+      const points = employees.map(emp => {
         const risk = calculateEmployeeRisk(emp.metrics);
         return {
           x: emp.metrics.stressLevel,
@@ -3342,7 +3555,9 @@
         return acc;
       }, {});
       const topRisk = points.slice().sort((a, b) => (b.y + b.x) - (a.y + a.x))[0];
-      const riskComment = `Ризики: high ${counts.high || 0}, medium ${counts.medium || 0}, low ${counts.low || 0}. Найвищий ризик: ${topRisk?.name || '—'}.`;
+      const riskComment = points.length
+        ? `Ризики: high ${counts.high || 0}, medium ${counts.medium || 0}, low ${counts.low || 0}. Найвищий ризик: ${topRisk?.name || '—'}.`
+        : 'Недостатньо даних для матриці ризиків.';
       const riskEl = document.getElementById('riskComment');
       if (riskEl) riskEl.textContent = riskComment;
 
@@ -3362,16 +3577,22 @@
       const history = advancedData.teamAverages;
       const latestKey = getLatestMonthKey();
       const prevKey = getPrevMonthKey();
-      if (!latestKey || !prevKey) return;
+      const forecastGrid = document.getElementById('forecastGrid');
+      if (!forecastGrid) return;
+      forecastGrid.innerHTML = '';
+      if (!latestKey || !prevKey) {
+        forecastGrid.innerHTML = '<div class="form-hint">Недостатньо даних для прогнозу.</div>';
+        return;
+      }
+      if (!hasCoverageForKey(latestKey) || !hasCoverageForKey(prevKey)) {
+        forecastGrid.innerHTML = '<div class="form-hint">Недостатньо даних для прогнозу.</div>';
+        return;
+      }
       const metrics = [
         { key: 'who5', name: 'WHO-5 Благополуччя' },
         { key: 'phq9', name: 'PHQ-9 Депресія' },
         { key: 'mbi', name: 'MBI Вигорання' },
       ];
-
-      const forecastGrid = document.getElementById('forecastGrid');
-      if (!forecastGrid) return;
-      forecastGrid.innerHTML = '';
 
       metrics.forEach(metric => {
         const prev = history[prevKey]?.[metric.key] ?? history[latestKey]?.[metric.key] ?? 0;
@@ -3396,7 +3617,19 @@
 
     function analyzeSleepDebt() {
       if (!advancedData) return;
-      const employees = advancedData.employees || [];
+      const employees = (advancedData.employees || []).filter(hasEmployeeData);
+      if (!employees.length) {
+        const totalEl = document.getElementById('totalSleepDebt');
+        const avgEl = document.getElementById('avgSleepDebt');
+        const riskEl = document.getElementById('atRiskCount');
+        if (totalEl) totalEl.textContent = '—';
+        if (avgEl) avgEl.textContent = '—';
+        if (riskEl) riskEl.textContent = '—';
+        if (advancedCharts.sleepDebt) {
+          advancedCharts.sleepDebt.destroy();
+        }
+        return;
+      }
       const optimalSleep = 7.5;
       let totalDebt = 0;
       let atRisk = 0;
@@ -3438,7 +3671,11 @@
       if (!advancedData) return;
       const grid = document.getElementById('insightGrid');
       if (!grid) return;
-      const employees = advancedData.employees || [];
+      const employees = (advancedData.employees || []).filter(hasEmployeeData);
+      if (!employees.length) {
+        grid.innerHTML = '<div class="form-hint">Недостатньо даних для інсайтів.</div>';
+        return;
+      }
 
       const latestKey = getLatestMonthKey();
       const prevKey = getPrevMonthKey();
@@ -3549,12 +3786,13 @@
       if (!container) return;
       container.innerHTML = '';
 
-      if (!advancedData?.employees?.length) {
+      const employees = (advancedData?.employees || []).filter(hasEmployeeData);
+      if (!employees.length) {
         container.innerHTML = '<div class="form-hint">Немає даних для плейбуків</div>';
         return;
       }
 
-      const ranked = [...advancedData.employees]
+      const ranked = [...employees]
         .sort((a, b) => (b.metrics.mbi + b.metrics.phq9 + b.metrics.gad7) - (a.metrics.mbi + a.metrics.phq9 + a.metrics.gad7))
         .slice(0, 3);
 
@@ -3588,12 +3826,17 @@
 
     function generateRecommendations() {
       if (!advancedData) return;
-      const employees = advancedData.employees || [];
+      const employees = (advancedData.employees || []).filter(hasEmployeeData);
       const plans = employees.map(buildRecommendationPlan).filter(Boolean);
 
       const grid = document.getElementById('recommendationsGrid');
       if (!grid) return;
       grid.innerHTML = '';
+
+      if (!employees.length) {
+        grid.innerHTML = '<p style="color: var(--gray); text-align: center; padding: 2rem;">Недостатньо даних для рекомендацій.</p>';
+        return;
+      }
 
       if (!plans.length) {
         grid.innerHTML = '<p style="color: var(--gray); text-align: center; padding: 2rem;">Всі показники в нормі! 🎉</p>';
@@ -3628,6 +3871,7 @@
     }
 
     function buildRecommendationPlan(emp) {
+      if (!hasEmployeeData(emp)) return null;
       const m = emp.metrics;
       const focusAreas = [];
 
@@ -4079,9 +4323,14 @@
       pulseRooms.forEach(room => {
         const card = document.createElement('div');
         card.className = `pulse-room-card${activePulseRoom?.id === room.id ? ' active' : ''}`;
+        const requiresModeration = room.require_moderation ?? room.requireModeration ?? false;
+        const moderationLabel = requiresModeration ? 'Модерація' : 'Відкрита';
         card.innerHTML = `
           <div class="plan-title">${room.title}</div>
           <div class="plan-meta">${room.description || ''}</div>
+          <div class="tag-row" style="margin-top: 0.5rem;">
+            <span class="tag-chip">${moderationLabel}</span>
+          </div>
         `;
         card.addEventListener('click', () => setActivePulseRoom(room));
         container.appendChild(card);
@@ -4106,12 +4355,23 @@
     function renderPulseMessages() {
       const container = document.getElementById('pulse-messages');
       const meta = document.getElementById('pulse-room-meta');
+      const guidance = document.getElementById('pulse-room-guidance');
       if (!container) return;
 
       if (meta) {
         meta.textContent = activePulseRoom
           ? `${activePulseRoom.title} · ${activePulseRoom.description || ''}`
           : 'Оберіть кімнату для перегляду';
+      }
+      if (guidance) {
+        if (!activePulseRoom) {
+          guidance.textContent = '';
+        } else {
+          const requiresModeration = activePulseRoom.require_moderation ?? activePulseRoom.requireModeration ?? false;
+          guidance.textContent = requiresModeration
+            ? 'Ця кімната з модерацією: повідомлення зʼявляються після перевірки.'
+            : 'Повідомлення у цій кімнаті зʼявляються одразу після відправлення.';
+        }
       }
 
       container.innerHTML = '';
@@ -4286,7 +4546,7 @@
           });
           document.getElementById('pulse-message-content').value = '';
           if (res?.status === 'PENDING') {
-            statusEl.textContent = '⏳ Повідомлення на модерації';
+            statusEl.textContent = '⏳ Повідомлення на модерації — зʼявиться після перевірки';
           } else {
             statusEl.textContent = '✅ Опубліковано';
             await loadPulseMessages();

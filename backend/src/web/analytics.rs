@@ -44,6 +44,7 @@ struct EmployeeMonthMetrics {
     name: String,
     #[serde(flatten)]
     metrics: MetricBlock,
+    has_data: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -53,6 +54,8 @@ struct TeamMonthData {
     month: u32,
     averages: MetricBlock,
     employees: Vec<EmployeeMonthMetrics>,
+    participants: i64,
+    responses: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,6 +77,7 @@ struct EmployeeProfile {
     history: HashMap<String, MetricBlock>,
     risk_level: String,
     notes: String,
+    has_data: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -184,10 +188,10 @@ async fn employee_data(
         team_averages.insert("current".to_string(), latest_avg);
     }
 
+    let mut employees = Vec::new();
     let mut alerts = Vec::new();
     let mut recommendations = Vec::new();
 
-    let mut employees = Vec::new();
     for user in &users {
         let history = analytics
             .user_history
@@ -195,18 +199,13 @@ async fn employee_data(
             .cloned()
             .unwrap_or_default();
 
-        let mut filled_history = HashMap::new();
-        for key in &analytics.month_keys {
-            let metrics = history.get(key).cloned().unwrap_or_else(MetricBlock::zero);
-            filled_history.insert(key.clone(), metrics);
-        }
-
         let metrics = latest_user_metrics(&history, &analytics.month_keys)
             .unwrap_or_else(MetricBlock::zero);
-        let risk_level = if history.is_empty() {
-            "low"
-        } else {
+        let has_data = !history.is_empty();
+        let risk_level = if has_data {
             calculate_employee_risk(&metrics)
+        } else {
+            "low"
         };
 
         let notes = build_notes(&metrics, &history, &analytics.month_keys, risk_level);
@@ -216,9 +215,10 @@ async fn employee_data(
             name: user.name.clone(),
             email: if include_all { Some(user.email.clone()) } else { None },
             metrics,
-            history: filled_history,
+            history,
             risk_level: risk_level.to_string(),
             notes,
+            has_data,
         });
     }
 
@@ -359,6 +359,9 @@ async fn build_analytics(
 
     let mut user_history: HashMap<Uuid, HashMap<String, MetricBlock>> = HashMap::new();
     let mut month_keys_set: HashSet<String> = HashSet::new();
+    let mut month_participants: HashMap<String, i64> = HashMap::new();
+    let mut month_responses: HashMap<String, i64> = HashMap::new();
+    let mut user_months: HashSet<(Uuid, String)> = HashSet::new();
 
     for row in rows {
         let key = format!("{}-{:02}", row.year, row.month);
@@ -377,7 +380,12 @@ async fn build_analytics(
             .entry(row.user_id)
             .or_default()
             .insert(key.clone(), metrics);
-        month_keys_set.insert(key);
+        month_keys_set.insert(key.clone());
+
+        *month_responses.entry(key.clone()).or_insert(0) += row.answers_count;
+        if user_months.insert((row.user_id, key.clone())) {
+            *month_participants.entry(key).or_insert(0) += 1;
+        }
     }
 
     let overrides = db::get_monthly_metric_overrides(&state.pool, &user_ids)
@@ -395,11 +403,13 @@ async fn build_analytics(
             work_life_balance: row.work_life_balance,
             stress_level: row.stress_level,
         };
-        user_history
-            .entry(row.user_id)
-            .or_default()
-            .insert(key.clone(), metrics);
-        month_keys_set.insert(key);
+        let entry = user_history.entry(row.user_id).or_default();
+        let had_data = entry.contains_key(&key);
+        entry.insert(key.clone(), metrics);
+        month_keys_set.insert(key.clone());
+        if !had_data {
+            *month_participants.entry(key).or_insert(0) += 1;
+        }
     }
 
     let mut month_keys: Vec<String> = month_keys_set.into_iter().collect();
@@ -459,6 +469,7 @@ async fn build_analytics(
                 user_id: user.id,
                 name: user.name.clone(),
                 metrics,
+                has_data,
             });
         }
 
@@ -469,11 +480,16 @@ async fn build_analytics(
         };
 
         team_averages.insert(key.clone(), averages.clone());
+        let participants = *month_participants.get(key).unwrap_or(&0);
+        let responses = *month_responses.get(key).unwrap_or(&0);
+
         months_output.push(TeamMonthData {
             year,
             month: month as u32,
             averages,
             employees,
+            participants,
+            responses,
         });
     }
 
@@ -502,23 +518,52 @@ fn compute_metrics(
     sleep_avg: Option<f64>,
     workload_avg: Option<f64>,
 ) -> MetricBlock {
-    let mood = mood_avg.unwrap_or(0.0);
-    let energy = energy_avg.unwrap_or(0.0);
-    let wellbeing = wellbeing_avg.unwrap_or(0.0);
-    let motivation = motivation_avg.unwrap_or(0.0);
-    let focus = focus_avg.unwrap_or(0.0);
-    let stress = stress_avg.unwrap_or(0.0);
-    let sleep = sleep_avg.unwrap_or(0.0);
-    let workload = workload_avg.unwrap_or(0.0);
+    fn avg(values: &[Option<f64>]) -> Option<f64> {
+        let mut sum = 0.0;
+        let mut count = 0.0;
+        for value in values {
+            if let Some(v) = value {
+                sum += v;
+                count += 1.0;
+            }
+        }
+        if count > 0.0 {
+            Some(sum / count)
+        } else {
+            None
+        }
+    }
 
-    let who5 = ((mood + energy + wellbeing) / 3.0 * 10.0).clamp(0.0, 100.0);
-    let phq9 = (((10.0 - mood) + (10.0 - energy) + (10.0 - motivation)) / 3.0 * 2.7)
-        .clamp(0.0, 27.0);
-    let gad7 = ((stress + (10.0 - focus)) / 2.0 * 2.1).clamp(0.0, 21.0);
-    let mbi = ((stress + workload + (10.0 - energy) + (10.0 - motivation)) / 4.0 * 10.0)
-        .clamp(0.0, 100.0);
-    let stress_level = (stress * 4.0).clamp(0.0, 40.0);
-    let work_life_balance = (10.0 - workload).clamp(0.0, 10.0);
+    let who5 = avg(&[mood_avg, energy_avg, wellbeing_avg])
+        .map(|v| (v * 10.0).clamp(0.0, 100.0))
+        .unwrap_or(0.0);
+
+    let phq9 = avg(&[
+        mood_avg.map(|v| 10.0 - v),
+        energy_avg.map(|v| 10.0 - v),
+        motivation_avg.map(|v| 10.0 - v),
+    ])
+    .map(|v| (v * 2.7).clamp(0.0, 27.0))
+    .unwrap_or(0.0);
+
+    let gad7 = avg(&[stress_avg, focus_avg.map(|v| 10.0 - v)])
+        .map(|v| (v * 2.1).clamp(0.0, 21.0))
+        .unwrap_or(0.0);
+
+    let mbi = avg(&[
+        stress_avg,
+        workload_avg,
+        energy_avg.map(|v| 10.0 - v),
+        motivation_avg.map(|v| 10.0 - v),
+    ])
+    .map(|v| (v * 10.0).clamp(0.0, 100.0))
+    .unwrap_or(0.0);
+
+    let sleep = sleep_avg.unwrap_or(0.0);
+    let stress_level = stress_avg.map(|v| (v * 4.0).clamp(0.0, 40.0)).unwrap_or(0.0);
+    let work_life_balance = workload_avg
+        .map(|v| (10.0 - v).clamp(0.0, 10.0))
+        .unwrap_or(0.0);
 
     MetricBlock {
         who5,

@@ -804,10 +804,10 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             /settime - Встановити час чекіну ⏰\n\
             /timezone - Часовий пояс\n\
             /notify - Нагадування on/off\n\
-            /kudos - Подякувати колезі 🎉\n\
+            /kudos - Подяка колезі (1-2 речення) 🎉\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
-            /pulse - Pulse rooms\n\
+            /pulse - Анонімні кімнати для фідбеку\n\
             /insight - Персональний інсайт\n\
             /help - Допомога\n\
             /weblogin - Вхід у web\n\
@@ -945,7 +945,8 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
             /feedback - OpsLab Feedback\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
-            /pulse - Pulse rooms\n\
+            /kudos - Подяка колезі\n\
+            /pulse - Анонімні кімнати для фідбеку\n\
             /insight - Персональний інсайт\n\
             /settings - Налаштування та час нагадувань\n\
             /help - Допомога\n\n\
@@ -1005,10 +1006,10 @@ async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
             /timezone - Часовий пояс\n\
             /notify - Нагадування on/off\n\
             /settings - Налаштування\n\
-            /kudos - Подяка колезі\n\
+            /kudos - Подяка колезі (1-2 речення, зʼявляється у тижневому підсумку)\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
-            /pulse - Pulse rooms\n\
+            /pulse - Анонімні кімнати для командного фідбеку (у web)\n\
             /insight - Персональний інсайт\n\n\
             🔗 Привʼязка Telegram:\n\
             /start email@opslab.uk 1234\n\
@@ -1895,11 +1896,11 @@ async fn handle_kudos_command(
         bot.send_message(
             chat_id,
             mdv2(
-                "🎉 Kudos - подяка колезі!\n\n\
+                "🎉 Kudos — коротка подяка колезі за конкретну дію.\n\n\
             Формат: /kudos @email повідомлення\n\n\
             Приклад:\n\
-            /kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙\n\n\
-            Колега отримає твоє повідомлення в Telegram!",
+            /kudos @jane.davydiuk@opslab.uk Дякую за підтримку на демо — це пришвидшило рішення! 💙\n\n\
+            Порада: напишіть «дія → вплив» у 1-2 реченнях.",
             ),
         )
         .parse_mode(ParseMode::MarkdownV2)
@@ -1915,7 +1916,7 @@ async fn handle_kudos_command(
             mdv2(
                 "❌ Неправильний формат.\n\n\
             Використай: /kudos @email повідомлення\n\n\
-            Приклад: /kudos @jane.davydiuk@opslab.uk дякую! 💙",
+            Приклад: /kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙",
             ),
         )
         .parse_mode(ParseMode::MarkdownV2)
@@ -1954,7 +1955,11 @@ async fn handle_kudos_command(
     // Notify sender
     bot.send_message(
         chat_id,
-        mdv2(format!("✅ Kudos відправлено {}! 🎉", recipient_email)),
+        mdv2(format!(
+            "✅ Kudos відправлено {}! 🎉\n\
+            Отримувач побачить повідомлення у Telegram та в тижневому підсумку.",
+            recipient_email
+        )),
     )
     .parse_mode(ParseMode::MarkdownV2)
     .await?;
@@ -2153,9 +2158,9 @@ async fn send_pulse_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
         chat_id,
         mdv2(format!(
             "🗣 Pulse rooms\n\n\
-            Анонімні командні обговорення з модерацією.\n\
-            Перейди у web та відкрий Pulse Rooms.\n\n\
-            🔗 {base_url}"
+            Тематичні кімнати для командного фідбеку та сигналів.\n\
+            Можна писати анонімно, частина кімнат проходить модерацію.\n\n\
+            Відкрий у web: {base_url} → Pulse Rooms",
         )),
     )
     .parse_mode(ParseMode::MarkdownV2)
