@@ -135,14 +135,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1.5rem;
+      gap: 2rem;
       flex: 1;
       min-width: 0;
     }
 
     .nav-menu {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.85rem;
       list-style: none;
       flex-wrap: wrap;
       justify-content: center;
@@ -153,7 +153,7 @@
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 1rem;
       flex-wrap: wrap;
       justify-content: flex-end;
       min-width: 0;
@@ -162,10 +162,10 @@
     .nav-user {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
       min-width: 0;
       border: 3px solid var(--dark);
-      padding: 0.35rem 0.6rem;
+      padding: 0.45rem 0.75rem;
       background: var(--white);
       box-shadow: 3px 3px 0 var(--dark);
     }
@@ -797,9 +797,12 @@
       max-width: 1000px;
       width: min(1000px, 94vw);
       max-height: 88vh;
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
       position: relative;
       animation: slideUp 0.3s ease-out;
+      display: flex;
+      flex-direction: column;
     }
 
     .modal-close {
@@ -892,35 +895,55 @@
     }
 
     .modal-pinpoints {
-      margin-top: 1.25rem;
-      padding-top: 1rem;
-      border-top: 2px dashed var(--dark);
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 3px dashed var(--dark);
+      width: 100%;
+    }
+
+    .modal-pinpoints h3 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
     .pinpoint-list {
       list-style: none;
       padding: 0;
+      margin: 0;
       display: grid;
-      gap: 0.75rem;
-      margin-top: 0.75rem;
+      gap: 0.85rem;
     }
 
     .pinpoint-item {
-      border: 2px solid var(--dark);
-      padding: 0.75rem;
-      background: var(--white);
-      box-shadow: 3px 3px 0 var(--dark);
+      border: 3px solid var(--dark);
+      padding: 1rem;
+      background: #fefefe;
+      box-shadow: 4px 4px 0 var(--dark);
       display: grid;
-      gap: 0.35rem;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .pinpoint-item:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0 var(--dark);
+      background: #fff;
     }
 
     .pinpoint-title {
       font-weight: 800;
+      font-size: 1rem;
+      line-height: 1.4;
+      color: var(--dark);
     }
 
     .pinpoint-meta {
-      font-size: 0.85rem;
-      color: var(--gray);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: #4b5563;
     }
 
     /* ===== ADVANCED ===== */
