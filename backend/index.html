@@ -2425,19 +2425,50 @@
     <div id="pulse-section" class="section">
       <div class="container">
         <div class="card">
-          <div class="card-header">🗣 Pulse Rooms</div>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <span>🗣 Pulse Rooms</span>
+            <button id="create-room-btn" class="btn btn-primary" type="button">+ Створити кімнату</button>
+          </div>
           <p style="color: var(--gray); margin-bottom: 0.75rem;">
             Pulse rooms — тематичні простори для командного фідбеку, ідей та важливих сигналів. Пишіть чесно й коротко, можна анонімно.
           </p>
           <div class="form-hint" style="margin-bottom: 1.5rem;">
             <strong>Як працює:</strong>
             <ul style="margin: 0.5rem 0 0 1.2rem;">
-              <li>Оберіть кімнату з темою (процеси, підтримка, культура).</li>
-              <li>Повідомлення можуть пройти модерацію, якщо кімната цього потребує або є токсичні індикатори.</li>
+              <li>Оберіть кімнату з темою або створіть свою.</li>
+              <li>Всі повідомлення публікуються відразу без модерації.</li>
               <li>Анонімність приховує імʼя для інших учасників.</li>
             </ul>
           </div>
           <div id="pulse-rooms" class="grid grid-3"></div>
+        </div>
+
+        <!-- Create Room Modal -->
+        <div id="create-room-modal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 600px;">
+            <span class="modal-close" onclick="closeCreateRoomModal()">&times;</span>
+            <h2 style="margin-top: 0; margin-bottom: 1.5rem;">Створити нову кімнату</h2>
+            <form id="create-room-form">
+              <div class="form-group">
+                <label for="room-name">Назва кімнати</label>
+                <input type="text" id="room-name" placeholder="Наприклад: Покращення процесів" required maxlength="100" />
+              </div>
+              <div class="form-group">
+                <label for="room-description">Опис (необов'язково)</label>
+                <textarea id="room-description" rows="3" maxlength="500" placeholder="Короткий опис теми кімнати..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="room-emoji">Емодзі (необов'язково)</label>
+                <input type="text" id="room-emoji" placeholder="💡" maxlength="2" />
+                <div class="form-hint">Один емодзі для візуалізації кімнати</div>
+              </div>
+              <div class="toggle-row" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary">Створити</button>
+                <button type="button" class="btn btn-secondary" onclick="closeCreateRoomModal()">Скасувати</button>
+                <span id="create-room-status" class="form-hint"></span>
+              </div>
+            </form>
+          </div>
         </div>
 
         <div class="card">
@@ -2462,10 +2493,6 @@
           </form>
         </div>
 
-        <div class="card hidden" id="pulse-moderation-card">
-          <div class="card-header">🛡️ Черга модерації</div>
-          <div id="pulse-moderation-queue" class="moderation-queue"></div>
-        </div>
       </div>
     </div>
 
@@ -2670,7 +2697,6 @@
     let pulseRooms = [];
     let activePulseRoom = null;
     let pulseMessages = [];
-    let pulseModerationQueue = [];
 
     // ===== API HELPERS =====
     async function apiCall(endpoint, options = {}) {
@@ -2816,9 +2842,6 @@
         loadAdvancedAnalytics();
       } else if (section === 'pulse') {
         loadPulseRooms();
-        if (isAdmin()) {
-          loadPulseModeration();
-        }
       } else if (section === 'admin') {
         loadTeamHeatmap();
         loadAdminUsers();
@@ -4958,14 +4981,10 @@
       pulseRooms.forEach(room => {
         const card = document.createElement('div');
         card.className = `pulse-room-card${activePulseRoom?.id === room.id ? ' active' : ''}`;
-        const requiresModeration = room.require_moderation ?? room.requireModeration ?? false;
-        const moderationLabel = requiresModeration ? 'Модерація' : 'Відкрита';
+        const emoji = room.emoji || '💬';
         card.innerHTML = `
-          <div class="plan-title">${room.title}</div>
+          <div class="plan-title">${emoji} ${room.title}</div>
           <div class="plan-meta">${room.description || ''}</div>
-          <div class="tag-row" style="margin-top: 0.5rem;">
-            <span class="tag-chip">${moderationLabel}</span>
-          </div>
         `;
         card.addEventListener('click', () => setActivePulseRoom(room));
         container.appendChild(card);
@@ -5002,10 +5021,7 @@
         if (!activePulseRoom) {
           guidance.textContent = '';
         } else {
-          const requiresModeration = activePulseRoom.require_moderation ?? activePulseRoom.requireModeration ?? false;
-          guidance.textContent = requiresModeration
-            ? 'Ця кімната з модерацією: повідомлення зʼявляються після перевірки.'
-            : 'Повідомлення у цій кімнаті зʼявляються одразу після відправлення.';
+          guidance.textContent = 'Повідомлення у цій кімнаті зʼявляються одразу після відправлення.';
         }
       }
 
@@ -5017,68 +5033,19 @@
 
       pulseMessages.forEach(message => {
         const card = document.createElement('div');
-        card.className = `pulse-message${message.status === 'PENDING' ? ' pending' : ''}`;
+        card.className = 'pulse-message';
         const created = message.created_at ? new Date(message.created_at).toLocaleString('uk-UA') : 'Нещодавно';
-        const status = message.status === 'PENDING' ? ' · На модерації' : '';
         const author = message.is_anonymous
           ? 'Анонім'
           : (message.author_name || 'Учасник');
         card.innerHTML = `
-          <div class="plan-meta">${created}${status} · ${author}</div>
+          <div class="plan-meta">${created} · ${author}</div>
           <div class="plan-title">${message.content}</div>
         `;
         container.appendChild(card);
       });
     }
 
-    async function loadPulseModeration() {
-      const card = document.getElementById('pulse-moderation-card');
-      if (!card) return;
-      if (!isAdmin()) {
-        card.classList.add('hidden');
-        return;
-      }
-      card.classList.remove('hidden');
-
-      try {
-        pulseModerationQueue = await apiCall('/pulse/moderation');
-        renderPulseModeration();
-      } catch (error) {
-        const container = document.getElementById('pulse-moderation-queue');
-        if (container) {
-          container.innerHTML = '<div class="form-hint">Не вдалося завантажити чергу</div>';
-        }
-      }
-    }
-
-    function renderPulseModeration() {
-      const container = document.getElementById('pulse-moderation-queue');
-      if (!container) return;
-      container.innerHTML = '';
-
-      if (!pulseModerationQueue || pulseModerationQueue.length === 0) {
-        container.innerHTML = '<div class="form-hint">Черга порожня</div>';
-        return;
-      }
-
-      pulseModerationQueue.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'moderation-card';
-        const created = item.created_at ? new Date(item.created_at).toLocaleString('uk-UA') : 'Нещодавно';
-        const reason = item.moderation_reason ? `<div class="form-hint">Причина: ${item.moderation_reason}</div>` : '';
-        card.innerHTML = `
-          <div class="plan-title">${item.room_title}</div>
-          <div class="plan-meta">${created} · ${item.room_slug}</div>
-          <div style="margin-top:0.5rem;">${item.content}</div>
-          ${reason}
-          <div class="toggle-row" style="margin-top:0.75rem;">
-            <button class="btn btn-secondary" data-action="approve" data-id="${item.id}">Approve</button>
-            <button class="btn btn-secondary" data-action="reject" data-id="${item.id}">Reject</button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
 
     // ===== WELLNESS GOALS =====
     // ===== PULSE MESSAGE FORM =====
@@ -5101,7 +5068,7 @@
         }
 
         try {
-          const res = await apiCall(`/pulse/rooms/${activePulseRoom.slug}/messages`, {
+          await apiCall(`/pulse/rooms/${activePulseRoom.slug}/messages`, {
             method: 'POST',
             body: JSON.stringify({
               content,
@@ -5109,46 +5076,74 @@
             }),
           });
           document.getElementById('pulse-message-content').value = '';
-          if (res?.status === 'PENDING') {
-            statusEl.textContent = '⏳ Повідомлення на модерації — зʼявиться після перевірки';
-          } else {
-            statusEl.textContent = '✅ Опубліковано';
-            await loadPulseMessages();
-          }
-          if (isAdmin()) {
-            await loadPulseModeration();
-          }
+          statusEl.textContent = '✅ Опубліковано';
+          await loadPulseMessages();
         } catch (error) {
           statusEl.textContent = '❌ ' + error.message;
         }
       });
     }
 
-    const moderationQueue = document.getElementById('pulse-moderation-queue');
-    if (moderationQueue) {
-      moderationQueue.addEventListener('click', async (e) => {
-        const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
-        const action = btn.dataset.action;
-        const id = btn.dataset.id;
-        if (!id) return;
+    // ===== CREATE ROOM =====
+    const createRoomBtn = document.getElementById('create-room-btn');
+    if (createRoomBtn) {
+      createRoomBtn.addEventListener('click', () => {
+        const modal = document.getElementById('create-room-modal');
+        if (modal) {
+          modal.style.display = 'flex';
+          setTimeout(() => {
+            modal.onclick = (e) => {
+              if (e.target === modal) {
+                closeCreateRoomModal();
+              }
+            };
+          }, 100);
+        }
+      });
+    }
+
+    function closeCreateRoomModal() {
+      const modal = document.getElementById('create-room-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.onclick = null;
+        document.getElementById('create-room-form').reset();
+        document.getElementById('create-room-status').textContent = '';
+      }
+    }
+
+    const createRoomForm = document.getElementById('create-room-form');
+    if (createRoomForm) {
+      createRoomForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('create-room-status');
+        statusEl.textContent = 'Створення...';
+
+        const name = document.getElementById('room-name').value.trim();
+        const description = document.getElementById('room-description').value.trim();
+        const emoji = document.getElementById('room-emoji').value.trim();
+
+        if (!name) {
+          statusEl.textContent = 'Введіть назву кімнати';
+          return;
+        }
 
         try {
-          if (action === 'approve') {
-            await apiCall(`/pulse/messages/${id}/approve`, { method: 'POST' });
-          } else if (action === 'reject') {
-            const reason = prompt('Причина відхилення (опційно):') || '';
-            await apiCall(`/pulse/messages/${id}/reject`, {
-              method: 'POST',
-              body: JSON.stringify({ reason }),
-            });
-          }
-          await loadPulseModeration();
-          if (activePulseRoom) {
-            await loadPulseMessages();
-          }
+          await apiCall('/pulse/rooms', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: name,
+              description: description || null,
+              emoji: emoji || '💬',
+            }),
+          });
+          statusEl.textContent = '✅ Кімнату створено!';
+          setTimeout(() => {
+            closeCreateRoomModal();
+            loadPulseRooms();
+          }, 1000);
         } catch (error) {
-          console.error(error);
+          statusEl.textContent = '❌ ' + error.message;
         }
       });
     }
