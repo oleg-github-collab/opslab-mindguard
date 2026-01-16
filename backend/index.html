@@ -34,6 +34,7 @@
       color: var(--dark);
       line-height: 1.6;
       overflow-x: hidden;
+      padding-top: 90px;
     }
 
     .mono { font-family: 'Space Mono', monospace; }
@@ -43,11 +44,18 @@
       background: linear-gradient(135deg, #fff4ea 0%, #ffffff 55%, #eefbff 100%);
       border-bottom: var(--border) solid var(--dark);
       padding: 1rem 2rem;
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
+      right: 0;
       z-index: 1000;
       box-shadow: 0 6px 0 var(--dark);
       overflow: hidden;
+      transition: transform 0.3s ease-out;
+    }
+
+    .nav.hidden {
+      transform: translateY(-100%);
     }
 
     .nav::before {
@@ -1594,6 +1602,40 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* ===== FOOTER ===== */
+    .app-footer {
+      margin-top: 4rem;
+      padding: 2rem;
+      background: linear-gradient(135deg, #f9f9f9 0%, #ffffff 100%);
+      border-top: 3px solid var(--dark);
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--gray);
+    }
+
+    .footer-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .footer-text {
+      margin-bottom: 0.75rem;
+      line-height: 1.8;
+    }
+
+    .footer-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .footer-link:hover {
+      color: var(--dark);
+      border-bottom-color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -2401,6 +2443,91 @@
       </div>
     </div>
 
+    <!-- ===== FOOTER ===== -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-text">
+          Платформу <strong>MindGuard</strong> створено для <strong>OpsLab</strong> компанією <strong>TeamPulse</strong>
+        </div>
+        <div class="footer-text">
+          Створено на експериментальній мові <a href="#maslo" class="footer-link" onclick="event.preventDefault(); showMASLOPage()">MASLO</a>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ===== MASLO PAGE MODAL ===== -->
+  <div id="maslo-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+      <span class="modal-close" onclick="closeMASLOPage()">&times;</span>
+
+      <h1 style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary);">MASLO</h1>
+      <p style="font-size: 1.2rem; color: var(--gray); margin-bottom: 2rem; font-weight: 500;">
+        Multi-paradigm AI-Aware Statically-typed Low-latency Omni-concurrent
+      </p>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">🚀 Про мову програмування</h2>
+        <p style="margin-bottom: 1rem; line-height: 1.8;">
+          <strong>MASLO</strong> — це експериментальна мова програмування нового покоління, розроблена з фокусом на
+          паралелізм, низьку затримку та безпеку типів. Мова поєднує найкращі практики сучасних мов програмування
+          з інноваційними підходами до управління конкурентністю та інтеграцією з AI.
+        </p>
+
+        <h3 style="font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: var(--dark);">Ключові характеристики</h3>
+        <ul style="margin-left: 1.5rem; line-height: 2;">
+          <li><strong>Multi-paradigm</strong> — підтримка функціонального, об'єктно-орієнтованого та процедурного стилів</li>
+          <li><strong>AI-Aware</strong> — вбудована підтримка машинного навчання та AI-моделей на рівні мови</li>
+          <li><strong>Statically-typed</strong> — строга типізація з потужним виведенням типів для безпеки коду</li>
+          <li><strong>Low-latency</strong> — оптимізація для мінімальної затримки в реальному часі</li>
+          <li><strong>Omni-concurrent</strong> — революційна модель паралельного виконання з автоматичним керуванням потоками</li>
+        </ul>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">🎯 Переваги</h2>
+        <div class="grid grid-2" style="gap: 1rem;">
+          <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--success);">
+            <h4 style="margin-bottom: 0.5rem;">⚡ Продуктивність</h4>
+            <p style="font-size: 0.9rem;">Zero-cost abstractions та ahead-of-time компіляція забезпечують швидкість виконання</p>
+          </div>
+          <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--accent);">
+            <h4 style="margin-bottom: 0.5rem;">🔒 Безпека</h4>
+            <p style="font-size: 0.9rem;">Строга типізація та перевірка пам'яті на етапі компіляції попереджають помилки</p>
+          </div>
+          <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--warning);">
+            <h4 style="margin-bottom: 0.5rem;">🤖 AI Integration</h4>
+            <p style="font-size: 0.9rem;">Нативна підтримка тензорів, моделей та паралельних обчислень для AI</p>
+          </div>
+          <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--primary);">
+            <h4 style="margin-bottom: 0.5rem;">🌐 Паралелізм</h4>
+            <p style="font-size: 0.9rem;">Автоматична оптимізація багатопотокового коду без race conditions</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #fff4ea 0%, #ffffff 100%); border: 3px solid var(--primary);">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">📅 Реліз та розробка</h2>
+        <p style="margin-bottom: 1rem; line-height: 1.8;">
+          На даний момент MASLO перебуває в активній стадії розробки. Створюється власна віртуальна машина
+          з оптимізованим runtime для забезпечення максимальної продуктивності та контролю над виконанням.
+        </p>
+        <div style="padding: 1.5rem; background: white; border: 2px solid var(--dark); box-shadow: 4px 4px 0 var(--dark); margin-top: 1.5rem;">
+          <p style="font-size: 1.1rem; margin: 0; font-weight: 600;">
+            🎉 Перший стабільний реліз на власній віртуальній машині очікується в <span style="color: var(--primary);">листопаді 2026</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">💡 Застосування</h2>
+        <p style="line-height: 1.8;">
+          MASLO ідеально підходить для високонавантажених систем реального часу, AI-додатків,
+          розподілених систем, фінтех-платформ та інших проектів, де критична продуктивність і надійність.
+        </p>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -2797,6 +2924,21 @@
         return;
       }
 
+      // Filter data for regular employees - only show their own data
+      if (!isAdmin()) {
+        const userId = currentUser?.user_id || currentUser?.id;
+        if (userId && teamDashboardData?.months) {
+          teamDashboardData.months = teamDashboardData.months.map(month => {
+            if (month.employees) {
+              month.employees = month.employees.filter(emp =>
+                (emp.userId === userId || emp.user_id === userId || emp.id === userId)
+              );
+            }
+            return month;
+          });
+        }
+      }
+
       const months = getTeamMonthList();
       if (!months.length) {
         if (monthSelector) {
@@ -2919,13 +3061,22 @@
     function updateRiskIndicator(elementId, riskLevel) {
       const element = document.getElementById(elementId);
       if (!element) return;
-      const labels = {
+
+      // Softer language for employees viewing their own data
+      const labels = isAdmin() ? {
         low: 'Низький ризик',
         medium: 'Середній ризик',
         high: 'Високий ризик',
         critical: 'Критичний ризик',
         unknown: 'Н/Д',
+      } : {
+        low: 'Все добре',
+        medium: 'Варто звернути увагу',
+        high: 'Потребує уваги',
+        critical: 'Важливо звернутись до фахівця',
+        unknown: 'Н/Д',
       };
+
       const level = riskLevel || 'unknown';
       element.textContent = labels[level] || 'Н/Д';
       element.className = `risk-indicator risk-${level}`;
@@ -3056,11 +3207,18 @@
     }
 
     function getRiskLabel(risk) {
-      const labels = {
+      // Softer language for employees
+      const labels = isAdmin() ? {
         low: 'Низький',
         medium: 'Середній',
         high: 'Високий',
         critical: 'Критичний',
+        unknown: 'Н/Д',
+      } : {
+        low: 'Добре',
+        medium: 'Звернути увагу',
+        high: 'Потребує уваги',
+        critical: 'Потребує підтримки',
         unknown: 'Н/Д',
       };
       return labels[risk] || 'Невідомо';
@@ -3346,12 +3504,31 @@
 
     async function openEmployeeModal(employeeId) {
       if (!employeeId) return;
+
+      // Regular employees can only view their own data
+      if (!isAdmin()) {
+        const currentUserId = currentUser?.user_id || currentUser?.id;
+        if (employeeId !== currentUserId) {
+          return; // Silently reject access to other employees' data
+        }
+      }
+
       try {
         if (!advancedData) {
           advancedData = await apiCall('/api/employee-data');
         }
       } catch (error) {
         return;
+      }
+
+      // Filter advancedData for regular employees
+      if (!isAdmin()) {
+        const currentUserId = currentUser?.user_id || currentUser?.id;
+        if (advancedData?.employees) {
+          advancedData.employees = advancedData.employees.filter(emp =>
+            (emp.userId === currentUserId || emp.user_id === currentUserId || emp.id === currentUserId)
+          );
+        }
       }
 
       const employee = advancedData?.employees?.find(e => e.userId === employeeId || e.user_id === employeeId || e.id === employeeId);
@@ -5257,6 +5434,30 @@
       await loadApp();
     }
 
+    // ===== MASLO PAGE =====
+    function showMASLOPage() {
+      const modal = document.getElementById('maslo-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        // Add click outside to close
+        setTimeout(() => {
+          modal.onclick = (e) => {
+            if (e.target === modal) {
+              closeMASLOPage();
+            }
+          };
+        }, 100);
+      }
+    }
+
+    function closeMASLOPage() {
+      const modal = document.getElementById('maslo-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.onclick = null;
+      }
+    }
+
     // ===== AUTO-LOAD ON SESSION =====
     (async function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -5278,6 +5479,35 @@
       } catch (error) {
         showLogin();
       }
+    })();
+
+    // Auto-hide header
+    (() => {
+      const nav = document.querySelector('.nav');
+      if (!nav) return;
+
+      let hideTimer = null;
+
+      const scheduleHide = () => {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          nav.classList.add('hidden');
+        }, 2000);
+      };
+
+      const showNav = () => {
+        nav.classList.remove('hidden');
+        clearTimeout(hideTimer);
+      };
+
+      // Start hide timer on page load
+      scheduleHide();
+
+      // Show nav on hover
+      nav.addEventListener('mouseenter', showNav);
+
+      // Restart timer when leaving nav
+      nav.addEventListener('mouseleave', scheduleHide);
     })();
   </script>
 
