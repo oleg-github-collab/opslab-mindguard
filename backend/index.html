@@ -1470,6 +1470,24 @@
       font-size: 0.85rem;
     }
 
+    .heatmap-pinpoints {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.6rem;
+    }
+
+    .pinpoint-badge {
+      display: inline-block;
+      border: 2px solid var(--dark);
+      padding: 0.25rem 0.5rem;
+      background: #fff3cd;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--dark);
+      box-shadow: 2px 2px 0 var(--dark);
+    }
+
     /* ===== ANIMATIONS ===== */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
@@ -5010,7 +5028,9 @@
 
       data.users.forEach(user => {
         const card = document.createElement('div');
-        card.className = 'metric-card';
+        card.className = 'metric-card clickable';
+        card.style.cursor = 'pointer';
+        card.onclick = () => openEmployeeModal(user.user_id);
 
         const status = statusLabel(user.status);
         const earlySignal = user.early_signal
@@ -5019,12 +5039,24 @@
         const actionCards = (user.action_cards || [])
           .map(card => `<div class="action-card"><strong>${card.title}</strong><br>${card.description}</div>`)
           .join('');
+
+        const pinpoints = [];
+        if (user.who5_score < 50) pinpoints.push('Низький WHO-5');
+        if (user.burnout_percentage > 50) pinpoints.push('Ризик вигорання');
+        if (user.phq9_score >= 10) pinpoints.push('Підвищена депресія');
+        if (user.gad7_score >= 10) pinpoints.push('Висока тривожність');
+
+        const pinpointsHtml = pinpoints.length
+          ? `<div class="heatmap-pinpoints">${pinpoints.map(p => `<span class="pinpoint-badge">${p}</span>`).join('')}</div>`
+          : '';
+
         card.innerHTML = `
           <div class="metric-label">${user.name}</div>
           <div class="metric-desc" style="color:${status.color}; font-weight:700;">${status.label}</div>
           <div class="form-hint">WHO-5: ${user.who5_score.toFixed(1)} · Burnout: ${user.burnout_percentage.toFixed(1)}%</div>
           <div class="form-hint">Streak: ${user.streak} днів</div>
           ${earlySignal ? `<div class="form-hint">${earlySignal}</div>` : ''}
+          ${pinpointsHtml}
           ${actionCards}
         `;
 
