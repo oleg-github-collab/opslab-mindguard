@@ -40,13 +40,37 @@
 
     /* ===== NAVIGATION ===== */
     .nav {
-      background: var(--white);
+      background: linear-gradient(135deg, #fff4ea 0%, #ffffff 55%, #eefbff 100%);
       border-bottom: var(--border) solid var(--dark);
       padding: 1rem 2rem;
       position: sticky;
       top: 0;
       z-index: 1000;
-      box-shadow: 0 4px 0 var(--dark);
+      box-shadow: 0 6px 0 var(--dark);
+      overflow: hidden;
+    }
+
+    .nav::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(255, 107, 53, 0.15), transparent 55%);
+      pointer-events: none;
+    }
+
+    .nav::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--dark) 0 14px,
+        var(--primary) 14px 28px,
+        var(--accent) 28px 42px
+      );
     }
 
     .nav-container {
@@ -55,6 +79,8 @@
       display: flex;
       align-items: center;
       gap: 1.5rem;
+      position: relative;
+      z-index: 1;
     }
 
     .nav-left {
@@ -65,21 +91,44 @@
     }
 
     .nav-logo {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 1.55rem;
+      font-weight: 800;
       color: var(--dark);
       text-decoration: none;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.6rem;
+      letter-spacing: -0.02em;
     }
 
-    .nav-tagline {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--gray);
-      border-left: 3px solid var(--dark);
-      padding-left: 0.75rem;
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--dark);
+      background: var(--primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      box-shadow: 4px 4px 0 var(--dark);
+    }
+
+    .logo-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .nav-badge {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dark);
+      background: var(--accent);
+      border: 2px solid var(--dark);
+      padding: 0.35rem 0.6rem;
+      box-shadow: 3px 3px 0 var(--dark);
     }
 
     .nav-panel {
@@ -115,6 +164,10 @@
       align-items: center;
       gap: 0.5rem;
       min-width: 0;
+      border: 3px solid var(--dark);
+      padding: 0.35rem 0.6rem;
+      background: var(--white);
+      box-shadow: 3px 3px 0 var(--dark);
     }
 
     #user-name {
@@ -143,16 +196,18 @@
     }
 
     .nav-link {
-      padding: 0.75rem 1.5rem;
+      padding: 0.65rem 1.35rem;
       border: 3px solid var(--dark);
       background: var(--white);
       color: var(--dark);
       text-decoration: none;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
       transition: all 0.2s;
       box-shadow: 4px 4px 0 var(--dark);
       white-space: nowrap;
+      border-radius: 999px;
+      position: relative;
     }
 
     .nav-link:hover {
@@ -163,6 +218,16 @@
     .nav-link.active {
       background: var(--primary);
       color: var(--white);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: -8px;
+      height: 4px;
+      background: var(--dark);
     }
 
     .btn {
@@ -545,6 +610,10 @@
       padding: 1rem;
     }
 
+    .risk-matrix-container {
+      min-height: 320px;
+    }
+
     .table-container {
       border: 3px solid var(--dark);
       box-shadow: 6px 6px 0 var(--dark);
@@ -585,19 +654,95 @@
     .risk-items {
       display: grid;
       gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
 
     .risk-item {
       border: 3px solid var(--dark);
       box-shadow: 6px 6px 0 var(--dark);
-      padding: 1rem;
+      padding: 1.25rem;
+      background: var(--white);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .risk-item:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 8px 8px 0 var(--dark);
+    }
+
+    .risk-item.critical {
+      background: #ffb3b3;
+      border-color: #dc2626;
+    }
+
+    .risk-item.high {
+      background: #ffd6d6;
+      border-color: #f87171;
+    }
+
+    .risk-item.medium {
+      background: #fff1c2;
+      border-color: #fb923c;
+    }
+
+    .risk-item.low {
+      background: #e8f9e8;
+      border-color: #22c55e;
+    }
+
+    .risk-item-title {
+      font-weight: 800;
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+    }
+
+    .risk-item-description {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #374151;
+    }
+
+    .risk-summary {
+      display: grid;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .risk-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .risk-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 2px solid var(--dark);
+      padding: 0.35rem 0.65rem;
+      font-weight: 800;
       background: var(--white);
     }
 
-    .risk-item.high { background: #ffd6d6; }
-    .risk-item.medium { background: #fff1c2; }
-    .risk-item.low { background: #e8f9e8; }
-    .risk-item.critical { background: #ffb3b3; }
+    .risk-chip-high { background: #ffe1e1; }
+    .risk-chip-medium { background: #fff2c9; }
+    .risk-chip-low { background: #dff7e7; }
+
+    .risk-top {
+      border: 2px dashed var(--dark);
+      padding: 0.75rem;
+      background: #fffaf2;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .risk-meta {
+      font-size: 0.85rem;
+      color: var(--gray);
+    }
 
     .data-meta {
       display: flex;
@@ -619,23 +764,42 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(15, 15, 15, 0.65);
       z-index: 50;
       align-items: center;
       justify-content: center;
       padding: 1.5rem;
+      backdrop-filter: blur(8px);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .modal-content {
-      background: var(--white);
+      background: #fffef9;
       border: 4px solid var(--dark);
-      box-shadow: 8px 8px 0 var(--dark);
-      padding: 1.5rem;
-      max-width: 860px;
-      width: 100%;
-      max-height: 85vh;
+      box-shadow: 12px 12px 0 var(--dark);
+      padding: 2rem;
+      max-width: 1000px;
+      width: min(1000px, 94vw);
+      max-height: 88vh;
       overflow: auto;
       position: relative;
+      animation: slideUp 0.3s ease-out;
     }
 
     .modal-close {
@@ -644,18 +808,119 @@
       top: 0.75rem;
       font-size: 1.5rem;
       cursor: pointer;
+      width: 38px;
+      height: 38px;
+      border: 3px solid var(--dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+      transition: all 0.2s;
+      font-weight: 700;
+    }
+
+    .modal-close:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
+      background: var(--danger);
+      color: var(--white);
+    }
+
+    .modal-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      margin-bottom: 1.25rem;
+      padding-right: 3rem;
+      line-height: 1.3;
+    }
+
+    .modal-notes,
+    .modal-metrics,
+    .modal-chart,
+    .modal-risk {
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 3px dashed var(--dark);
+    }
+
+    .modal-notes h3,
+    .modal-metrics h3,
+    .modal-chart h3,
+    .modal-risk h3 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
     .modal-metrics-grid {
       display: grid;
-      gap: 0.75rem;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.85rem;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     }
 
     .modal-metric {
+      border: 3px solid var(--dark);
+      padding: 0.85rem 1rem;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .modal-metric:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0 var(--dark);
+    }
+
+    .modal-metric .metric-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gray);
+      font-weight: 700;
+    }
+
+    .modal-metric .metric-value {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .modal-pinpoints {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 2px dashed var(--dark);
+    }
+
+    .pinpoint-list {
+      list-style: none;
+      padding: 0;
+      display: grid;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .pinpoint-item {
       border: 2px solid var(--dark);
       padding: 0.75rem;
-      background: var(--gray-light);
+      background: var(--white);
+      box-shadow: 3px 3px 0 var(--dark);
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .pinpoint-title {
+      font-weight: 800;
+    }
+
+    .pinpoint-meta {
+      font-size: 0.85rem;
+      color: var(--gray);
     }
 
     /* ===== ADVANCED ===== */
@@ -1193,7 +1458,7 @@
     /* ===== RESPONSIVE ===== */
     @media (max-width: 980px) {
       .nav-container { flex-wrap: wrap; }
-      .nav-tagline { display: none; }
+      .nav-badge { display: none; }
       .nav-toggle { display: inline-flex; }
       .nav-panel {
         display: none;
@@ -1201,33 +1466,50 @@
         flex-direction: column;
         align-items: stretch;
         gap: 1rem;
-        border-top: 3px solid var(--dark);
-        padding-top: 1rem;
+        border: 3px solid var(--dark);
+        background: var(--white);
+        padding: 1rem;
+        box-shadow: 6px 6px 0 var(--dark);
       }
-      .nav-panel.open { display: flex; }
+      .nav-panel.open { display: flex; animation: fadeIn 0.25s ease-out; }
       .nav-menu { flex-direction: column; align-items: stretch; }
-      .nav-actions { justify-content: space-between; }
+      .nav-actions { justify-content: space-between; flex-wrap: wrap; }
       .nav-link { width: 100%; text-align: center; }
     }
 
     @media (max-width: 768px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-      .month-selector { justify-content: center; }
+      .month-selector { justify-content: center; flex-wrap: wrap; }
       .login-container { padding: 2rem; }
       .card { padding: 1.5rem; }
+      .modal-content { padding: 1.5rem; max-height: 90vh; }
+      .modal-metrics-grid { grid-template-columns: 1fr; }
+      .modal-title { font-size: 1.5rem; }
+      .modal-close { right: 0.75rem; top: 0.75rem; width: 36px; height: 36px; }
+      .risk-chip-row { flex-direction: column; align-items: flex-start; }
+      .risk-items { grid-template-columns: 1fr; }
       .admin-table thead { display: none; }
       .admin-table tr { display: block; margin-bottom: 1rem; }
       .admin-table td { display: flex; justify-content: space-between; gap: 1rem; }
       .admin-table td::before { content: attr(data-label); font-weight: 700; }
-      #employee-table { font-size: 0.8rem; }
-      #employee-table th, #employee-table td { padding: 0.45rem; }
+      #employee-table { font-size: 0.85rem; }
+      #employee-table th, #employee-table td { padding: 0.5rem 0.35rem; }
+      .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
 
     @media (max-width: 560px) {
-      .container { padding: 1.25rem; }
-      .nav { padding: 0.85rem 1rem; }
-      .nav-logo { font-size: 1.2rem; }
-      .btn { padding: 0.6rem 1rem; }
+      .container { padding: 1rem; }
+      .nav { padding: 0.75rem 1rem; }
+      .nav-logo { font-size: 1.15rem; }
+      .logo-mark { width: 32px; height: 32px; font-size: 0.95rem; }
+      .btn { padding: 0.65rem 0.95rem; font-size: 0.9rem; }
+      .modal { padding: 1rem; }
+      .modal-content { padding: 1.25rem; }
+      .modal-title { font-size: 1.35rem; }
+      .card-header { font-size: 1.2rem; }
+      .risk-item { padding: 1rem; }
+      .risk-item-title { font-size: 0.95rem; }
+      .risk-item-description { font-size: 0.9rem; }
     }
 
     /* ===== LOADING ===== */
@@ -1287,8 +1569,11 @@
     <nav class="nav">
       <div class="nav-container">
         <div class="nav-left">
-          <a href="#" class="nav-logo">🧠 OpsLab Mindguard</a>
-          <span class="nav-tagline">TeamPulse Analytics</span>
+          <a href="#" class="nav-logo">
+            <span class="logo-mark">🧠</span>
+            <span class="logo-text">OpsLab Mindguard</span>
+          </a>
+          <span class="nav-badge">TeamPulse Analytics</span>
         </div>
 
         <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel" aria-label="Меню навігації">☰</button>
@@ -1536,50 +1821,6 @@
             <div class="modal-notes">
               <h3>Примітки</h3>
               <p id="modalNotes"></p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card" id="wellness-card">
-          <div class="card-header">🌿 Wellness OS · План + Цілі</div>
-          <p style="color: var(--gray); margin-bottom: 1.5rem;">
-            Персональний план на день, який адаптується до метрик, сну та стресу.
-          </p>
-          <div class="grid grid-2">
-            <div>
-              <h4 style="margin-bottom: 0.5rem;">План на сьогодні</h4>
-              <div id="wellness-plan" class="plan-list">
-                <div class="form-hint">Завантаження плану...</div>
-              </div>
-              <div class="toggle-row">
-                <button id="complete-plan-btn" class="btn btn-secondary" type="button">Позначити виконаним</button>
-                <span id="wellness-plan-status" class="form-hint"></span>
-              </div>
-            </div>
-            <div>
-              <h4 style="margin-bottom: 0.5rem;">Wellbeing goals</h4>
-              <form id="wellness-goals-form">
-                <div class="form-group">
-                  <label for="goal-sleep">Сон (год/ніч)</label>
-                  <input id="goal-sleep" type="number" min="4" max="10" step="1" />
-                </div>
-                <div class="form-group">
-                  <label for="goal-breaks">Пауза / день (кількість)</label>
-                  <input id="goal-breaks" type="number" min="1" max="10" step="1" />
-                </div>
-                <div class="form-group">
-                  <label for="goal-move">Рух (хв / день)</label>
-                  <input id="goal-move" type="number" min="5" max="120" step="5" />
-                </div>
-                <div class="toggle-row">
-                  <input type="checkbox" id="goal-notifications" />
-                  <label for="goal-notifications">Gentle nudges</label>
-                </div>
-                <div class="toggle-row">
-                  <button type="submit" class="btn btn-primary">Зберегти цілі</button>
-                  <span id="wellness-goals-status" class="form-hint"></span>
-                </div>
-              </form>
             </div>
           </div>
         </div>
@@ -1877,7 +2118,7 @@
             <div class="chart-container risk-matrix-container">
               <canvas id="riskBubbleChart"></canvas>
             </div>
-            <p class="chart-comment" id="riskComment">Дані оновлюються...</p>
+            <div class="risk-summary" id="riskComment">Дані оновлюються...</div>
           </div>
         </section>
 
@@ -1986,6 +2227,10 @@
             <div class="modal-metrics">
               <h3>Розкладання ризику</h3>
               <div class="modal-metrics-grid" id="riskMetrics"></div>
+            </div>
+            <div class="modal-pinpoints">
+              <h3>Пінпоінти</h3>
+              <ul id="riskPinpoints" class="pinpoint-list"></ul>
             </div>
           </div>
         </div>
@@ -2354,7 +2599,6 @@
       await loadTeamDashboardData();
       await loadTelegramStatus();
       await Promise.allSettled([
-        loadWellnessData(),
         loadInsights(),
         loadKudos(),
       ]);
@@ -3554,18 +3798,79 @@
         acc[p.risk] = (acc[p.risk] || 0) + 1;
         return acc;
       }, {});
-      const topRisk = points.slice().sort((a, b) => (b.y + b.x) - (a.y + a.x))[0];
-      const riskComment = points.length
-        ? `Ризики: high ${counts.high || 0}, medium ${counts.medium || 0}, low ${counts.low || 0}. Найвищий ризик: ${topRisk?.name || '—'}.`
-        : 'Недостатньо даних для матриці ризиків.';
+      const riskWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+      const scoreRisk = (p) => (riskWeight[p.risk] || 0) * 100 + p.y + p.x + p.phq9;
+      const sorted = points.slice().sort((a, b) => scoreRisk(b) - scoreRisk(a));
+      const topRisk = sorted[0];
+
       const riskEl = document.getElementById('riskComment');
-      if (riskEl) riskEl.textContent = riskComment;
+      if (riskEl) {
+        riskEl.innerHTML = '';
+        if (!points.length) {
+          riskEl.innerHTML = '<div class="form-hint">Недостатньо даних для матриці ризиків.</div>';
+        } else {
+          const row = document.createElement('div');
+          row.className = 'risk-chip-row';
+          const highChip = document.createElement('span');
+          highChip.className = 'risk-chip risk-chip-high';
+          highChip.innerHTML = `High <span class="mono">${counts.high || 0}</span>`;
+          const mediumChip = document.createElement('span');
+          mediumChip.className = 'risk-chip risk-chip-medium';
+          mediumChip.innerHTML = `Medium <span class="mono">${counts.medium || 0}</span>`;
+          const lowChip = document.createElement('span');
+          lowChip.className = 'risk-chip risk-chip-low';
+          lowChip.innerHTML = `Low <span class="mono">${counts.low || 0}</span>`;
+          row.append(highChip, mediumChip, lowChip);
+
+          const top = document.createElement('div');
+          top.className = 'risk-top';
+          const topLine = document.createElement('div');
+          topLine.textContent = 'Найвищий ризик:';
+          const topName = document.createElement('strong');
+          topName.textContent = topRisk?.name || '—';
+          const meta = document.createElement('div');
+          meta.className = 'risk-meta';
+          meta.textContent = topRisk
+            ? `MBI ${topRisk.y.toFixed(0)}% · Стрес ${topRisk.x.toFixed(0)}/40 · PHQ-9 ${topRisk.phq9.toFixed(0)}`
+            : '—';
+          top.append(topLine, topName, meta);
+
+          riskEl.append(row, top);
+        }
+      }
+
+      const pinpointsEl = document.getElementById('riskPinpoints');
+      if (pinpointsEl) {
+        pinpointsEl.innerHTML = '';
+        if (!sorted.length) {
+          pinpointsEl.innerHTML = '<li class="form-hint">Немає даних для пінпоінтів.</li>';
+        } else {
+          sorted.slice(0, 3).forEach((item) => {
+            const li = document.createElement('li');
+            li.className = 'pinpoint-item';
+            const title = document.createElement('div');
+            title.className = 'pinpoint-title';
+            title.textContent = item.name;
+            const meta = document.createElement('div');
+            meta.className = 'pinpoint-meta';
+            meta.textContent = `MBI ${item.y.toFixed(0)}% · Стрес ${item.x.toFixed(0)}/40 · PHQ-9 ${item.phq9.toFixed(0)}`;
+            li.append(title, meta);
+            pinpointsEl.appendChild(li);
+          });
+        }
+      }
 
       const modalMetrics = [
         { key: 'mbi', label: 'High', value: counts.high || 0 },
         { key: 'mbi', label: 'Medium', value: counts.medium || 0 },
         { key: 'mbi', label: 'Low', value: counts.low || 0 },
-        { key: 'mbi', label: 'Найвищий ризик', value: topRisk ? `${topRisk.name} · MBI ${topRisk.y.toFixed(0)}%, стрес ${topRisk.x}/40` : '—' },
+        {
+          key: 'mbi',
+          label: 'Найвищий ризик',
+          value: topRisk
+            ? `${topRisk.name} · MBI ${topRisk.y.toFixed(0)}%`
+            : '—',
+        },
       ];
       fillMetricsGrid('riskMetrics', modalMetrics);
       const riskSummary = document.getElementById('riskSummary');
@@ -4002,69 +4307,6 @@
     }
 
     // ===== WELLNESS =====
-    async function loadWellnessData() {
-      try {
-        const [goals, plan] = await Promise.all([
-          apiCall('/wellness/goals'),
-          apiCall('/wellness/plan'),
-        ]);
-        wellnessGoals = goals;
-        wellnessPlan = plan;
-        renderWellness();
-      } catch (error) {
-        const container = document.getElementById('wellness-plan');
-        if (container) {
-          container.innerHTML = '<div class="form-hint">Не вдалося завантажити план</div>';
-        }
-      }
-    }
-
-    function renderWellness() {
-      const planContainer = document.getElementById('wellness-plan');
-      const planStatus = document.getElementById('wellness-plan-status');
-      const completeBtn = document.getElementById('complete-plan-btn');
-
-      if (planContainer) {
-        planContainer.innerHTML = '';
-        const items = wellnessPlan?.items || [];
-        if (!items.length) {
-          planContainer.innerHTML = '<div class="form-hint">План буде доступний після чекіну</div>';
-        } else {
-          items.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'plan-item';
-            const duration = item.duration_minutes ? ` · ${item.duration_minutes} хв` : '';
-            card.innerHTML = `
-              <div class="plan-title">${item.title}${duration}</div>
-              <div class="plan-meta">${item.description}</div>
-            `;
-            planContainer.appendChild(card);
-          });
-        }
-      }
-
-      if (planStatus && completeBtn) {
-        if (wellnessPlan?.completed_at) {
-          planStatus.textContent = '✅ План виконано';
-          completeBtn.disabled = true;
-        } else {
-          planStatus.textContent = '';
-          completeBtn.disabled = false;
-        }
-      }
-
-      if (wellnessGoals) {
-        const sleepInput = document.getElementById('goal-sleep');
-        const breakInput = document.getElementById('goal-breaks');
-        const moveInput = document.getElementById('goal-move');
-        const notifyInput = document.getElementById('goal-notifications');
-        if (sleepInput) sleepInput.value = wellnessGoals.sleep_target ?? 7;
-        if (breakInput) breakInput.value = wellnessGoals.break_target ?? 3;
-        if (moveInput) moveInput.value = wellnessGoals.move_target ?? 20;
-        if (notifyInput) notifyInput.checked = !!wellnessGoals.notifications_enabled;
-      }
-    }
-
     // ===== INSIGHTS =====
     async function loadInsights() {
       try {
@@ -4446,48 +4688,6 @@
     }
 
     // ===== WELLNESS GOALS =====
-    const wellnessGoalsForm = document.getElementById('wellness-goals-form');
-    if (wellnessGoalsForm) {
-      wellnessGoalsForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const statusEl = document.getElementById('wellness-goals-status');
-        statusEl.textContent = 'Збереження...';
-
-        const payload = {
-          sleep_target: parseInt(document.getElementById('goal-sleep').value, 10),
-          break_target: parseInt(document.getElementById('goal-breaks').value, 10),
-          move_target: parseInt(document.getElementById('goal-move').value, 10),
-          notifications_enabled: document.getElementById('goal-notifications').checked,
-        };
-
-        try {
-          wellnessGoals = await apiCall('/wellness/goals', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          });
-          statusEl.textContent = '✅ Збережено';
-          renderWellness();
-        } catch (error) {
-          statusEl.textContent = '❌ ' + error.message;
-        }
-      });
-    }
-
-    const completePlanBtn = document.getElementById('complete-plan-btn');
-    if (completePlanBtn) {
-      completePlanBtn.addEventListener('click', async () => {
-        const statusEl = document.getElementById('wellness-plan-status');
-        statusEl.textContent = 'Збереження...';
-        try {
-          await apiCall('/wellness/plan/complete', { method: 'POST' });
-          await loadWellnessData();
-          statusEl.textContent = '✅ План виконано';
-        } catch (error) {
-          statusEl.textContent = '❌ ' + error.message;
-        }
-      });
-    }
-
     // ===== KUDOS FORM =====
     const kudosForm = document.getElementById('kudos-form');
     if (kudosForm) {
