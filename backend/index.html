@@ -39,6 +39,23 @@
 
     .mono { font-family: 'Space Mono', monospace; }
 
+    /* ===== ACCESS CONTROL ===== */
+    .admin-only {
+      display: block !important;
+    }
+
+    .employee-only {
+      display: none !important;
+    }
+
+    body.employee-view .admin-only {
+      display: none !important;
+    }
+
+    body.employee-view .employee-only {
+      display: block !important;
+    }
+
     /* ===== NAVIGATION ===== */
     .nav {
       background: linear-gradient(135deg, #fff4ea 0%, #ffffff 55%, #eefbff 100%);
@@ -1739,7 +1756,21 @@
           </div>
         </div>
 
-        <div class="card" id="team-dashboard-card">
+        <!-- Employee Personal Data Card -->
+        <div class="card employee-only" id="employee-personal-card">
+          <div class="card-header">🧠 Мої показники</div>
+          <div id="employee-no-data-message" class="hidden" style="padding: 2rem; text-align: center; color: var(--gray);">
+            <p style="font-size: 1.1rem; margin-bottom: 1rem;">📊 Дані з'являться тут після проходження опитувань</p>
+            <p>Пройдіть кілька щоденних чекінів через Telegram бот, щоб система могла згенерувати аналітику вашого ментального здоров'я.</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;">Рекомендуємо пройти мінімум 5-7 чекінів для якісної аналітики.</p>
+          </div>
+          <div id="employee-personal-data" class="hidden">
+            <!-- Personal metrics will be injected here -->
+          </div>
+        </div>
+
+        <!-- Admin Team Dashboard Card -->
+        <div class="card admin-only" id="team-dashboard-card">
           <div class="card-header">📊 TeamPulse Mindguard Analytics</div>
           <p style="color: var(--gray); margin-bottom: 1.5rem;">
             Повна аналітика ментального здоров'я за всі місяці з деталями по ключових метриках.
@@ -1863,14 +1894,14 @@
           </section>
         </div>
 
-        <div class="card">
+        <div class="card admin-only">
           <div class="card-header">📈 Динаміка команди</div>
           <div class="chart-container" style="position: relative; height: 420px;">
             <canvas id="teamTrendChart"></canvas>
           </div>
         </div>
 
-        <div class="card" id="employee-analysis-card">
+        <div class="card admin-only" id="employee-analysis-card">
           <div class="card-header">🧑‍🤝‍🧑 Аналіз працівників</div>
           <div id="employee-month-selector" class="employee-month-selector"></div>
           <div class="table-container">
@@ -1898,7 +1929,7 @@
           </div>
         </div>
 
-        <div class="card" id="risk-assessment-card">
+        <div class="card admin-only" id="risk-assessment-card">
           <div class="card-header">⚠️ Оцінка ризиків</div>
           <div class="risk-items" id="risk-items">
             <div class="risk-item medium">
@@ -1943,7 +1974,24 @@
           </div>
         </div>
 
-        <div class="card" id="insights-card">
+        <!-- Quick Links for Employees -->
+        <div class="card employee-only">
+          <div class="card-header">🔗 Корисні посилання</div>
+          <div class="grid grid-2" style="gap: 1.5rem;">
+            <a href="#" onclick="event.preventDefault(); switchSection('pulse');" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 1.5rem;">
+              🗣 <span style="margin-left: 0.5rem;">Pulse Rooms</span>
+            </a>
+            <a href="https://opslab-feedback-production.up.railway.app/" target="_blank" rel="noopener" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 1.5rem;">
+              💬 <span style="margin-left: 0.5rem;">Wall of Cries</span>
+            </a>
+          </div>
+          <p style="margin-top: 1rem; color: var(--gray); font-size: 0.9rem;">
+            <strong>Pulse Rooms</strong> — анонімні кімнати для фідбеку та ідей<br>
+            <strong>Wall of Cries</strong> — конфіденційна стіна плачу для важливих сигналів
+          </p>
+        </div>
+
+        <div class="card admin-only" id="insights-card">
           <div class="card-header">🔍 Персональні інсайти</div>
           <div class="grid grid-2">
             <div>
@@ -2017,7 +2065,78 @@
                 </div>
                 <div class="form-group">
                   <label for="timezone-input">Часовий пояс</label>
-                  <input type="text" id="timezone-input" placeholder="Europe/Kyiv або UTC+2" />
+                  <select id="timezone-input">
+                    <option value="">Оберіть часовий пояс...</option>
+                    <optgroup label="Європа">
+                      <option value="Europe/Kyiv">Europe/Kyiv (Київ, UTC+2/+3)</option>
+                      <option value="Europe/London">Europe/London (Лондон, UTC+0/+1)</option>
+                      <option value="Europe/Paris">Europe/Paris (Париж, UTC+1/+2)</option>
+                      <option value="Europe/Berlin">Europe/Berlin (Берлін, UTC+1/+2)</option>
+                      <option value="Europe/Moscow">Europe/Moscow (Москва, UTC+3)</option>
+                      <option value="Europe/Istanbul">Europe/Istanbul (Стамбул, UTC+3)</option>
+                      <option value="Europe/Warsaw">Europe/Warsaw (Варшава, UTC+1/+2)</option>
+                      <option value="Europe/Bucharest">Europe/Bucharest (Бухарест, UTC+2/+3)</option>
+                      <option value="Europe/Athens">Europe/Athens (Афіни, UTC+2/+3)</option>
+                      <option value="Europe/Helsinki">Europe/Helsinki (Гельсінкі, UTC+2/+3)</option>
+                    </optgroup>
+                    <optgroup label="Америка">
+                      <option value="America/New_York">America/New_York (Нью-Йорк, UTC-5/-4)</option>
+                      <option value="America/Chicago">America/Chicago (Чикаго, UTC-6/-5)</option>
+                      <option value="America/Denver">America/Denver (Денвер, UTC-7/-6)</option>
+                      <option value="America/Los_Angeles">America/Los_Angeles (Лос-Анджелес, UTC-8/-7)</option>
+                      <option value="America/Toronto">America/Toronto (Торонто, UTC-5/-4)</option>
+                      <option value="America/Sao_Paulo">America/Sao_Paulo (Сан-Паулу, UTC-3)</option>
+                      <option value="America/Mexico_City">America/Mexico_City (Мехіко, UTC-6/-5)</option>
+                    </optgroup>
+                    <optgroup label="Азія">
+                      <option value="Asia/Dubai">Asia/Dubai (Дубай, UTC+4)</option>
+                      <option value="Asia/Kolkata">Asia/Kolkata (Мумбаї, UTC+5:30)</option>
+                      <option value="Asia/Shanghai">Asia/Shanghai (Шанхай, UTC+8)</option>
+                      <option value="Asia/Tokyo">Asia/Tokyo (Токіо, UTC+9)</option>
+                      <option value="Asia/Singapore">Asia/Singapore (Сінгапур, UTC+8)</option>
+                      <option value="Asia/Hong_Kong">Asia/Hong_Kong (Гонконг, UTC+8)</option>
+                      <option value="Asia/Seoul">Asia/Seoul (Сеул, UTC+9)</option>
+                      <option value="Asia/Bangkok">Asia/Bangkok (Бангкок, UTC+7)</option>
+                      <option value="Asia/Jakarta">Asia/Jakarta (Джакарта, UTC+7)</option>
+                    </optgroup>
+                    <optgroup label="Океанія">
+                      <option value="Australia/Sydney">Australia/Sydney (Сідней, UTC+10/+11)</option>
+                      <option value="Australia/Melbourne">Australia/Melbourne (Мельбурн, UTC+10/+11)</option>
+                      <option value="Pacific/Auckland">Pacific/Auckland (Окленд, UTC+12/+13)</option>
+                    </optgroup>
+                    <optgroup label="Африка">
+                      <option value="Africa/Cairo">Africa/Cairo (Каїр, UTC+2)</option>
+                      <option value="Africa/Johannesburg">Africa/Johannesburg (Йоганнесбург, UTC+2)</option>
+                      <option value="Africa/Lagos">Africa/Lagos (Лагос, UTC+1)</option>
+                    </optgroup>
+                    <optgroup label="UTC">
+                      <option value="UTC">UTC (Координований всесвітній час)</option>
+                      <option value="Etc/GMT+12">UTC-12</option>
+                      <option value="Etc/GMT+11">UTC-11</option>
+                      <option value="Etc/GMT+10">UTC-10</option>
+                      <option value="Etc/GMT+9">UTC-9</option>
+                      <option value="Etc/GMT+8">UTC-8</option>
+                      <option value="Etc/GMT+7">UTC-7</option>
+                      <option value="Etc/GMT+6">UTC-6</option>
+                      <option value="Etc/GMT+5">UTC-5</option>
+                      <option value="Etc/GMT+4">UTC-4</option>
+                      <option value="Etc/GMT+3">UTC-3</option>
+                      <option value="Etc/GMT+2">UTC-2</option>
+                      <option value="Etc/GMT+1">UTC-1</option>
+                      <option value="Etc/GMT-1">UTC+1</option>
+                      <option value="Etc/GMT-2">UTC+2</option>
+                      <option value="Etc/GMT-3">UTC+3</option>
+                      <option value="Etc/GMT-4">UTC+4</option>
+                      <option value="Etc/GMT-5">UTC+5</option>
+                      <option value="Etc/GMT-6">UTC+6</option>
+                      <option value="Etc/GMT-7">UTC+7</option>
+                      <option value="Etc/GMT-8">UTC+8</option>
+                      <option value="Etc/GMT-9">UTC+9</option>
+                      <option value="Etc/GMT-10">UTC+10</option>
+                      <option value="Etc/GMT-11">UTC+11</option>
+                      <option value="Etc/GMT-12">UTC+12</option>
+                    </optgroup>
+                  </select>
                 </div>
                 <div class="toggle-row">
                   <input type="checkbox" id="notifications-enabled" />
@@ -2722,11 +2841,15 @@
         if (advancedLink) {
           advancedLink.classList.remove('hidden');
         }
+        // Admin view - show all sections
+        document.body.classList.remove('employee-view');
       } else {
         adminLink.classList.add('hidden');
         if (advancedLink) {
           advancedLink.classList.add('hidden');
         }
+        // Employee view - hide admin sections
+        document.body.classList.add('employee-view');
       }
 
       // Load initial data
@@ -2753,7 +2876,104 @@
 
       if (isAdmin()) {
         await loadTeamHeatmap();
+      } else {
+        // For employees, load and display personal data
+        await loadEmployeePersonalData();
       }
+    }
+
+    // ===== EMPLOYEE PERSONAL DATA =====
+    async function loadEmployeePersonalData() {
+      const noDataMsg = document.getElementById('employee-no-data-message');
+      const personalDataContainer = document.getElementById('employee-personal-data');
+
+      if (!noDataMsg || !personalDataContainer) return;
+
+      // Get employee data from filtered teamDashboardData
+      const currentUserId = currentUser?.user_id || currentUser?.id;
+      if (!teamDashboardData || !teamDashboardData.months) {
+        noDataMsg.classList.remove('hidden');
+        personalDataContainer.classList.add('hidden');
+        return;
+      }
+
+      // Find employee data across all months
+      let hasAnyData = false;
+      let latestData = null;
+
+      for (const month of teamDashboardData.months) {
+        if (month.employees && month.employees.length > 0) {
+          const emp = month.employees.find(e =>
+            e.userId === currentUserId || e.user_id === currentUserId || e.id === currentUserId
+          );
+          if (emp && (emp.hasData || emp.has_data || hasMetricData(emp))) {
+            hasAnyData = true;
+            latestData = emp;
+            break;
+          }
+        }
+      }
+
+      if (!hasAnyData || !latestData) {
+        noDataMsg.classList.remove('hidden');
+        personalDataContainer.classList.add('hidden');
+        return;
+      }
+
+      // Show personal data
+      noDataMsg.classList.add('hidden');
+      personalDataContainer.classList.remove('hidden');
+
+      // Render personal metrics
+      const html = `
+        <div class="metrics-grid" style="margin-bottom: 1.5rem;">
+          <div class="metric-card">
+            <div class="metric-label">WHO-5 Благополуччя</div>
+            <div class="metric-value ${getScoreClass('who5', latestData.who5)}">${metricOrDash(latestData.who5)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('who5', latestData.who5)}">${getRiskLabel(getRiskLevel('who5', latestData.who5))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">PHQ-9 Депресія</div>
+            <div class="metric-value ${getScoreClass('phq9', latestData.phq9)}">${metricOrDash(latestData.phq9)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('phq9', latestData.phq9)}">${getRiskLabel(getRiskLevel('phq9', latestData.phq9))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">GAD-7 Тривожність</div>
+            <div class="metric-value ${getScoreClass('gad7', latestData.gad7)}">${metricOrDash(latestData.gad7)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('gad7', latestData.gad7)}">${getRiskLabel(getRiskLevel('gad7', latestData.gad7))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">MBI Вигорання</div>
+            <div class="metric-value ${getScoreClass('mbi', latestData.mbi)}">${metricOrDash(latestData.mbi, '%')}</div>
+            <span class="risk-indicator risk-${getRiskLevel('mbi', latestData.mbi)}">${getRiskLabel(getRiskLevel('mbi', latestData.mbi))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Сон (годин)</div>
+            <div class="metric-value ${getScoreClass('sleepDuration', latestData.sleepDuration)}">${metricOrDash(latestData.sleepDuration)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('sleepDuration', latestData.sleepDuration)}">${getRiskLabel(getRiskLevel('sleepDuration', latestData.sleepDuration))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Якість сну</div>
+            <div class="metric-value ${getScoreClass('sleepQuality', latestData.sleepQuality)}">${metricOrDash(latestData.sleepQuality)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('sleepQuality', latestData.sleepQuality)}">${getRiskLabel(getRiskLevel('sleepQuality', latestData.sleepQuality))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Work-Life баланс</div>
+            <div class="metric-value ${getScoreClass('workLifeBalance', latestData.workLifeBalance)}">${metricOrDash(latestData.workLifeBalance)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('workLifeBalance', latestData.workLifeBalance)}">${getRiskLabel(getRiskLevel('workLifeBalance', latestData.workLifeBalance))}</span>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Рівень стресу</div>
+            <div class="metric-value ${getScoreClass('stressLevel', latestData.stressLevel)}">${metricOrDash(latestData.stressLevel)}</div>
+            <span class="risk-indicator risk-${getRiskLevel('stressLevel', latestData.stressLevel)}">${getRiskLabel(getRiskLevel('stressLevel', latestData.stressLevel))}</span>
+          </div>
+        </div>
+        <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--primary);">
+          <p style="margin: 0; font-size: 0.9rem;">💡 Ваші дані конфіденційні. Вони доступні тільки вам та адміністрації для надання підтримки при необхідності.</p>
+        </div>
+      `;
+
+      personalDataContainer.innerHTML = html;
     }
 
     // ===== TEAM DASHBOARD =====
@@ -5487,11 +5707,14 @@
       if (!nav) return;
 
       let hideTimer = null;
+      let isNearTop = false;
 
       const scheduleHide = () => {
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => {
-          nav.classList.add('hidden');
+          if (!isNearTop) {
+            nav.classList.add('hidden');
+          }
         }, 2000);
       };
 
@@ -5500,14 +5723,30 @@
         clearTimeout(hideTimer);
       };
 
+      // Track mouse position to show header when near top
+      document.addEventListener('mousemove', (e) => {
+        isNearTop = e.clientY < 100;
+        if (isNearTop) {
+          showNav();
+        } else if (!nav.matches(':hover')) {
+          scheduleHide();
+        }
+      });
+
       // Start hide timer on page load
       scheduleHide();
 
       // Show nav on hover
-      nav.addEventListener('mouseenter', showNav);
+      nav.addEventListener('mouseenter', () => {
+        showNav();
+        isNearTop = true;
+      });
 
       // Restart timer when leaving nav
-      nav.addEventListener('mouseleave', scheduleHide);
+      nav.addEventListener('mouseleave', () => {
+        isNearTop = false;
+        scheduleHide();
+      });
     })();
   </script>
 
