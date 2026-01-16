@@ -756,10 +756,6 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             send_settings(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
             }
-            "/kudos" => {
-                handle_kudos_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
-                return Ok(());
-            }
             "/plan" => {
             send_wellness_plan(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());

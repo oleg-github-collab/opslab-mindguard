@@ -355,6 +355,20 @@
       margin-top: 0.5rem;
     }
 
+    .metric-pinpoints {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 2px dashed var(--gray-light);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #4b5563;
+      min-height: 24px;
+    }
+
+    .metric-pinpoints:empty {
+      display: none;
+    }
+
     .badge-success { background: var(--success); }
     .badge-warning { background: var(--warning); }
     .badge-danger { background: var(--danger); }
@@ -1702,6 +1716,7 @@
                 <div class="metric-value" id="who5-value">—</div>
                 <div class="metric-description">Середній показник</div>
                 <span class="risk-indicator" id="who5-risk">—</span>
+                <div class="metric-pinpoints" id="who5-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1714,6 +1729,7 @@
                 <div class="metric-value" id="phq9-value">—</div>
                 <div class="metric-description">Середній показник</div>
                 <span class="risk-indicator" id="phq9-risk">—</span>
+                <div class="metric-pinpoints" id="phq9-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1726,6 +1742,7 @@
                 <div class="metric-value" id="gad7-value">—</div>
                 <div class="metric-description">Середній показник</div>
                 <span class="risk-indicator" id="gad7-risk">—</span>
+                <div class="metric-pinpoints" id="gad7-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1738,6 +1755,7 @@
                 <div class="metric-value" id="mbi-value">—</div>
                 <div class="metric-description">Середній показник (%)</div>
                 <span class="risk-indicator" id="mbi-risk">—</span>
+                <div class="metric-pinpoints" id="mbi-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1750,6 +1768,7 @@
                 <div class="metric-value" id="sleep-duration-value">—</div>
                 <div class="metric-description">Середня кількість годин</div>
                 <span class="risk-indicator" id="sleep-duration-risk">—</span>
+                <div class="metric-pinpoints" id="sleep-duration-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1762,6 +1781,7 @@
                 <div class="metric-value" id="sleep-quality-value">—</div>
                 <div class="metric-description">Середня оцінка (1-10)</div>
                 <span class="risk-indicator" id="sleep-quality-risk">—</span>
+                <div class="metric-pinpoints" id="sleep-quality-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1774,6 +1794,7 @@
                 <div class="metric-value" id="work-life-value">—</div>
                 <div class="metric-description">Середня оцінка (1-10)</div>
                 <span class="risk-indicator" id="work-life-risk">—</span>
+                <div class="metric-pinpoints" id="work-life-pinpoints"></div>
               </div>
 
               <div class="metric-card">
@@ -1786,6 +1807,7 @@
                 <div class="metric-value" id="stress-value">—</div>
                 <div class="metric-description">Середній показник (0-40)</div>
                 <span class="risk-indicator" id="stress-risk">—</span>
+                <div class="metric-pinpoints" id="stress-pinpoints"></div>
               </div>
             </div>
           </section>
@@ -1885,56 +1907,6 @@
           <div id="early-signal-banner" class="insight-banner hidden"></div>
         </div>
 
-        <div class="card" id="kudos-card">
-          <div class="card-header">🎉 Kudos + Recognition</div>
-          <p style="color: var(--gray); margin-bottom: 0.75rem;">
-            Kudos — це коротка подяка за конкретну дію або підтримку. Вона підсилює довіру та допомагає бачити внесок один одного.
-          </p>
-          <div class="form-hint" style="margin-bottom: 1rem;">
-            <strong>Як працює:</strong>
-            <ul style="margin: 0.5rem 0 0 1.2rem;">
-              <li>Напишіть 1-2 речення: що зробив колега і який був ефект.</li>
-              <li>Отримувач бачить kudos у вебі та в тижневому підсумку.</li>
-              <li>Це не оцінювання — лише вдячність і підтримка.</li>
-            </ul>
-          </div>
-          <div class="grid grid-2">
-            <form id="kudos-form">
-              <div class="form-group">
-                <label for="kudos-email">Email колеги</label>
-                <input id="kudos-email" type="email" placeholder="colleague@opslab.uk" required />
-              </div>
-              <div class="form-group">
-                <label for="kudos-message">Повідомлення</label>
-                <textarea id="kudos-message" rows="3" maxlength="500" placeholder="Дякую за підтримку на демо — це допомогло швидко закрити рішення." required></textarea>
-                <div class="form-hint">Пишіть коротко і конкретно: дія → вплив.</div>
-              </div>
-              <div class="toggle-row">
-                <button type="submit" class="btn btn-success">Надіслати kudos</button>
-                <span id="kudos-status" class="form-hint"></span>
-              </div>
-            </form>
-            <div>
-              <h4 style="margin-bottom: 0.5rem;">Інсайти визнання</h4>
-              <div id="kudos-insights" class="tag-row">
-                <span class="form-hint">Завантаження...</span>
-              </div>
-              <div id="kudos-summary" class="form-hint" style="margin-top: 0.75rem;"></div>
-              <div class="form-hint">Топ теми та люди, які найчастіше дякують.</div>
-            </div>
-          </div>
-          <div class="grid grid-2" style="margin-top: 1.5rem;">
-            <div>
-              <h4 style="margin-bottom: 0.5rem;">Отримані kudos</h4>
-              <div id="kudos-received" class="kudos-list"></div>
-            </div>
-            <div>
-              <h4 style="margin-bottom: 0.5rem;">Надіслані kudos</h4>
-              <div id="kudos-sent" class="kudos-list"></div>
-            </div>
-          </div>
-        </div>
-
         <!-- Telegram Bot Info -->
         <div class="card">
           <div class="card-header">🤖 Telegram Bot Integration</div>
@@ -1954,9 +1926,6 @@
                 <li class="mono" style="margin: 0.5rem 0;">🌍 /timezone - Часовий пояс</li>
                 <li class="mono" style="margin: 0.5rem 0;">🔔 /notify - Нагадування on/off</li>
                 <li class="mono" style="margin: 0.5rem 0;">⚙️ /settings - Налаштування</li>
-                <li class="mono" style="margin: 0.5rem 0;">🎉 /kudos - Подяка колезі (1-2 речення)</li>
-                <li class="mono" style="margin: 0.5rem 0;">🌿 /plan - План Wellness OS</li>
-                <li class="mono" style="margin: 0.5rem 0;">🎯 /goals - Персональні цілі</li>
                 <li class="mono" style="margin: 0.5rem 0;">🗣 /pulse - Анонімні кімнати для фідбеку</li>
                 <li class="mono" style="margin: 0.5rem 0;">✨ /insight - Персональний інсайт</li>
               </ul>
@@ -2439,7 +2408,6 @@
     let wellnessPlan = null;
     let wellnessGoals = null;
     let insights = { selfBenchmark: null, correlations: [], earlySignal: null };
-    let kudosData = null;
     let pulseRooms = [];
     let activePulseRoom = null;
     let pulseMessages = [];
@@ -2641,7 +2609,6 @@
       await loadTelegramStatus();
       await Promise.allSettled([
         loadInsights(),
-        loadKudos(),
       ]);
 
       if (isAdmin()) {
@@ -3005,9 +2972,41 @@
 
         document.getElementById('stress-value').textContent = metricOrDash(avg.stressLevel);
         updateRiskIndicator('stress-risk', getRiskLevel('stressLevel', avg.stressLevel));
+
+        // Pinpoints для кожної метрики
+        updateMetricPinpoints('who5-pinpoints', 'who5', avg.who5, data);
+        updateMetricPinpoints('phq9-pinpoints', 'phq9', avg.phq9, data);
+        updateMetricPinpoints('gad7-pinpoints', 'gad7', avg.gad7, data);
+        updateMetricPinpoints('mbi-pinpoints', 'mbi', avg.mbi, data);
+        updateMetricPinpoints('sleep-duration-pinpoints', 'sleepDuration', avg.sleepDuration, data);
+        updateMetricPinpoints('sleep-quality-pinpoints', 'sleepQuality', avg.sleepQuality, data);
+        updateMetricPinpoints('work-life-pinpoints', 'workLifeBalance', avg.workLifeBalance, data);
+        updateMetricPinpoints('stress-pinpoints', 'stressLevel', avg.stressLevel, data);
       }
 
       renderTeamCoverage();
+    }
+
+    function updateMetricPinpoints(elementId, metric, value, data) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+
+      const employees = data?.employees || [];
+      const atRisk = employees.filter(emp => {
+        const empValue = emp[metric];
+        if (empValue === null || empValue === undefined) return false;
+        const risk = getRiskLevel(metric, empValue);
+        return risk === 'high' || risk === 'critical';
+      });
+
+      if (atRisk.length === 0) {
+        el.innerHTML = '';
+        return;
+      }
+
+      const names = atRisk.slice(0, 3).map(e => e.name).join(', ');
+      const remaining = atRisk.length > 3 ? ` та ще ${atRisk.length - 3}` : '';
+      el.textContent = `⚠️ Ризик: ${names}${remaining}`;
     }
 
     function renderTeamCoverage() {
@@ -4468,107 +4467,6 @@
     }
 
     // ===== KUDOS =====
-    async function loadKudos() {
-      try {
-        kudosData = await apiCall('/kudos');
-        renderKudos();
-      } catch (error) {
-        const container = document.getElementById('kudos-received');
-        if (container) {
-          container.innerHTML = '<div class="form-hint">Не вдалося завантажити kudos</div>';
-        }
-      }
-    }
-
-    function renderKudos() {
-      const receivedContainer = document.getElementById('kudos-received');
-      const sentContainer = document.getElementById('kudos-sent');
-      const insightsContainer = document.getElementById('kudos-insights');
-      const summaryContainer = document.getElementById('kudos-summary');
-
-      if (receivedContainer) receivedContainer.innerHTML = '';
-      if (sentContainer) sentContainer.innerHTML = '';
-      if (insightsContainer) insightsContainer.innerHTML = '';
-      if (summaryContainer) summaryContainer.textContent = '';
-
-      if (!kudosData) return;
-
-      const topSenders = kudosData.insights?.top_senders || [];
-      const topKeywords = kudosData.insights?.top_keywords || [];
-      const receivedCount = kudosData.insights?.received_count_30d || 0;
-      const sentCount = kudosData.insights?.sent_count_30d || 0;
-      const summary = kudosData.insights?.summary || '';
-
-      if (summaryContainer) {
-        summaryContainer.textContent = summary;
-      }
-
-      if (insightsContainer) {
-        if (receivedCount === 0 && sentCount === 0 && topSenders.length === 0 && topKeywords.length === 0) {
-          insightsContainer.innerHTML = '<span class="form-hint">Немає даних для інсайтів</span>';
-        } else {
-          if (receivedCount > 0) {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip';
-            chip.textContent = `Отримано за 30 днів: ${receivedCount}`;
-            insightsContainer.appendChild(chip);
-          }
-          if (sentCount > 0) {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip';
-            chip.textContent = `Надіслано за 30 днів: ${sentCount}`;
-            insightsContainer.appendChild(chip);
-          }
-          topSenders.forEach(name => {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip';
-            chip.textContent = `⭐ ${name}`;
-            insightsContainer.appendChild(chip);
-          });
-          topKeywords.forEach(word => {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip';
-            chip.textContent = `#${word}`;
-            insightsContainer.appendChild(chip);
-          });
-        }
-      }
-
-      if (receivedContainer) {
-        if (!kudosData.received || kudosData.received.length === 0) {
-          receivedContainer.innerHTML = '<div class="form-hint">Поки що немає отриманих kudos</div>';
-        } else {
-          kudosData.received.forEach(entry => {
-            const card = document.createElement('div');
-            card.className = 'kudos-item';
-            const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('uk-UA') : 'Нещодавно';
-            card.innerHTML = `
-              <div class="kudos-meta">Від: ${entry.from_name} · ${date}</div>
-              <div class="kudos-message">${entry.message}</div>
-            `;
-            receivedContainer.appendChild(card);
-          });
-        }
-      }
-
-      if (sentContainer) {
-        if (!kudosData.sent || kudosData.sent.length === 0) {
-          sentContainer.innerHTML = '<div class="form-hint">Поки що немає надісланих kudos</div>';
-        } else {
-          kudosData.sent.forEach(entry => {
-            const card = document.createElement('div');
-            card.className = 'kudos-item';
-            const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('uk-UA') : 'Нещодавно';
-            card.innerHTML = `
-              <div class="kudos-meta">Кому: ${entry.to_name} · ${date}</div>
-              <div class="kudos-message">${entry.message}</div>
-            `;
-            sentContainer.appendChild(card);
-          });
-        }
-      }
-    }
-
     // ===== PULSE ROOMS =====
     async function loadPulseRooms() {
       const container = document.getElementById('pulse-rooms');
@@ -4729,35 +4627,6 @@
     }
 
     // ===== WELLNESS GOALS =====
-    // ===== KUDOS FORM =====
-    const kudosForm = document.getElementById('kudos-form');
-    if (kudosForm) {
-      kudosForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const statusEl = document.getElementById('kudos-status');
-        statusEl.textContent = 'Відправка...';
-
-        const recipient = document.getElementById('kudos-email').value.trim();
-        const message = document.getElementById('kudos-message').value.trim();
-        if (!recipient || !message) {
-          statusEl.textContent = '❌ Заповніть всі поля';
-          return;
-        }
-
-        try {
-          await apiCall('/kudos', {
-            method: 'POST',
-            body: JSON.stringify({ recipient_email: recipient, message }),
-          });
-          statusEl.textContent = '✅ Kudos відправлено';
-          document.getElementById('kudos-message').value = '';
-          await loadKudos();
-        } catch (error) {
-          statusEl.textContent = '❌ ' + error.message;
-        }
-      });
-    }
-
     // ===== PULSE MESSAGE FORM =====
     const pulseMessageForm = document.getElementById('pulse-message-form');
     if (pulseMessageForm) {
