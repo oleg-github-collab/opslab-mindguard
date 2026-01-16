@@ -5377,7 +5377,24 @@
     const onboardingRefreshBtn = document.getElementById('onboarding-refresh');
     if (onboardingRefreshBtn) {
       onboardingRefreshBtn.addEventListener('click', async () => {
-        await loadTelegramStatus();
+        const statusEl = document.getElementById('onboarding-status');
+        if (statusEl) statusEl.textContent = '⏳ Перевіряємо...';
+        onboardingRefreshBtn.disabled = true;
+
+        try {
+          await loadTelegramStatus();
+          if (statusEl) {
+            if (telegramStatus?.connected) {
+              statusEl.textContent = '✅ Telegram привʼязано!';
+            } else {
+              statusEl.textContent = '⚠️ Telegram ще не привʼязаний';
+            }
+          }
+        } catch (error) {
+          if (statusEl) statusEl.textContent = '❌ Помилка перевірки';
+        } finally {
+          onboardingRefreshBtn.disabled = false;
+        }
       });
     }
 
@@ -5385,15 +5402,24 @@
     if (onboardingCompleteBtn) {
       onboardingCompleteBtn.addEventListener('click', async () => {
         const statusEl = document.getElementById('onboarding-status');
-        if (statusEl) statusEl.textContent = 'Перевіряємо...';
+        if (statusEl) statusEl.textContent = '⏳ Перевіряємо...';
+        onboardingCompleteBtn.disabled = true;
+
         if (!telegramStatus?.connected) {
-          if (statusEl) statusEl.textContent = 'Спочатку привʼяжіть Telegram у боті.';
+          if (statusEl) statusEl.textContent = '❌ Спочатку привʼяжіть Telegram у боті';
+          onboardingCompleteBtn.disabled = false;
           return;
         }
 
         const reminderTime = document.getElementById('reminder-time')?.value;
         const timezone = document.getElementById('timezone-input')?.value?.trim();
         const notificationsEnabled = document.getElementById('notifications-enabled')?.checked ?? true;
+
+        if (!reminderTime || !timezone) {
+          if (statusEl) statusEl.textContent = '❌ Налаштуйте час нагадувань та часовий пояс';
+          onboardingCompleteBtn.disabled = false;
+          return;
+        }
 
         const payload = {
           onboarding_complete: true,
@@ -5403,14 +5429,19 @@
         if (timezone) payload.timezone = timezone;
 
         try {
+          if (statusEl) statusEl.textContent = '⏳ Зберігаємо налаштування...';
           await apiCall('/telegram/preferences', {
             method: 'POST',
             body: JSON.stringify(payload),
           });
-          if (statusEl) statusEl.textContent = '✅ Онбординг завершено';
-          await loadTelegramStatus();
+          if (statusEl) statusEl.textContent = '✅ Онбординг завершено! Картка зникне через 2 сек...';
+
+          setTimeout(async () => {
+            await loadTelegramStatus();
+          }, 2000);
         } catch (error) {
           if (statusEl) statusEl.textContent = `❌ ${error.message}`;
+          onboardingCompleteBtn.disabled = false;
         }
       });
     }
