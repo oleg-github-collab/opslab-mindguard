@@ -1545,24 +1545,116 @@
 
     /* ===== RESPONSIVE ===== */
     @media (max-width: 980px) {
-      .nav-container { flex-wrap: wrap; }
+      body { padding-top: 70px; }
+
+      .nav { padding: 0.75rem 1rem; }
+
+      .nav-container {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .nav-left { gap: 0.5rem; }
+
+      .nav-logo { font-size: 1.2rem; }
+
+      .logo-mark {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+        box-shadow: 3px 3px 0 var(--dark);
+      }
+
+      .logo-text { font-size: 0.9rem; }
+
       .nav-badge { display: none; }
-      .nav-toggle { display: inline-flex; }
+
+      .nav-toggle {
+        display: inline-flex;
+        order: 3;
+        margin-left: auto;
+      }
+
       .nav-panel {
         display: none;
-        width: 100%;
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(26, 26, 26, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0;
+        padding: 2rem 1.5rem;
+        overflow-y: auto;
+      }
+
+      .nav-panel.open {
+        display: flex;
+        animation: slideInDown 0.3s ease-out;
+      }
+
+      @keyframes slideInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .nav-menu {
         flex-direction: column;
         align-items: stretch;
-        gap: 1rem;
-        border: 3px solid var(--dark);
-        background: var(--white);
-        padding: 1rem;
-        box-shadow: 6px 6px 0 var(--dark);
+        width: 100%;
+        max-width: 400px;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
       }
-      .nav-panel.open { display: flex; animation: fadeIn 0.25s ease-out; }
-      .nav-menu { flex-direction: column; align-items: stretch; }
-      .nav-actions { justify-content: space-between; flex-wrap: wrap; }
-      .nav-link { width: 100%; text-align: center; }
+
+      .nav-link {
+        width: 100%;
+        text-align: center;
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+        background: var(--white);
+        color: var(--dark);
+      }
+
+      .nav-link.active {
+        background: var(--primary);
+        color: var(--white);
+      }
+
+      .nav-link-external {
+        background: var(--accent);
+      }
+
+      .nav-actions {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 400px;
+        gap: 0.75rem;
+      }
+
+      .nav-user {
+        width: 100%;
+        justify-content: center;
+        padding: 1rem 1.5rem;
+        background: var(--white);
+      }
+
+      #user-name {
+        max-width: 200px;
+      }
+
+      #logout-btn {
+        width: 100%;
+        padding: 1rem 1.5rem;
+        font-size: 1rem;
+      }
     }
 
     @media (max-width: 768px) {
@@ -1586,12 +1678,57 @@
     }
 
     @media (max-width: 560px) {
+      body { padding-top: 60px; }
+
       .container { padding: 1rem; }
-      .nav { padding: 0.75rem 1rem; }
-      .nav-logo { font-size: 1.15rem; }
-      .logo-mark { width: 32px; height: 32px; font-size: 0.95rem; }
+
+      .nav { padding: 0.65rem 0.85rem; }
+
+      .nav-panel { top: 60px; padding: 1.5rem 1rem; }
+
+      .nav-logo { font-size: 1.1rem; }
+
+      .logo-mark {
+        width: 32px;
+        height: 32px;
+        font-size: 0.95rem;
+        box-shadow: 2px 2px 0 var(--dark);
+      }
+
+      .logo-text { display: none; }
+
+      .nav-toggle {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+      }
+
+      .nav-menu {
+        max-width: 100%;
+        gap: 0.65rem;
+      }
+
+      .nav-link {
+        padding: 0.85rem 1.25rem;
+        font-size: 1rem;
+      }
+
+      .nav-actions {
+        max-width: 100%;
+        gap: 0.65rem;
+      }
+
+      .nav-user {
+        padding: 0.85rem 1.25rem;
+      }
+
+      #logout-btn {
+        padding: 0.85rem 1.25rem;
+        font-size: 0.95rem;
+      }
+
       .btn { padding: 0.65rem 0.95rem; font-size: 0.9rem; }
-      .modal { padding: 1rem; }
+      .modal { padding: 0.75rem; }
       .modal-content { padding: 1.25rem; }
       .modal-title { font-size: 1.35rem; }
       .card-header { font-size: 1.2rem; }
@@ -5696,15 +5833,19 @@
       }
     })();
 
-    // Auto-hide header
+    // Auto-hide header (desktop only)
     (() => {
       const nav = document.querySelector('.nav');
       if (!nav) return;
+
+      // Disable auto-hide on mobile
+      const isMobile = () => window.innerWidth <= 980;
 
       let hideTimer = null;
       let isNearTop = false;
 
       const scheduleHide = () => {
+        if (isMobile()) return; // Don't hide on mobile
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => {
           if (!isNearTop) {
@@ -5718,8 +5859,9 @@
         clearTimeout(hideTimer);
       };
 
-      // Track mouse position to show header when near top
+      // Track mouse position to show header when near top (desktop only)
       document.addEventListener('mousemove', (e) => {
+        if (isMobile()) return;
         isNearTop = e.clientY < 100;
         if (isNearTop) {
           showNav();
@@ -5728,19 +5870,30 @@
         }
       });
 
-      // Start hide timer on page load
-      scheduleHide();
+      // Start hide timer on page load (desktop only)
+      if (!isMobile()) {
+        scheduleHide();
+      }
 
       // Show nav on hover
       nav.addEventListener('mouseenter', () => {
+        if (isMobile()) return;
         showNav();
         isNearTop = true;
       });
 
       // Restart timer when leaving nav
       nav.addEventListener('mouseleave', () => {
+        if (isMobile()) return;
         isNearTop = false;
         scheduleHide();
+      });
+
+      // Re-check on resize
+      window.addEventListener('resize', () => {
+        if (isMobile()) {
+          showNav(); // Always show on mobile
+        }
       });
     })();
   </script>
