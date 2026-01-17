@@ -75,6 +75,13 @@
       transform: translateY(-100%);
     }
 
+    /* Don't hide header on mobile - keep hamburger accessible */
+    @media (max-width: 980px) {
+      .nav.hidden {
+        transform: none;
+      }
+    }
+
     .nav::before {
       content: '';
       position: absolute;
@@ -3020,6 +3027,16 @@
       document.getElementById('app').classList.add('hidden');
       document.getElementById('login-screen').classList.remove('hidden');
       currentUser = null;
+
+      // Clear cached data to ensure fresh data on next login
+      teamDashboardData = null;
+      advancedData = null;
+      wellnessPlan = null;
+      wellnessGoals = null;
+      insights = { selfBenchmark: null, correlations: [], earlySignal: null };
+      pulseRooms = [];
+      activePulseRoom = null;
+      pulseMessages = [];
     }
 
     function isAdmin() {
@@ -3304,20 +3321,7 @@
         return;
       }
 
-      // Filter data for regular employees - only show their own data
-      if (!isAdmin()) {
-        const userId = currentUser?.user_id || currentUser?.id;
-        if (userId && teamDashboardData?.months) {
-          teamDashboardData.months = teamDashboardData.months.map(month => {
-            if (month.employees) {
-              month.employees = month.employees.filter(emp =>
-                (emp.userId === userId || emp.user_id === userId || emp.id === userId)
-              );
-            }
-            return month;
-          });
-        }
-      }
+      // Backend already filters data for non-admin users
 
       const months = getTeamMonthList();
       if (!months.length) {
@@ -3894,22 +3898,13 @@
       }
 
       try {
-        if (!advancedData) {
-          advancedData = await apiCall('/api/employee-data');
-        }
+        // Always reload data to ensure fresh and correct data
+        advancedData = await apiCall('/api/employee-data');
       } catch (error) {
         return;
       }
 
-      // Filter advancedData for regular employees
-      if (!isAdmin()) {
-        const currentUserId = currentUser?.user_id || currentUser?.id;
-        if (advancedData?.employees) {
-          advancedData.employees = advancedData.employees.filter(emp =>
-            (emp.userId === currentUserId || emp.user_id === currentUserId || emp.id === currentUserId)
-          );
-        }
-      }
+      // Backend already filters data for non-admin users
 
       const employee = advancedData?.employees?.find(e => e.userId === employeeId || e.user_id === employeeId || e.id === employeeId);
       if (!employee) return;
