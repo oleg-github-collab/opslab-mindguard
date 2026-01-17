@@ -1909,7 +1909,125 @@
             <p style="margin-top: 1rem; font-size: 0.9rem;">Рекомендуємо пройти мінімум 5-7 чекінів для якісної аналітики.</p>
           </div>
           <div id="employee-personal-data" class="hidden">
-            <!-- Personal metrics will be injected here -->
+            <p style="color: var(--gray); margin-bottom: 1.5rem;">
+              Повна аналітика вашого ментального здоров'я за всі місяці з деталями по ключових метриках.
+              Дані оновлюються після щоденних чекінів та відображають вашу особисту історію по місяцях.
+            </p>
+            <div class="data-meta" id="employee-data-meta"></div>
+
+            <div id="employee-month-selector-personal" class="month-selector"></div>
+
+            <section class="metrics-section">
+              <h3 class="section-title">Ключові показники</h3>
+              <div class="metrics-grid">
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">WHO-5 Благополуччя</span>
+                      <span class="info-icon" data-tooltip="Індекс благополуччя ВООЗ (0-100). <50 — низьке благополуччя.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-who5-value">—</div>
+                  <div class="metric-description">Ваш показник</div>
+                  <span class="risk-indicator" id="employee-who5-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">PHQ-9 Депресія</span>
+                      <span class="info-icon" data-tooltip="PHQ-9 (0-27). 5-9: легка, 10-14: помірна, 15+: тяжка.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-phq9-value">—</div>
+                  <div class="metric-description">Ваш показник</div>
+                  <span class="risk-indicator" id="employee-phq9-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">GAD-7 Тривожність</span>
+                      <span class="info-icon" data-tooltip="GAD-7 (0-21). 5-9: легка, 10-14: помірна, 15+: тяжка.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-gad7-value">—</div>
+                  <div class="metric-description">Ваш показник</div>
+                  <span class="risk-indicator" id="employee-gad7-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">MBI Вигорання</span>
+                      <span class="info-icon" data-tooltip="MBI (0-100%). 25-50%: середній ризик, >50%: високий.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-mbi-value">—</div>
+                  <div class="metric-description">Ваш показник (%)</div>
+                  <span class="risk-indicator" id="employee-mbi-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">Тривалість сну</span>
+                      <span class="info-icon" data-tooltip="Середня тривалість сну. Рекомендовано 7-9 год.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-sleep-duration-value">—</div>
+                  <div class="metric-description">Середня кількість годин</div>
+                  <span class="risk-indicator" id="employee-sleep-duration-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">Якість сну</span>
+                      <span class="info-icon" data-tooltip="Якість сну (1-10). 7-10: добра, <4: погана.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-sleep-quality-value">—</div>
+                  <div class="metric-description">Середня оцінка (1-10)</div>
+                  <span class="risk-indicator" id="employee-sleep-quality-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">Баланс життя</span>
+                      <span class="info-icon" data-tooltip="Баланс робота/життя (1-10). 7-10: здоровий.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-work-life-value">—</div>
+                  <div class="metric-description">Середня оцінка (1-10)</div>
+                  <span class="risk-indicator" id="employee-work-life-risk">—</span>
+                </div>
+
+                <div class="metric-card">
+                  <div class="metric-header">
+                    <div class="metric-label-wrapper">
+                      <span class="metric-label">Рівень стресу</span>
+                      <span class="info-icon" data-tooltip="PSS (0-40). 0-13: низький, 14-26: помірний, 27-40: високий.">i</span>
+                    </div>
+                  </div>
+                  <div class="metric-value" id="employee-stress-value">—</div>
+                  <div class="metric-description">Ваш показник (0-40)</div>
+                  <span class="risk-indicator" id="employee-stress-risk">—</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Employee Personal Trend Chart -->
+        <div class="card employee-only" id="employee-trend-card" style="display: none;">
+          <div class="card-header">📈 Моя динаміка</div>
+          <div class="chart-container" style="position: relative; height: 420px;">
+            <canvas id="employeeTrendChart"></canvas>
+          </div>
+          <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--primary); margin-top: 1.5rem;">
+            <p style="margin: 0; font-size: 0.9rem;">💡 Ваші дані конфіденційні. Вони доступні тільки вам та адміністрації для надання підтримки при необхідності.</p>
           </div>
         </div>
 
@@ -3060,24 +3178,27 @@
     }
 
     // ===== EMPLOYEE PERSONAL DATA =====
+    let employeePersonalSelectedKey = null;
+    let employeePersonalCharts = {};
+
     async function loadEmployeePersonalData() {
       const noDataMsg = document.getElementById('employee-no-data-message');
       const personalDataContainer = document.getElementById('employee-personal-data');
+      const trendCard = document.getElementById('employee-trend-card');
 
       if (!noDataMsg || !personalDataContainer) return;
 
       // Get employee data from filtered teamDashboardData
       const currentUserId = currentUser?.user_id || currentUser?.id;
-      if (!teamDashboardData || !teamDashboardData.months) {
+      if (!teamDashboardData || !teamDashboardData.months || teamDashboardData.months.length === 0) {
         noDataMsg.classList.remove('hidden');
         personalDataContainer.classList.add('hidden');
+        if (trendCard) trendCard.style.display = 'none';
         return;
       }
 
-      // Find employee data across all months
+      // Check if employee has any data
       let hasAnyData = false;
-      let latestData = null;
-
       for (const month of teamDashboardData.months) {
         if (month.employees && month.employees.length > 0) {
           const emp = month.employees.find(e =>
@@ -3085,72 +3206,176 @@
           );
           if (emp && (emp.hasData || emp.has_data || hasMetricData(emp))) {
             hasAnyData = true;
-            latestData = emp;
             break;
           }
         }
       }
 
-      if (!hasAnyData || !latestData) {
+      if (!hasAnyData) {
         noDataMsg.classList.remove('hidden');
         personalDataContainer.classList.add('hidden');
+        if (trendCard) trendCard.style.display = 'none';
         return;
       }
 
       // Show personal data
       noDataMsg.classList.add('hidden');
       personalDataContainer.classList.remove('hidden');
+      if (trendCard) trendCard.style.display = 'block';
 
-      // Render personal metrics
-      const html = `
-        <div class="metrics-grid" style="margin-bottom: 1.5rem;">
-          <div class="metric-card">
-            <div class="metric-label">WHO-5 Благополуччя</div>
-            <div class="metric-value ${getScoreClass('who5', latestData.who5)}">${metricOrDash(latestData.who5)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('who5', latestData.who5)}">${getRiskLabel(getRiskLevel('who5', latestData.who5))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">PHQ-9 Депресія</div>
-            <div class="metric-value ${getScoreClass('phq9', latestData.phq9)}">${metricOrDash(latestData.phq9)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('phq9', latestData.phq9)}">${getRiskLabel(getRiskLevel('phq9', latestData.phq9))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">GAD-7 Тривожність</div>
-            <div class="metric-value ${getScoreClass('gad7', latestData.gad7)}">${metricOrDash(latestData.gad7)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('gad7', latestData.gad7)}">${getRiskLabel(getRiskLevel('gad7', latestData.gad7))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">MBI Вигорання</div>
-            <div class="metric-value ${getScoreClass('mbi', latestData.mbi)}">${metricOrDash(latestData.mbi, '%')}</div>
-            <span class="risk-indicator risk-${getRiskLevel('mbi', latestData.mbi)}">${getRiskLabel(getRiskLevel('mbi', latestData.mbi))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Сон (годин)</div>
-            <div class="metric-value ${getScoreClass('sleepDuration', latestData.sleepDuration)}">${metricOrDash(latestData.sleepDuration)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('sleepDuration', latestData.sleepDuration)}">${getRiskLabel(getRiskLevel('sleepDuration', latestData.sleepDuration))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Якість сну</div>
-            <div class="metric-value ${getScoreClass('sleepQuality', latestData.sleepQuality)}">${metricOrDash(latestData.sleepQuality)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('sleepQuality', latestData.sleepQuality)}">${getRiskLabel(getRiskLevel('sleepQuality', latestData.sleepQuality))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Work-Life баланс</div>
-            <div class="metric-value ${getScoreClass('workLifeBalance', latestData.workLifeBalance)}">${metricOrDash(latestData.workLifeBalance)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('workLifeBalance', latestData.workLifeBalance)}">${getRiskLabel(getRiskLevel('workLifeBalance', latestData.workLifeBalance))}</span>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Рівень стресу</div>
-            <div class="metric-value ${getScoreClass('stressLevel', latestData.stressLevel)}">${metricOrDash(latestData.stressLevel)}</div>
-            <span class="risk-indicator risk-${getRiskLevel('stressLevel', latestData.stressLevel)}">${getRiskLabel(getRiskLevel('stressLevel', latestData.stressLevel))}</span>
-          </div>
-        </div>
-        <div style="padding: 1rem; background: var(--gray-light); border-left: 4px solid var(--primary);">
-          <p style="margin: 0; font-size: 0.9rem;">💡 Ваші дані конфіденційні. Вони доступні тільки вам та адміністрації для надання підтримки при необхідності.</p>
-        </div>
-      `;
+      // Get available months
+      const months = getTeamMonthList();
+      if (!months.length) return;
 
-      personalDataContainer.innerHTML = html;
+      // Set selected month to latest if not set
+      const latest = months[months.length - 1];
+      const latestKey = monthKeyFromParts(latest.year, latest.month);
+      if (!employeePersonalSelectedKey || !months.some(m => monthKeyFromParts(m.year, m.month) === employeePersonalSelectedKey)) {
+        employeePersonalSelectedKey = latestKey;
+      }
+
+      // Render month selector
+      renderEmployeeMonthSelector();
+
+      // Render metrics for selected month
+      renderEmployeePersonalMetrics();
+
+      // Render trend chart
+      renderEmployeePersonalChart();
+    }
+
+    function renderEmployeeMonthSelector() {
+      const container = document.getElementById('employee-month-selector-personal');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const months = getTeamMonthList();
+      const display = [...months].reverse();
+      display.forEach(month => {
+        const key = monthKeyFromParts(month.year, month.month);
+        const button = document.createElement('button');
+        button.className = `month-btn${key === employeePersonalSelectedKey ? ' active' : ''}`;
+        button.textContent = monthLabelFromKey(key);
+        button.addEventListener('click', () => {
+          employeePersonalSelectedKey = key;
+          renderEmployeeMonthSelector();
+          renderEmployeePersonalMetrics();
+        });
+        container.appendChild(button);
+      });
+    }
+
+    function renderEmployeePersonalMetrics() {
+      const currentUserId = currentUser?.user_id || currentUser?.id;
+      const selectedMonth = teamDashboardData.months.find(m => monthKeyFromParts(m.year, m.month) === employeePersonalSelectedKey);
+
+      if (!selectedMonth || !selectedMonth.employees) return;
+
+      const emp = selectedMonth.employees.find(e =>
+        e.userId === currentUserId || e.user_id === currentUserId || e.id === currentUserId
+      );
+
+      // Get metrics
+      const metrics = emp?.metrics || emp || {};
+
+      // Update all metric values
+      updateMetricElement('employee-who5', metrics.who5);
+      updateMetricElement('employee-phq9', metrics.phq9);
+      updateMetricElement('employee-gad7', metrics.gad7);
+      updateMetricElement('employee-mbi', metrics.mbi);
+      updateMetricElement('employee-sleep-duration', metrics.sleepDuration || metrics.sleep_duration);
+      updateMetricElement('employee-sleep-quality', metrics.sleepQuality || metrics.sleep_quality);
+      updateMetricElement('employee-work-life', metrics.workLifeBalance || metrics.work_life_balance);
+      updateMetricElement('employee-stress', metrics.stressLevel || metrics.stress_level);
+
+      // Update meta info
+      const metaEl = document.getElementById('employee-data-meta');
+      if (metaEl && selectedMonth) {
+        const monthLabel = monthLabelFromKey(employeePersonalSelectedKey);
+        const participants = selectedMonth.participants || 0;
+        const responses = selectedMonth.responses || 0;
+        metaEl.innerHTML = `<div class="data-pill">Період: <span class="mono">${monthLabel}</span></div><div class="data-pill">Відповідей: <span class="mono">${responses}</span></div>`;
+      }
+    }
+
+    function updateMetricElement(prefix, value) {
+      const valueEl = document.getElementById(`${prefix}-value`);
+      const riskEl = document.getElementById(`${prefix}-risk`);
+
+      if (valueEl) {
+        const metric = prefix.replace('employee-', '').replace(/-/g, '_');
+        const formattedValue = metricOrDash(value, metric === 'mbi' ? '%' : '');
+        valueEl.textContent = formattedValue;
+        valueEl.className = `metric-value ${getScoreClass(metric, value)}`;
+      }
+
+      if (riskEl) {
+        const metric = prefix.replace('employee-', '').replace(/-/g, '_');
+        const risk = getRiskLevel(metric, value);
+        riskEl.className = `risk-indicator risk-${risk}`;
+        riskEl.textContent = getRiskLabel(risk);
+      }
+    }
+
+    function renderEmployeePersonalChart() {
+      const ctx = document.getElementById('employeeTrendChart');
+      if (!ctx) return;
+
+      if (employeePersonalCharts.trend) {
+        employeePersonalCharts.trend.destroy();
+      }
+
+      const currentUserId = currentUser?.user_id || currentUser?.id;
+      const months = getTeamMonthList();
+      const labels = months.map(m => monthLabelFromKey(monthKeyFromParts(m.year, m.month), true));
+
+      const values = (key) => months.map(m => {
+        const monthKey = monthKeyFromParts(m.year, m.month);
+        const monthData = teamDashboardData.months.find(md => monthKeyFromParts(md.year, md.month) === monthKey);
+        if (!monthData || !monthData.employees) return null;
+
+        const emp = monthData.employees.find(e =>
+          e.userId === currentUserId || e.user_id === currentUserId || e.id === currentUserId
+        );
+        if (!emp) return null;
+
+        const metrics = emp.metrics || emp;
+        const value = metrics[key] ?? metrics[key.replace(/([A-Z])/g, '_$1').toLowerCase()];
+        return Number.isFinite(value) ? value : null;
+      });
+
+      employeePersonalCharts.trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'WHO-5', metricKey: 'who5', data: values('who5'), borderColor: '#1f8f3a', tension: 0.35, borderWidth: 3 },
+            { label: 'PHQ-9', metricKey: 'phq9', data: values('phq9'), borderColor: '#ffb000', tension: 0.35, borderWidth: 3 },
+            { label: 'GAD-7', metricKey: 'gad7', data: values('gad7'), borderColor: '#ff595e', tension: 0.35, borderWidth: 3 },
+            { label: 'MBI (%)', metricKey: 'mbi', data: values('mbi'), borderColor: '#6a4c93', tension: 0.35, borderWidth: 3 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: (context) => {
+                  const key = context.dataset.metricKey;
+                  const hint = METRIC_HINTS[key] || '';
+                  const value = Number.isFinite(context.parsed.y) ? context.parsed.y.toFixed(1) : '—';
+                  return `${context.dataset.label}: ${value}${hint ? ' (' + hint + ')' : ''}`;
+                }
+              }
+            }
+          },
+          scales: { y: { beginAtZero: true } },
+        },
+      });
     }
 
     // ===== TEAM DASHBOARD =====
