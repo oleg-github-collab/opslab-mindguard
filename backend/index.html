@@ -3235,7 +3235,7 @@
       }
 
       // Render month selector
-      renderEmployeeMonthSelector();
+      renderEmployeePersonalMonthSelector();
 
       // Render metrics for selected month
       renderEmployeePersonalMetrics();
@@ -3244,7 +3244,7 @@
       renderEmployeePersonalChart();
     }
 
-    function renderEmployeeMonthSelector() {
+    function renderEmployeePersonalMonthSelector() {
       const container = document.getElementById('employee-month-selector-personal');
       if (!container) return;
       container.innerHTML = '';
@@ -3258,7 +3258,7 @@
         button.textContent = monthLabelFromKey(key);
         button.addEventListener('click', () => {
           employeePersonalSelectedKey = key;
-          renderEmployeeMonthSelector();
+          renderEmployeePersonalMonthSelector();
           renderEmployeePersonalMetrics();
         });
         container.appendChild(button);
