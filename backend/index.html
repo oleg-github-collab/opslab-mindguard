@@ -5529,9 +5529,10 @@
       try {
         status = await apiCall('/telegram/status');
       } catch (error) {
+        console.error('Telegram status error:', error);
         const connection = document.getElementById('telegram-connection-status');
         if (connection) {
-          connection.textContent = '⚠️ Не вдалося завантажити Telegram статус';
+          connection.textContent = `⚠️ Не вдалося завантажити Telegram статус (${error.message})`;
         }
         return;
       }
