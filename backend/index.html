@@ -3640,6 +3640,13 @@
     }
 
     function getRiskLevel(metric, value) {
+      // Normalize metric key to camelCase
+      const normalizeKey = (key) => {
+        return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      };
+
+      const normalizedMetric = normalizeKey(metric);
+
       const thresholds = {
         who5: { critical: 35, low: 50, medium: 75 },
         phq9: { critical: 15, low: 5, medium: 10 },
@@ -3651,16 +3658,18 @@
         stressLevel: { critical: 30, low: 14, medium: 27 },
       };
 
-      const t = thresholds[metric];
+      const t = thresholds[normalizedMetric];
       if (!t || value === null || value === undefined || !Number.isFinite(value)) return 'unknown';
 
-      if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(metric)) {
+      // Lower is worse for these metrics (reverse logic)
+      if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(normalizedMetric)) {
         if (value < t.critical) return 'critical';
         if (value < t.low) return 'high';
         if (value < t.medium) return 'medium';
         return 'low';
       }
 
+      // Higher is worse for these metrics (normal logic)
       if (value >= t.critical) return 'critical';
       if (value >= t.medium) return 'high';
       if (value >= t.low) return 'medium';
