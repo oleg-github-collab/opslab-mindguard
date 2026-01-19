@@ -708,8 +708,8 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
     let row = sqlx::query(
         r#"
         SELECT
-            COALESCE(reminder_hour, 10) as reminder_hour,
-            COALESCE(reminder_minute, 0) as reminder_minute,
+            COALESCE(reminder_hour, 10)::SMALLINT as reminder_hour,
+            COALESCE(reminder_minute, 0)::SMALLINT as reminder_minute,
             COALESCE(timezone, 'Europe/Kyiv') as timezone,
             COALESCE(notification_enabled, true) as notification_enabled,
             last_reminder_date,
@@ -781,8 +781,8 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
         SELECT
             u.id as user_id,
             u.telegram_id as telegram_id,
-            COALESCE(p.reminder_hour, 10) as reminder_hour,
-            COALESCE(p.reminder_minute, 0) as reminder_minute,
+            COALESCE(p.reminder_hour, 10)::SMALLINT as reminder_hour,
+            COALESCE(p.reminder_minute, 0)::SMALLINT as reminder_minute,
             COALESCE(p.timezone, 'Europe/Kyiv') as timezone,
             COALESCE(p.notification_enabled, true) as notification_enabled,
             p.last_reminder_date as last_reminder_date,
