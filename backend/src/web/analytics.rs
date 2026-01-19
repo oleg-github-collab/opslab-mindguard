@@ -141,16 +141,34 @@ async fn team_data(
 ) -> Result<Json<TeamDataResponse>, StatusCode> {
     let requester = db::find_user_by_id(&state.pool, user_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            tracing::error!("Failed to find user {} in team_data: {}", user_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .ok_or(StatusCode::UNAUTHORIZED)?;
     if !requester.is_active {
         return Err(StatusCode::FORBIDDEN);
     }
 
     let include_all = matches!(requester.role, UserRole::Admin | UserRole::Founder);
-    let users = fetch_users(&state, user_id, include_all).await?;
-    let analytics = build_analytics(&state, &users).await?;
-    let (company, metadata, meta_updated_at) = load_metadata(&state).await?;
+    tracing::debug!("team_data: user_id={}, include_all={}", user_id, include_all);
+
+    let users = fetch_users(&state, user_id, include_all).await.map_err(|e| {
+        tracing::error!("Failed to fetch users: {:?}", e);
+        e
+    })?;
+    tracing::debug!("team_data: fetched {} users", users.len());
+
+    let analytics = build_analytics(&state, &users).await.map_err(|e| {
+        tracing::error!("Failed to build analytics: {:?}", e);
+        e
+    })?;
+    tracing::debug!("team_data: built analytics with {} months", analytics.months.len());
+
+    let (company, metadata, meta_updated_at) = load_metadata(&state).await.map_err(|e| {
+        tracing::error!("Failed to load metadata: {:?}", e);
+        e
+    })?;
     let last_updated = resolve_last_updated(&analytics.month_keys, meta_updated_at);
 
     Ok(Json(TeamDataResponse {
