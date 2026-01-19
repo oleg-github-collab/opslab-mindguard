@@ -1748,15 +1748,15 @@ pub async fn get_monthly_metric_overrides(
         SELECT
             user_id,
             period,
-            who5,
-            phq9,
-            gad7,
-            mbi,
-            sleep_duration,
-            sleep_quality,
-            work_life_balance,
-            stress_level,
-            source
+            COALESCE(who5, 0) as who5,
+            COALESCE(phq9, 0) as phq9,
+            COALESCE(gad7, 0) as gad7,
+            COALESCE(mbi, 0) as mbi,
+            COALESCE(sleep_duration, 0) as sleep_duration,
+            COALESCE(sleep_quality, sleep_duration, 0) as sleep_quality,
+            COALESCE(work_life_balance, 0) as work_life_balance,
+            COALESCE(stress_level, 0) as stress_level,
+            COALESCE(source, 'computed') as source
         FROM analytics_monthly_metrics
         WHERE user_id = ANY($1)
         ORDER BY period ASC
@@ -1861,7 +1861,18 @@ pub async fn get_analytics_metadata(pool: &PgPool) -> Result<Option<AnalyticsMet
         "#,
     )
     .fetch_optional(pool)
-    .await?;
+    .await;
+
+    let row = match row {
+        Ok(row) => row,
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!("analytics_metadata unavailable ({}); using defaults", err);
+                return Ok(None);
+            }
+            return Err(err.into());
+        }
+    };
 
     let Some(row) = row else {
         return Ok(None);
@@ -1900,8 +1911,22 @@ pub async fn get_industry_benchmarks(pool: &PgPool) -> Result<Vec<IndustryBenchm
         "#,
     )
     .fetch_all(pool)
-    .await?;
-    Ok(rows)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_industry_benchmarks unavailable ({}); using defaults",
+                    err
+                );
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
 }
 
 pub async fn get_analytics_alerts(pool: &PgPool) -> Result<Vec<AnalyticsAlertRow>> {
@@ -1913,8 +1938,19 @@ pub async fn get_analytics_alerts(pool: &PgPool) -> Result<Vec<AnalyticsAlertRow
         "#,
     )
     .fetch_all(pool)
-    .await?;
-    Ok(rows)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!("analytics_alerts unavailable ({}); skipping", err);
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
 }
 
 pub async fn get_analytics_recommendations(
@@ -1928,7 +1964,21 @@ pub async fn get_analytics_recommendations(
         "#,
     )
     .fetch_all(pool)
-    .await?;
+    .await;
+
+    let rows = match rows {
+        Ok(rows) => rows,
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_recommendations unavailable ({}); skipping",
+                    err
+                );
+                return Ok(Vec::new());
+            }
+            return Err(err.into());
+        }
+    };
 
     let mut out = Vec::new();
     for row in rows {

@@ -411,7 +411,10 @@ async fn build_analytics(
 
     let overrides = db::get_monthly_metric_overrides(&state.pool, &user_ids)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to load monthly metric overrides: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     for row in overrides {
         let key = format!("{}-{:02}", row.period.year(), row.period.month());
         let metrics = MetricBlock {
