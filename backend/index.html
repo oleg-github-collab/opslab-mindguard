@@ -3648,6 +3648,14 @@
 
       const normalizedMetric = normalizeKey(metric);
 
+      // Map shortened keys to full threshold keys
+      const keyMap = {
+        'workLife': 'workLifeBalance',
+        'stress': 'stressLevel',
+      };
+
+      const finalMetric = keyMap[normalizedMetric] || normalizedMetric;
+
       const thresholds = {
         who5: { critical: 35, low: 50, medium: 75 },
         phq9: { critical: 15, low: 5, medium: 10 },
@@ -3659,11 +3667,11 @@
         stressLevel: { critical: 30, low: 14, medium: 27 },
       };
 
-      const t = thresholds[normalizedMetric];
+      const t = thresholds[finalMetric];
       if (!t || value === null || value === undefined || !Number.isFinite(value)) return 'unknown';
 
       // Lower is worse for these metrics (reverse logic)
-      if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(normalizedMetric)) {
+      if (['who5', 'sleepDuration', 'sleepQuality', 'workLifeBalance'].includes(finalMetric)) {
         if (value < t.critical) return 'critical';
         if (value < t.low) return 'high';
         if (value < t.medium) return 'medium';
