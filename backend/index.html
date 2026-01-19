@@ -3642,7 +3642,8 @@
     function getRiskLevel(metric, value) {
       // Normalize metric key to camelCase
       const normalizeKey = (key) => {
-        return key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        // Convert snake_case or kebab-case to camelCase
+        return key.replace(/[-_]([a-z])/g, (_, letter) => letter.toUpperCase());
       };
 
       const normalizedMetric = normalizeKey(metric);
