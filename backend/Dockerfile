@@ -4,7 +4,6 @@ WORKDIR /app
 # Copy manifests; Cargo.lock is optional and can be added later
 COPY Cargo.toml ./
 COPY Cargo.lock* ./
-COPY .sqlx ./.sqlx
 
 # Prime dependency cache
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -14,8 +13,11 @@ RUN rm -rf src
 # Copy full source
 COPY . .
 
-# Build application (offline SQLx to avoid DB requirement in CI/build)
-RUN SQLX_OFFLINE=true cargo build --release
+# Build application with DATABASE_URL (requires database connection during build)
+# SQLx will verify queries against the database at compile time
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates openssl && rm -rf /var/lib/apt/lists/*
