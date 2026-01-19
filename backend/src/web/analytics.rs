@@ -153,22 +153,31 @@ async fn team_data(
     let include_all = matches!(requester.role, UserRole::Admin | UserRole::Founder);
     tracing::debug!("team_data: user_id={}, include_all={}", user_id, include_all);
 
-    let users = fetch_users(&state, user_id, include_all).await.map_err(|e| {
-        tracing::error!("Failed to fetch users: {:?}", e);
-        e
-    })?;
+    let users = match fetch_users(&state, user_id, include_all).await {
+        Ok(users) => users,
+        Err(e) => {
+            tracing::error!("Failed to fetch users: {:?}", e);
+            Vec::new()
+        }
+    };
     tracing::debug!("team_data: fetched {} users", users.len());
 
-    let analytics = build_analytics(&state, &users).await.map_err(|e| {
-        tracing::error!("Failed to build analytics: {:?}", e);
-        e
-    })?;
+    let analytics = match build_analytics(&state, &users).await {
+        Ok(analytics) => analytics,
+        Err(e) => {
+            tracing::error!("Failed to build analytics: {:?}", e);
+            AnalyticsData::empty()
+        }
+    };
     tracing::debug!("team_data: built analytics with {} months", analytics.months.len());
 
-    let (company, metadata, meta_updated_at) = load_metadata(&state).await.map_err(|e| {
-        tracing::error!("Failed to load metadata: {:?}", e);
-        e
-    })?;
+    let (company, metadata, meta_updated_at) = match load_metadata(&state).await {
+        Ok(value) => value,
+        Err(e) => {
+            tracing::error!("Failed to load metadata: {:?}", e);
+            default_metadata()
+        }
+    };
     let last_updated = resolve_last_updated(&analytics.month_keys, meta_updated_at);
 
     Ok(Json(TeamDataResponse {
@@ -192,8 +201,20 @@ async fn employee_data(
     }
 
     let include_all = matches!(requester.role, UserRole::Admin | UserRole::Founder);
-    let users = fetch_users(&state, user_id, include_all).await?;
-    let analytics = build_analytics(&state, &users).await?;
+    let users = match fetch_users(&state, user_id, include_all).await {
+        Ok(users) => users,
+        Err(e) => {
+            tracing::error!("Failed to fetch users: {:?}", e);
+            Vec::new()
+        }
+    };
+    let analytics = match build_analytics(&state, &users).await {
+        Ok(analytics) => analytics,
+        Err(e) => {
+            tracing::error!("Failed to build analytics: {:?}", e);
+            AnalyticsData::empty()
+        }
+    };
 
     let latest_key = analytics
         .month_keys
@@ -240,7 +261,13 @@ async fn employee_data(
         });
     }
 
-    let (company, metadata, meta_updated_at) = load_metadata(&state).await?;
+    let (company, metadata, meta_updated_at) = match load_metadata(&state).await {
+        Ok(value) => value,
+        Err(e) => {
+            tracing::error!("Failed to load metadata: {:?}", e);
+            default_metadata()
+        }
+    };
     let last_updated = resolve_last_updated(&analytics.month_keys, meta_updated_at);
     let industry_benchmarks = load_industry_benchmarks(&state).await?;
 
@@ -266,6 +293,17 @@ struct AnalyticsData {
     team_averages: HashMap<String, MetricBlock>,
     user_history: HashMap<Uuid, HashMap<String, MetricBlock>>,
     month_keys: Vec<String>,
+}
+
+impl AnalyticsData {
+    fn empty() -> Self {
+        Self {
+            months: Vec::new(),
+            team_averages: HashMap::new(),
+            user_history: HashMap::new(),
+            month_keys: Vec::new(),
+        }
+    }
 }
 
 struct UserInfo {
@@ -349,20 +387,20 @@ async fn build_analytics(
         answers_count: i64,
     }
 
-    let rows: Vec<MonthRow> = sqlx::query_as(
+    let rows: Vec<MonthRow> = match sqlx::query_as(
         r#"
         SELECT
             user_id,
             EXTRACT(YEAR FROM created_at)::int AS year,
             EXTRACT(MONTH FROM created_at)::int AS month,
-            AVG(CASE WHEN question_type = 'mood' THEN value END) AS mood_avg,
-            AVG(CASE WHEN question_type = 'energy' THEN value END) AS energy_avg,
-            AVG(CASE WHEN question_type = 'wellbeing' THEN value END) AS wellbeing_avg,
-            AVG(CASE WHEN question_type = 'motivation' THEN value END) AS motivation_avg,
-            AVG(CASE WHEN question_type = 'focus' THEN value END) AS focus_avg,
-            AVG(CASE WHEN question_type = 'stress' THEN value END) AS stress_avg,
-            AVG(CASE WHEN question_type = 'sleep' THEN value END) AS sleep_avg,
-            AVG(CASE WHEN question_type = 'workload' THEN value END) AS workload_avg,
+            AVG(CASE WHEN question_type = 'mood' THEN value END)::double precision AS mood_avg,
+            AVG(CASE WHEN question_type = 'energy' THEN value END)::double precision AS energy_avg,
+            AVG(CASE WHEN question_type = 'wellbeing' THEN value END)::double precision AS wellbeing_avg,
+            AVG(CASE WHEN question_type = 'motivation' THEN value END)::double precision AS motivation_avg,
+            AVG(CASE WHEN question_type = 'focus' THEN value END)::double precision AS focus_avg,
+            AVG(CASE WHEN question_type = 'stress' THEN value END)::double precision AS stress_avg,
+            AVG(CASE WHEN question_type = 'sleep' THEN value END)::double precision AS sleep_avg,
+            AVG(CASE WHEN question_type = 'workload' THEN value END)::double precision AS workload_avg,
             COUNT(*)::bigint AS answers_count
         FROM checkin_answers
         WHERE user_id = ANY($1)
@@ -373,10 +411,13 @@ async fn build_analytics(
     .bind(&user_ids)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| {
-        tracing::error!("Failed to load analytics rows: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!("Failed to load analytics rows: {}", e);
+            Vec::new()
+        }
+    };
 
     let mut user_history: HashMap<Uuid, HashMap<String, MetricBlock>> = HashMap::new();
     let mut month_keys_set: HashSet<String> = HashSet::new();
@@ -409,12 +450,13 @@ async fn build_analytics(
         }
     }
 
-    let overrides = db::get_monthly_metric_overrides(&state.pool, &user_ids)
-        .await
-        .map_err(|e| {
+    let overrides = match db::get_monthly_metric_overrides(&state.pool, &user_ids).await {
+        Ok(overrides) => overrides,
+        Err(e) => {
             tracing::error!("Failed to load monthly metric overrides: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+            Vec::new()
+        }
+    };
     for row in overrides {
         let key = format!("{}-{:02}", row.period.year(), row.period.month());
         let metrics = MetricBlock {
@@ -736,23 +778,27 @@ async fn load_metadata(
         };
         Ok((company, metadata, Some(updated_at)))
     } else {
-        Ok((
-            "OpsLab".to_string(),
-            AnalyticsMetadata {
-                assessment_tools: vec![
-                    "WHO-5 Well-Being Index (0-100)".to_string(),
-                    "PHQ-9 Patient Health Questionnaire (0-27)".to_string(),
-                    "GAD-7 Generalized Anxiety Disorder (0-21)".to_string(),
-                    "MBI Maslach Burnout Inventory (0-100%)".to_string(),
-                ],
-                update_frequency: "monthly".to_string(),
-                next_assessment: None,
-                participation_rate: "—".to_string(),
-                data_collection_period: String::new(),
-            },
-            None,
-        ))
+        Ok(default_metadata())
     }
+}
+
+fn default_metadata() -> (String, AnalyticsMetadata, Option<DateTime<Utc>>) {
+    (
+        "OpsLab".to_string(),
+        AnalyticsMetadata {
+            assessment_tools: vec![
+                "WHO-5 Well-Being Index (0-100)".to_string(),
+                "PHQ-9 Patient Health Questionnaire (0-27)".to_string(),
+                "GAD-7 Generalized Anxiety Disorder (0-21)".to_string(),
+                "MBI Maslach Burnout Inventory (0-100%)".to_string(),
+            ],
+            update_frequency: "monthly".to_string(),
+            next_assessment: None,
+            participation_rate: "—".to_string(),
+            data_collection_period: String::new(),
+        },
+        None,
+    )
 }
 
 fn resolve_last_updated(month_keys: &[String], meta_updated_at: Option<DateTime<Utc>>) -> DateTime<Utc> {
