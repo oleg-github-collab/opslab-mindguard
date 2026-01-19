@@ -3671,7 +3671,7 @@
       const element = document.getElementById(elementId);
       if (!element) return;
 
-      // Softer language for employees viewing their own data
+      // Softer, supportive language for employees viewing their own data
       const labels = isAdmin() ? {
         low: 'Низький ризик',
         medium: 'Середній ризик',
@@ -3680,9 +3680,9 @@
         unknown: 'Н/Д',
       } : {
         low: 'Все добре',
-        medium: 'Варто звернути увагу',
-        high: 'Потребує уваги',
-        critical: 'Важливо звернутись до фахівця',
+        medium: 'Варто подбати про себе',
+        high: 'Рекомендуємо звернути увагу',
+        critical: 'Варто поспілкуватися з підтримкою',
         unknown: 'Н/Д',
       };
 
@@ -3816,7 +3816,7 @@
     }
 
     function getRiskLabel(risk) {
-      // Softer language for employees
+      // Softer, supportive language for employees
       const labels = isAdmin() ? {
         low: 'Низький',
         medium: 'Середній',
@@ -3824,10 +3824,10 @@
         critical: 'Критичний',
         unknown: 'Н/Д',
       } : {
-        low: 'Добре',
-        medium: 'Звернути увагу',
-        high: 'Потребує уваги',
-        critical: 'Потребує підтримки',
+        low: 'Все добре',
+        medium: 'Варто подбати про себе',
+        high: 'Рекомендуємо звернути увагу',
+        critical: 'Варто поспілкуватися з підтримкою',
         unknown: 'Н/Д',
       };
       return labels[risk] || 'Невідомо';

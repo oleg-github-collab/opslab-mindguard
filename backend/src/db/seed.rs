@@ -221,7 +221,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "kateryna.petukhova@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(72.0, 1.0, 0.0, 40.0, 7.2, 7.0, 7.0, 12.0),
+                metrics: metrics(72.0, 1.0, 2.0, 40.0, 7.2, 7.0, 7.0, 12.0),
             },
             SeedMetric {
                 email: "kateryna.petukhova@opslab.uk",
@@ -231,7 +231,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "kateryna.petukhova@opslab.uk",
                 period: period(2025, 10),
-                metrics: metrics(48.0, 14.0, 0.0, 44.44, 6.3, 5.0, 5.0, 15.0),
+                metrics: metrics(48.0, 14.0, 12.0, 44.44, 6.3, 5.0, 5.0, 15.0),
             },
             SeedMetric {
                 email: "kateryna.petukhova@opslab.uk",
@@ -246,7 +246,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "ivanna.sakalo@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(60.0, 2.0, 0.0, 45.0, 6.8, 6.0, 6.0, 14.0),
+                metrics: metrics(60.0, 2.0, 3.0, 45.0, 6.8, 6.0, 6.0, 14.0),
             },
             SeedMetric {
                 email: "ivanna.sakalo@opslab.uk",
@@ -271,7 +271,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "mykhailo.ivashchuk@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(52.0, 6.0, 0.0, 62.0, 6.2, 6.0, 5.0, 18.0),
+                metrics: metrics(52.0, 6.0, 7.0, 62.0, 6.2, 6.0, 5.0, 18.0),
             },
             SeedMetric {
                 email: "mykhailo.ivashchuk@opslab.uk",
@@ -321,7 +321,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "oksana.klinchaian@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(72.0, 2.0, 0.0, 40.0, 7.2, 7.0, 7.0, 10.0),
+                metrics: metrics(72.0, 2.0, 3.0, 40.0, 7.2, 7.0, 7.0, 10.0),
             },
             SeedMetric {
                 email: "oksana.klinchaian@opslab.uk",
@@ -346,7 +346,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "iryna.miachkova@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(72.0, 1.0, 0.0, 40.0, 7.5, 8.0, 7.0, 8.0),
+                metrics: metrics(72.0, 1.0, 2.0, 40.0, 7.5, 8.0, 7.0, 8.0),
             },
             SeedMetric {
                 email: "iryna.miachkova@opslab.uk",
@@ -371,7 +371,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "veronika.kukharchuk@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(92.0, 1.0, 0.0, 30.0, 7.8, 8.0, 8.0, 6.0),
+                metrics: metrics(92.0, 1.0, 2.0, 30.0, 7.8, 8.0, 8.0, 6.0),
             },
             SeedMetric {
                 email: "veronika.kukharchuk@opslab.uk",
@@ -396,7 +396,7 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
             SeedMetric {
                 email: "mariya.vasylyk@opslab.uk",
                 period: period(2025, 8),
-                metrics: metrics(60.0, 1.0, 0.0, 45.0, 7.0, 7.0, 7.0, 10.0),
+                metrics: metrics(60.0, 1.0, 2.0, 45.0, 7.0, 7.0, 7.0, 10.0),
             },
             SeedMetric {
                 email: "mariya.vasylyk@opslab.uk",
