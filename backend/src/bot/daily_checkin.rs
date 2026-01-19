@@ -55,8 +55,10 @@ pub struct Metrics {
     pub gad7_score: f64,
     #[serde(alias = "burnout_percentage")]
     pub mbi_score: f64,
-    #[serde(alias = "sleep_quality")]
+    #[serde(default)]
     pub sleep_duration: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sleep_quality: Option<f64>,
     pub work_life_balance: f64,
     pub stress_level: f64,
 }
@@ -68,7 +70,7 @@ impl Metrics {
     }
 
     pub fn sleep_quality(&self) -> f64 {
-        self.sleep_duration
+        self.sleep_quality.unwrap_or(self.sleep_duration)
     }
 }
 
@@ -577,6 +579,7 @@ impl MetricsCalculator {
             gad7_score: gad7 as f64,
             mbi_score: mbi,
             sleep_duration,
+            sleep_quality: Some(sleep_duration),
             work_life_balance,
             stress_level,
         })

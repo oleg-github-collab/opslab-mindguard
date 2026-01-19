@@ -373,7 +373,10 @@ async fn build_analytics(
     .bind(&user_ids)
     .fetch_all(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        tracing::error!("Failed to load analytics rows: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut user_history: HashMap<Uuid, HashMap<String, MetricBlock>> = HashMap::new();
     let mut month_keys_set: HashSet<String> = HashSet::new();

@@ -1272,6 +1272,7 @@ pub async fn calculate_user_metrics_for_period(
         gad7_score: gad7,
         mbi_score: mbi,
         sleep_duration,
+        sleep_quality: Some(sleep_duration),
         work_life_balance,
         stress_level,
     }))
@@ -1763,8 +1764,33 @@ pub async fn get_monthly_metric_overrides(
     )
     .bind(user_ids)
     .fetch_all(pool)
-    .await?;
-    Ok(rows)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_monthly_metrics unavailable ({}); skipping overrides",
+                    err
+                );
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+}
+
+fn is_missing_analytics_schema(err: &sqlx::Error) -> bool {
+    match err {
+        sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+            Some("42P01") => true, // undefined_table
+            Some("42703") => true, // undefined_column
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 pub async fn upsert_monthly_metric(
