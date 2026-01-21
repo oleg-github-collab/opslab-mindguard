@@ -774,6 +774,28 @@ pub async fn mark_reminder_sent(
     Ok(result.rows_affected() > 0)
 }
 
+/// Clear reminder marker for a given local date (used when delivery fails)
+pub async fn clear_reminder_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    local_date: NaiveDate,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        UPDATE user_preferences
+        SET last_reminder_date = NULL,
+            updated_at = NOW()
+        WHERE user_id = $1
+          AND last_reminder_date = $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(local_date)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get reminder candidates with preferences
 pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandidate>> {
     let rows = sqlx::query(

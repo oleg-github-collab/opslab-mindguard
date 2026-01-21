@@ -21,6 +21,7 @@ use axum::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use sqlx::{postgres::PgPoolOptions, Row};
+use chrono::NaiveDate;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -153,7 +154,7 @@ async fn run() -> anyhow::Result<()> {
                     }
                 };
 
-                let mut due_users: Vec<(uuid::Uuid, i64)> = Vec::new();
+                let mut due_users: Vec<DueReminder> = Vec::new();
 
                 for candidate in candidates {
                     if !candidate.notification_enabled {
@@ -166,14 +167,21 @@ async fn run() -> anyhow::Result<()> {
                     let (local_date, local_hour, local_minute) =
                         time_utils::local_components(&candidate.timezone, now);
 
-                    if local_hour == candidate.reminder_hour
-                        && local_minute == candidate.reminder_minute
+                    let is_due_time = local_hour > candidate.reminder_hour
+                        || (local_hour == candidate.reminder_hour
+                            && local_minute >= candidate.reminder_minute);
+
+                    if is_due_time
                     {
                         match db::mark_reminder_sent(&state.pool, candidate.user_id, local_date)
                             .await
                         {
                             Ok(true) => {
-                                due_users.push((candidate.user_id, candidate.telegram_id));
+                                due_users.push(DueReminder {
+                                    user_id: candidate.user_id,
+                                    telegram_id: candidate.telegram_id,
+                                    local_date,
+                                });
                             }
                             Ok(false) => {}
                             Err(e) => {
@@ -267,36 +275,48 @@ async fn run() -> anyhow::Result<()> {
 }
 
 /// #2 WOW Feature: Smart Reminders - надсилає чекіни користувачам у їхній вибраний час
-async fn send_smart_reminders(
-    state: &SharedState,
-    users: Vec<(uuid::Uuid, i64)>,
-) -> anyhow::Result<()> {
+struct DueReminder {
+    user_id: Uuid,
+    telegram_id: i64,
+    local_date: NaiveDate,
+}
+
+async fn send_smart_reminders(state: &SharedState, users: Vec<DueReminder>) -> anyhow::Result<()> {
     let bot_token = std::env::var("TELEGRAM_BOT_TOKEN")?;
     let bot = teloxide::Bot::new(bot_token);
 
     let mut success_count = 0;
     let mut error_count = 0;
 
-    for (user_id, telegram_id) in users {
-        let chat_id = teloxide::types::ChatId(telegram_id);
+    for due in users {
+        let chat_id = teloxide::types::ChatId(due.telegram_id);
 
-        match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, user_id).await {
+        match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, due.user_id).await {
             Ok(_) => {
                 success_count += 1;
                 tracing::debug!(
                     "Sent smart reminder to user {} (telegram: {})",
-                    user_id,
-                    telegram_id
+                    due.user_id,
+                    due.telegram_id
                 );
             }
             Err(e) => {
                 error_count += 1;
                 tracing::error!(
                     "Failed to send smart reminder to user {} (telegram: {}): {}",
-                    user_id,
-                    telegram_id,
+                    due.user_id,
+                    due.telegram_id,
                     e
                 );
+                if let Err(clear_err) =
+                    db::clear_reminder_sent(&state.pool, due.user_id, due.local_date).await
+                {
+                    tracing::warn!(
+                        "Failed to clear reminder marker for {}: {}",
+                        due.user_id,
+                        clear_err
+                    );
+                }
             }
         }
 
