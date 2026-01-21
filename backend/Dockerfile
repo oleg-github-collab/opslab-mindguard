@@ -13,10 +13,7 @@ RUN rm -rf src
 # Copy full source
 COPY . .
 
-# Build application with DATABASE_URL (requires database connection during build)
-# SQLx will verify queries against the database at compile time
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
+# Build application (migrations are embedded, no DB connection needed at build time)
 RUN cargo build --release
 
 FROM debian:bookworm-slim
@@ -31,4 +28,6 @@ COPY --from=builder /app/static static
 
 ENV RUST_LOG=info
 EXPOSE 8080
-CMD ["/usr/local/bin/opslab-mindguard"]
+
+# Use shell form to ensure environment variables are properly expanded
+CMD /usr/local/bin/opslab-mindguard
