@@ -30,5 +30,5 @@ COPY --from=builder /app/index.html index.html
 COPY --from=builder /app/static static
 
 ENV RUST_LOG=info
-EXPOSE 3000
+EXPOSE 8080
 CMD ["/usr/local/bin/opslab-mindguard"]
