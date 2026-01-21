@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT pin_code\n        FROM telegram_pins\n        WHERE user_id = $1\n          AND used = false\n          AND expires_at > NOW()\n        ORDER BY created_at DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pin_code",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "727763db1be3f3b5337f66ad0dafb0d66a8c286b1ba9c16752d3ea88c3463ff1"
+}

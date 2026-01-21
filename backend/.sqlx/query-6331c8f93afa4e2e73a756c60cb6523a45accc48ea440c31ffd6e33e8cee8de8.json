@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT question_id, question_type as qtype, value\n        FROM checkin_answers\n        WHERE user_id = $1\n          AND created_at >= NOW() - ($2 || ' days')::INTERVAL\n        ORDER BY created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "question_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "qtype",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6331c8f93afa4e2e73a756c60cb6523a45accc48ea440c31ffd6e33e8cee8de8"
+}

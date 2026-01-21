@@ -13,7 +13,8 @@ RUN rm -rf src
 # Copy full source
 COPY . .
 
-# Build application (migrations are embedded, no DB connection needed at build time)
+# Build application with SQLx offline cache (.sqlx/)
+ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 FROM debian:bookworm-slim
@@ -29,5 +30,4 @@ COPY --from=builder /app/static static
 ENV RUST_LOG=info
 EXPOSE 8080
 
-# Use shell form to ensure environment variables are properly expanded
-CMD /usr/local/bin/opslab-mindguard
+CMD ["/usr/local/bin/opslab-mindguard"]

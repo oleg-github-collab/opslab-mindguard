@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH daily_data AS (\n            SELECT\n                DATE(created_at) as day,\n                AVG(CASE WHEN question_type = 'energy' THEN value ELSE NULL END) as energy,\n                AVG(CASE WHEN question_type = 'motivation' THEN value ELSE NULL END) as productivity\n            FROM checkin_answers\n            WHERE user_id = $1\n              AND created_at >= NOW() - INTERVAL '30 days'\n            GROUP BY DATE(created_at)\n            HAVING\n                AVG(CASE WHEN question_type = 'energy' THEN value ELSE NULL END) IS NOT NULL\n                AND AVG(CASE WHEN question_type = 'motivation' THEN value ELSE NULL END) IS NOT NULL\n        )\n        SELECT\n            CORR(energy, productivity) as \"correlation\"\n        FROM daily_data\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "correlation",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "dcee97213abe62475a4189a523aa2874666fdd762f1daff0285900017d671dc3"
+}

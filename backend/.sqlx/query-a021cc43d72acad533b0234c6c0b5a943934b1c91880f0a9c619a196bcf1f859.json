@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH day_averages AS (\n            SELECT\n                EXTRACT(DOW FROM created_at)::INT as dow,\n                AVG(value) as avg_value\n            FROM checkin_answers\n            WHERE user_id = $1\n              AND created_at >= NOW() - INTERVAL '60 days'\n            GROUP BY dow\n        )\n        SELECT\n            (SELECT dow FROM day_averages ORDER BY avg_value DESC LIMIT 1) as \"best_day!\",\n            (SELECT dow FROM day_averages ORDER BY avg_value ASC LIMIT 1) as \"worst_day!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "best_day!",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "worst_day!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "a021cc43d72acad533b0234c6c0b5a943934b1c91880f0a9c619a196bcf1f859"
+}
