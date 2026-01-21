@@ -30,4 +30,23 @@ COPY --from=builder /app/static static
 ENV RUST_LOG=info
 EXPOSE 8080
 
-CMD ["/usr/local/bin/opslab-mindguard"]
+# Create startup script with debugging
+RUN echo '#!/bin/sh\n\
+set -e\n\
+echo "=== OpsLab Mindguard Startup Debug ==="\n\
+echo "Timestamp: $(date)"\n\
+echo "PORT: ${PORT:-not set}"\n\
+echo "BIND_ADDR: ${BIND_ADDR:-not set}"\n\
+echo "DATABASE_URL: ${DATABASE_URL:0:40}..."\n\
+echo "RAILWAY_ENVIRONMENT: ${RAILWAY_ENVIRONMENT:-not set}"\n\
+echo "RUST_LOG: ${RUST_LOG:-not set}"\n\
+echo "PWD: $(pwd)"\n\
+echo "Checking binary..."\n\
+ls -lh /usr/local/bin/opslab-mindguard || echo "Binary not found!"\n\
+echo "Checking migrations..."\n\
+ls -lh migrations/ | head -5 || echo "Migrations not found!"\n\
+echo "========================================"\n\
+echo "Starting application now..."\n\
+exec /usr/local/bin/opslab-mindguard 2>&1' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
