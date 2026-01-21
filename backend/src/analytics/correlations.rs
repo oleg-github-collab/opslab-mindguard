@@ -2,7 +2,7 @@
 ///! Аналізує кореляції між показниками (sleep→mood, stress→concentration, day patterns)
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,7 +118,7 @@ pub async fn analyze_correlations(pool: &PgPool, user_id: Uuid) -> Result<Vec<Co
 
 /// Sleep → Mood Pearson correlation
 async fn calculate_sleep_mood_correlation(pool: &PgPool, user_id: Uuid) -> Result<f64> {
-    let result = sqlx::query!(
+    let correlation: Option<f64> = sqlx::query_scalar(
         r#"
         WITH daily_data AS (
             SELECT
@@ -137,17 +137,17 @@ async fn calculate_sleep_mood_correlation(pool: &PgPool, user_id: Uuid) -> Resul
             CORR(sleep, mood) as "correlation"
         FROM daily_data
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(result.correlation.unwrap_or(0.0))
+    Ok(correlation.unwrap_or(0.0))
 }
 
 /// Stress → Concentration correlation (negative expected)
 async fn calculate_stress_concentration_correlation(pool: &PgPool, user_id: Uuid) -> Result<f64> {
-    let result = sqlx::query!(
+    let correlation: Option<f64> = sqlx::query_scalar(
         r#"
         WITH daily_data AS (
             SELECT
@@ -166,17 +166,17 @@ async fn calculate_stress_concentration_correlation(pool: &PgPool, user_id: Uuid
             CORR(stress, concentration) as "correlation"
         FROM daily_data
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(result.correlation.unwrap_or(0.0))
+    Ok(correlation.unwrap_or(0.0))
 }
 
 /// Energy → Productivity (motivation) correlation
 async fn calculate_energy_productivity_correlation(pool: &PgPool, user_id: Uuid) -> Result<f64> {
-    let result = sqlx::query!(
+    let correlation: Option<f64> = sqlx::query_scalar(
         r#"
         WITH daily_data AS (
             SELECT
@@ -195,17 +195,17 @@ async fn calculate_energy_productivity_correlation(pool: &PgPool, user_id: Uuid)
             CORR(energy, productivity) as "correlation"
         FROM daily_data
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(result.correlation.unwrap_or(0.0))
+    Ok(correlation.unwrap_or(0.0))
 }
 
 /// Workload → Burnout correlation
 async fn calculate_workload_burnout_correlation(pool: &PgPool, user_id: Uuid) -> Result<f64> {
-    let result = sqlx::query!(
+    let correlation: Option<f64> = sqlx::query_scalar(
         r#"
         WITH daily_data AS (
             SELECT
@@ -224,17 +224,17 @@ async fn calculate_workload_burnout_correlation(pool: &PgPool, user_id: Uuid) ->
             CORR(workload, stress) as "correlation"
         FROM daily_data
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(result.correlation.unwrap_or(0.0))
+    Ok(correlation.unwrap_or(0.0))
 }
 
 /// Знайти найкращий і найгірший день тижня
 async fn find_best_worst_days(pool: &PgPool, user_id: Uuid) -> Result<(u32, u32)> {
-    let result = sqlx::query!(
+    let result = sqlx::query(
         r#"
         WITH day_averages AS (
             SELECT
@@ -249,12 +249,14 @@ async fn find_best_worst_days(pool: &PgPool, user_id: Uuid) -> Result<(u32, u32)
             (SELECT dow FROM day_averages ORDER BY avg_value DESC LIMIT 1) as "best_day!",
             (SELECT dow FROM day_averages ORDER BY avg_value ASC LIMIT 1) as "worst_day!"
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok((result.best_day as u32, result.worst_day as u32))
+    let best_day: i32 = result.try_get("best_day")?;
+    let worst_day: i32 = result.try_get("worst_day")?;
+    Ok((best_day as u32, worst_day as u32))
 }
 
 fn day_name(dow: u32) -> &'static str {

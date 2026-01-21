@@ -221,15 +221,15 @@ pub async fn find_user_by_telegram(pool: &PgPool, telegram_id: i64) -> Result<Op
 }
 
 pub async fn attach_telegram(pool: &PgPool, user_id: Uuid, telegram_id: i64) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $2, updated_at = now()
         WHERE id = $1
         "#,
-        user_id,
-        telegram_id
     )
+    .bind(user_id)
+    .bind(telegram_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -262,16 +262,16 @@ pub async fn insert_answer(
     let normalized_value = ((value as f32 / 3.0) * 9.0 + 1.0).round() as i16;
 
     // Insert into new table
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO checkin_answers (user_id, question_id, question_type, value)
         VALUES ($1, $2, $3, $4)
         "#,
-        user_id,
-        question_id,
-        question_type,
-        normalized_value
     )
+    .bind(user_id)
+    .bind(question_id)
+    .bind(question_type)
+    .bind(normalized_value)
     .execute(pool)
     .await?;
 
@@ -293,18 +293,18 @@ pub async fn insert_voice_log(
         None => None,
     };
     let id = Uuid::new_v4();
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO voice_logs (id, user_id, enc_transcript, enc_ai_analysis, risk_score, urgent)
         VALUES ($1, $2, $3, $4, $5, $6)
         "#,
-        id,
-        user_id,
-        enc_transcript,
-        enc_ai_analysis,
-        risk_score,
-        urgent
     )
+    .bind(id)
+    .bind(user_id)
+    .bind(enc_transcript)
+    .bind(enc_ai_analysis)
+    .bind(risk_score)
+    .bind(urgent)
     .execute(pool)
     .await?;
     Ok(id)
@@ -330,7 +330,7 @@ pub async fn insert_checkin_open_response(
         None => None,
     };
     let id = Uuid::new_v4();
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO checkin_open_responses (
             id,
@@ -347,18 +347,18 @@ pub async fn insert_checkin_open_response(
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         "#,
-        id,
-        user_id,
-        checkin_id,
-        question_id,
-        qtype,
-        response_source,
-        enc_response,
-        enc_ai_analysis,
-        risk_score,
-        urgent,
-        audio_duration_seconds
     )
+    .bind(id)
+    .bind(user_id)
+    .bind(checkin_id)
+    .bind(question_id)
+    .bind(qtype)
+    .bind(response_source)
+    .bind(enc_response)
+    .bind(enc_ai_analysis)
+    .bind(risk_score)
+    .bind(urgent)
+    .bind(audio_duration_seconds)
     .execute(pool)
     .await?;
     Ok(id)
@@ -374,16 +374,16 @@ pub async fn insert_checkin_answer(
     qtype: &str,
     value: i16,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO checkin_answers (user_id, question_id, question_type, value)
         VALUES ($1, $2, $3, $4)
         "#,
-        user_id,
-        question_id,
-        qtype,
-        value
     )
+    .bind(user_id)
+    .bind(question_id)
+    .bind(qtype)
+    .bind(value)
     .execute(pool)
     .await?;
     Ok(())
@@ -395,8 +395,7 @@ pub async fn get_recent_checkin_answers(
     user_id: Uuid,
     days: i32,
 ) -> Result<Vec<CheckInAnswer>> {
-    let answers = sqlx::query_as!(
-        CheckInAnswer,
+    let rows = sqlx::query(
         r#"
         SELECT question_id, question_type as qtype, value
         FROM checkin_answers
@@ -404,26 +403,32 @@ pub async fn get_recent_checkin_answers(
           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
         ORDER BY created_at DESC
         "#,
-        user_id,
-        &days.to_string()
     )
+    .bind(user_id)
+    .bind(days.to_string())
     .fetch_all(pool)
     .await?;
+
+    let mut answers = Vec::with_capacity(rows.len());
+    for row in rows {
+        answers.push(CheckInAnswer {
+            question_id: row.try_get("question_id")?,
+            qtype: row.try_get("qtype")?,
+            value: row.try_get("value")?,
+        });
+    }
     Ok(answers)
 }
 
 /// Calculate and return metrics for a user
 pub async fn calculate_user_metrics(pool: &PgPool, user_id: Uuid) -> Result<Option<Metrics>> {
-    let result = sqlx::query!(
-        r#"
-        SELECT calculate_user_metrics($1) as metrics
-        "#,
-        user_id
-    )
-    .fetch_one(pool)
-    .await?;
+    let metrics_json: Option<serde_json::Value> =
+        sqlx::query_scalar("SELECT calculate_user_metrics($1)")
+            .bind(user_id)
+            .fetch_one(pool)
+            .await?;
 
-    match result.metrics {
+    match metrics_json {
         Some(json_value) => {
             let metrics: Metrics = serde_json::from_value(json_value)?;
             Ok(Some(metrics))
@@ -434,19 +439,19 @@ pub async fn calculate_user_metrics(pool: &PgPool, user_id: Uuid) -> Result<Opti
 
 /// Get the count of check-in answers for a user in the last N days
 pub async fn get_checkin_answer_count(pool: &PgPool, user_id: Uuid, days: i32) -> Result<i64> {
-    let result = sqlx::query!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(*) as count
+        SELECT COUNT(*)
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
         "#,
-        user_id,
-        &days.to_string()
     )
+    .bind(user_id)
+    .bind(days.to_string())
     .fetch_one(pool)
     .await?;
-    Ok(result.count.unwrap_or(0))
+    Ok(count)
 }
 
 // ========== Telegram PIN Functions ==========
@@ -486,7 +491,7 @@ pub async fn link_telegram_by_email_code(
         return Ok(TelegramLinkOutcome::TelegramIdInUse);
     }
 
-    let pin = sqlx::query!(
+    let pin_row = sqlx::query(
         r#"
         SELECT id
         FROM telegram_pins
@@ -497,33 +502,34 @@ pub async fn link_telegram_by_email_code(
         ORDER BY created_at DESC
         LIMIT 1
         "#,
-        user.id,
-        code
     )
+    .bind(user.id)
+    .bind(code)
     .fetch_optional(pool)
     .await?;
 
-    if let Some(pin) = pin {
-        sqlx::query!(
+    if let Some(pin) = pin_row {
+        let pin_id: Uuid = pin.try_get("id")?;
+        sqlx::query(
             r#"
             UPDATE telegram_pins
             SET used = true, used_at = NOW()
             WHERE id = $1
             "#,
-            pin.id
         )
+        .bind(pin_id)
         .execute(pool)
         .await?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE users
             SET telegram_id = $1, updated_at = NOW()
             WHERE id = $2
             "#,
-            telegram_id,
-            user.id
         )
+        .bind(telegram_id)
+        .bind(user.id)
         .execute(pool)
         .await?;
 
@@ -539,15 +545,15 @@ pub async fn link_telegram_by_email_code(
         return Ok(TelegramLinkOutcome::InvalidCredentials);
     }
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $1, updated_at = NOW()
         WHERE id = $2
         "#,
-        telegram_id,
-        user.id
     )
+    .bind(telegram_id)
+    .bind(user.id)
     .execute(pool)
     .await?;
 
@@ -565,26 +571,26 @@ pub async fn generate_telegram_pin(pool: &PgPool, user_id: Uuid) -> Result<Strin
     };
 
     // Mark old PINs as used
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE telegram_pins
         SET used = true
         WHERE user_id = $1 AND used = false
         "#,
-        user_id
     )
+    .bind(user_id)
     .execute(pool)
     .await?;
 
     // Insert new PIN
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO telegram_pins (user_id, pin_code, expires_at)
         VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
         "#,
-        user_id,
-        &pin_code
     )
+    .bind(user_id)
+    .bind(&pin_code)
     .execute(pool)
     .await?;
 
@@ -598,7 +604,7 @@ pub async fn verify_and_link_telegram(
     telegram_id: i64,
 ) -> Result<Option<Uuid>> {
     // Find valid PIN
-    let pin = sqlx::query!(
+    let pin = sqlx::query(
         r#"
         SELECT user_id, expires_at
         FROM telegram_pins
@@ -608,8 +614,8 @@ pub async fn verify_and_link_telegram(
         ORDER BY created_at DESC
         LIMIT 1
         "#,
-        pin_code
     )
+    .bind(pin_code)
     .fetch_optional(pool)
     .await?;
 
@@ -617,37 +623,39 @@ pub async fn verify_and_link_telegram(
         return Ok(None); // Invalid or expired PIN
     };
 
+    let user_id: Uuid = pin.try_get("user_id")?;
+
     // Mark PIN as used
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE telegram_pins
         SET used = true, used_at = NOW()
         WHERE pin_code = $1
         "#,
-        pin_code
     )
+    .bind(pin_code)
     .execute(pool)
     .await?;
 
     // Link Telegram ID to user
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $1, updated_at = NOW()
         WHERE id = $2
         "#,
-        telegram_id,
-        pin.user_id
     )
+    .bind(telegram_id)
+    .bind(user_id)
     .execute(pool)
     .await?;
 
-    Ok(Some(pin.user_id))
+    Ok(Some(user_id))
 }
 
 /// Get active PIN for user (for display on dashboard)
 pub async fn get_active_pin(pool: &PgPool, user_id: Uuid) -> Result<Option<String>> {
-    let pin = sqlx::query!(
+    let pin = sqlx::query(
         r#"
         SELECT pin_code
         FROM telegram_pins
@@ -657,12 +665,12 @@ pub async fn get_active_pin(pool: &PgPool, user_id: Uuid) -> Result<Option<Strin
         ORDER BY created_at DESC
         LIMIT 1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
-    Ok(pin.map(|p| p.pin_code))
+    Ok(pin.map(|p| p.try_get("pin_code")).transpose()?)
 }
 
 // ========== WOW Features Database Functions ==========
@@ -945,14 +953,14 @@ pub async fn calculate_best_reminder_time_local(
 
 /// Get user's current streak
 pub async fn get_user_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32> {
-    let streak = sqlx::query_scalar!(
+    let streak: Option<i32> = sqlx::query_scalar(
         r#"
-        SELECT COALESCE(current_streak, 0) as "streak!"
+        SELECT COALESCE(current_streak, 0)
         FROM user_streaks
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
@@ -961,15 +969,15 @@ pub async fn get_user_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32
 
 /// Get check-in count for the last week
 pub async fn get_checkin_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<i32> {
-    let count = sqlx::query_scalar!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(DISTINCT DATE(created_at)) as "count!"
+        SELECT COUNT(DISTINCT DATE(created_at))
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - INTERVAL '7 days'
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -978,14 +986,14 @@ pub async fn get_checkin_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<
 
 /// Get last check-in date for user
 pub async fn get_last_checkin_date(pool: &PgPool, user_id: Uuid) -> Result<Option<DateTime<Utc>>> {
-    let result = sqlx::query_scalar!(
+    let result: Option<DateTime<Utc>> = sqlx::query_scalar(
         r#"
-        SELECT MAX(created_at) as "last_checkin"
+        SELECT MAX(created_at)
         FROM checkin_answers
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -1105,15 +1113,15 @@ pub async fn insert_kudos(
     to_user_id: Uuid,
     message: &str,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO kudos (from_user_id, to_user_id, message)
         VALUES ($1, $2, $3)
         "#,
-        from_user_id,
-        to_user_id,
-        message
     )
+    .bind(from_user_id)
+    .bind(to_user_id)
+    .bind(message)
     .execute(pool)
     .await?;
     Ok(())
@@ -1121,15 +1129,15 @@ pub async fn insert_kudos(
 
 /// Get kudos count for the last week
 pub async fn get_kudos_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<i64> {
-    let count = sqlx::query_scalar!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(*) as "count!"
+        SELECT COUNT(*)
         FROM kudos
         WHERE to_user_id = $1
           AND created_at >= NOW() - INTERVAL '7 days'
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -1142,20 +1150,19 @@ pub async fn get_recent_kudos(
     user_id: Uuid,
     limit: i64,
 ) -> Result<Vec<KudosRecord>> {
-    let records = sqlx::query_as!(
-        KudosRecord,
+    let records = sqlx::query_as::<_, KudosRecord>(
         r#"
         SELECT k.id, k.from_user_id, k.to_user_id, k.message, k.created_at,
-               u.enc_name as "from_user_enc_name!"
+               u.enc_name as from_user_enc_name
         FROM kudos k
         JOIN users u ON k.from_user_id = u.id
         WHERE k.to_user_id = $1
         ORDER BY k.created_at DESC
         LIMIT $2
         "#,
-        user_id,
-        limit
     )
+    .bind(user_id)
+    .bind(limit)
     .fetch_all(pool)
     .await?;
 
@@ -1234,14 +1241,14 @@ pub async fn get_active_users(pool: &PgPool) -> Result<Vec<DbUser>> {
 
 /// Get user role
 pub async fn get_user_role(pool: &PgPool, user_id: Uuid) -> Result<UserRole> {
-    let role = sqlx::query_scalar!(
+    let role: UserRole = sqlx::query_scalar(
         r#"
-        SELECT role as "role: UserRole"
+        SELECT role
         FROM users
         WHERE id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -1252,23 +1259,26 @@ pub async fn get_user_role(pool: &PgPool, user_id: Uuid) -> Result<UserRole> {
 
 /// Get question type pattern for adaptive logic
 pub async fn get_user_recent_pattern(pool: &PgPool, user_id: Uuid) -> Result<Vec<(String, f64)>> {
-    let patterns: Vec<_> = sqlx::query!(
+    let rows = sqlx::query(
         r#"
-        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as "avg_value: f64"
+        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as avg_value
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - INTERVAL '3 days'
         GROUP BY question_type
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
 
-    Ok(patterns
-        .into_iter()
-        .map(|p| (p.question_type, p.avg_value.unwrap_or(0.0)))
-        .collect())
+    let mut patterns = Vec::with_capacity(rows.len());
+    for row in rows {
+        let question_type: String = row.try_get("question_type")?;
+        let avg_value: f64 = row.try_get("avg_value")?;
+        patterns.push((question_type, avg_value));
+    }
+    Ok(patterns)
 }
 
 // ---------- Metrics for Period (#6) ----------

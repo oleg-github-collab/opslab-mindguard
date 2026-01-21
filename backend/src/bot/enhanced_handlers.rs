@@ -11,7 +11,7 @@ use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use chrono::{Datelike, Utc};
 use serde_json::json;
-use sqlx;
+use sqlx::{self, Row};
 use std::env;
 use teloxide::net::Download;
 use teloxide::prelude::*;
@@ -704,6 +704,14 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
                 bot.send_message(
                     msg.chat.id,
                     "⏱️ Голосове може тривати до 5 хв. Будь ласка, надішли коротше.",
+                )
+                .await?;
+                return Ok(());
+            }
+            if !state.ai.is_enabled() {
+                bot.send_message(
+                    msg.chat.id,
+                    "Голосовий аналіз тимчасово недоступний. Надішліть відповідь текстом.",
                 )
                 .await?;
                 return Ok(());
@@ -1749,6 +1757,15 @@ async fn handle_voice(
     user_id: Uuid,
     file_id: String,
 ) -> Result<()> {
+    if !state.ai.is_enabled() {
+        bot.send_message(
+            msg.chat.id,
+            "Голосовий аналіз тимчасово недоступний. Надішліть відповідь текстом.",
+        )
+        .await?;
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         "🎧 Отримав голосове. Аналізую, це займе до 30 секунд...",
@@ -1978,7 +1995,7 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
 }
 
 async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
-    let logs = sqlx::query!(
+    let logs = sqlx::query(
         r#"
         SELECT enc_transcript, created_at
         FROM voice_logs
@@ -1986,17 +2003,19 @@ async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
         ORDER BY created_at DESC
         LIMIT 3
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_all(&state.pool)
     .await?;
 
     let mut parts = Vec::new();
     for log in logs {
-        if let Ok(text) = state.crypto.decrypt_str(&log.enc_transcript) {
+        let enc_transcript: String = log.try_get("enc_transcript")?;
+        let created_at: chrono::DateTime<chrono::Utc> = log.try_get("created_at")?;
+        if let Ok(text) = state.crypto.decrypt_str(&enc_transcript) {
             parts.push(format!(
                 "{}: {}",
-                log.created_at.with_timezone(&Utc).date_naive(),
+                created_at.with_timezone(&Utc).date_naive(),
                 text
             ));
         }

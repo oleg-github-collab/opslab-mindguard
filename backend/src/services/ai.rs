@@ -23,20 +23,46 @@ pub struct AiOutcome {
 
 #[derive(Clone)]
 pub struct AiService {
-    client: Client<OpenAIConfig>,
+    client: Option<Client<OpenAIConfig>>,
     crypto: Arc<Crypto>,
-    api_key: String,
+    api_key: Option<String>,
 }
 
 impl AiService {
-    pub fn new(api_key: String, crypto: Arc<Crypto>) -> Self {
-        let config = OpenAIConfig::new().with_api_key(api_key.clone());
-        let client = Client::with_config(config);
+    pub fn new(api_key: Option<String>, crypto: Arc<Crypto>) -> Self {
+        let api_key = api_key.and_then(|val| {
+            let trimmed = val.trim().to_string();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        });
+        let client = api_key.as_ref().map(|key| {
+            let config = OpenAIConfig::new().with_api_key(key.clone());
+            Client::with_config(config)
+        });
         Self {
             client,
             crypto,
             api_key,
         }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.api_key.is_some()
+    }
+
+    fn client(&self) -> Result<&Client<OpenAIConfig>> {
+        self.client
+            .as_ref()
+            .ok_or_else(|| anyhow!("OpenAI API key not configured"))
+    }
+
+    fn api_key(&self) -> Result<&str> {
+        self.api_key
+            .as_deref()
+            .ok_or_else(|| anyhow!("OpenAI API key not configured"))
     }
 
     pub async fn analyze_transcript(
@@ -45,6 +71,7 @@ impl AiService {
         context: &str,
         metrics: Option<&Metrics>,
     ) -> Result<AiOutcome> {
+        let client = self.client()?;
         let mut retries = 0;
         let mut system_prompt = String::from(
             "You are a mental health triage assistant for OpsLab Mindguard.\n\
@@ -100,7 +127,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
                 .max_tokens(300u16)
                 .build()?;
 
-            match self.client.chat().create(request).await {
+            match client.chat().create(request).await {
                 Ok(resp) => {
                     let content = resp
                         .choices
@@ -148,6 +175,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
     }
 
     pub async fn transcribe_voice(&self, audio_bytes: Vec<u8>) -> Result<String> {
+        let api_key = self.api_key()?;
         let form = reqwest::multipart::Form::new()
             .text("model", "whisper-1")
             .part(
@@ -159,7 +187,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
 
         let resp = reqwest::Client::new()
             .post("https://api.openai.com/v1/audio/transcriptions")
-            .bearer_auth(&self.api_key)
+            .bearer_auth(api_key)
             .multipart(form)
             .send()
             .await?
@@ -173,6 +201,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
     }
 
     pub async fn group_coach_response(&self, mention_text: &str) -> Result<String> {
+        let client = self.client()?;
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
                 role: Role::System,
@@ -193,7 +222,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
             .messages(messages)
             .build()?;
 
-        let resp = self.client.chat().create(request).await?;
+        let resp = client.chat().create(request).await?;
         let content = resp
             .choices
             .first()
@@ -207,6 +236,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
         metrics: &Metrics,
         correlations: &[CorrelationInsight],
     ) -> Result<String> {
+        let client = self.client()?;
         let correlations_text = if correlations.is_empty() {
             "No strong correlations found.".to_string()
         } else {
@@ -259,7 +289,7 @@ Compose the insight now.",
             .max_tokens(200u16)
             .build()?;
 
-        let resp = self.client.chat().create(request).await?;
+        let resp = client.chat().create(request).await?;
         let content = resp
             .choices
             .first()

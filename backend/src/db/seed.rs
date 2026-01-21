@@ -8,7 +8,7 @@ use argon2::{
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use serde_json::json;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -103,19 +103,19 @@ async fn seed_users(pool: &PgPool, crypto: &Crypto) -> Result<()> {
             .to_string();
 
         let enc_name = crypto.encrypt_str(user.name)?;
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO users (id, email, hash, enc_name, role, note)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (email) DO NOTHING
             "#,
-            Uuid::new_v4(),
-            user.email,
-            hash,
-            enc_name,
-            user.role as UserRole,
-            user.note
         )
+        .bind(Uuid::new_v4())
+        .bind(user.email)
+        .bind(hash)
+        .bind(enc_name)
+        .bind(user.role as UserRole)
+        .bind(user.note)
         .execute(pool)
         .await?;
     }
@@ -123,7 +123,7 @@ async fn seed_users(pool: &PgPool, crypto: &Crypto) -> Result<()> {
 }
 
 async fn seed_questions(pool: &PgPool) -> Result<()> {
-    let existing: i64 = sqlx::query_scalar!("SELECT COUNT(*) as \"count!\" FROM questions")
+    let existing: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM questions")
         .fetch_one(pool)
         .await?;
     if existing > 0 {
@@ -155,15 +155,15 @@ async fn seed_questions(pool: &PgPool) -> Result<()> {
     ];
 
     for (idx, prompt) in prompts.into_iter().enumerate() {
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO questions (id, text, order_index)
             VALUES ($1, $2, $3)
             "#,
-            (idx + 1) as i32,
-            prompt,
-            (idx + 1) as i32
         )
+        .bind((idx + 1) as i32)
+        .bind(prompt)
+        .bind((idx + 1) as i32)
         .execute(pool)
         .await?;
     }
@@ -203,18 +203,19 @@ fn period(year: i32, month: u32) -> NaiveDate {
 }
 
 async fn seed_analytics(pool: &PgPool) -> Result<()> {
-    let existing: i64 =
-        sqlx::query_scalar!("SELECT COUNT(*) as \"count!\" FROM analytics_monthly_metrics")
-            .fetch_one(pool)
-            .await?;
+    let existing: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analytics_monthly_metrics")
+        .fetch_one(pool)
+        .await?;
     let seeded_metrics = existing == 0;
     if seeded_metrics {
-        let rows = sqlx::query!("SELECT id, email FROM users")
+        let rows = sqlx::query("SELECT id, email FROM users")
             .fetch_all(pool)
             .await?;
         let mut user_map: HashMap<String, Uuid> = HashMap::new();
         for row in rows {
-            user_map.insert(row.email, row.id);
+            let email: String = row.try_get("email")?;
+            let id: Uuid = row.try_get("id")?;
+            user_map.insert(email, id);
         }
 
         let seeds = vec![
@@ -428,17 +429,18 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
         }
     }
 
-    let alert_count: i64 =
-        sqlx::query_scalar!("SELECT COUNT(*) as \"count!\" FROM analytics_alerts")
-            .fetch_one(pool)
-            .await?;
+    let alert_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM analytics_alerts")
+        .fetch_one(pool)
+        .await?;
     if alert_count == 0 {
-        let user_lookup = sqlx::query!("SELECT id, email FROM users")
+        let user_lookup = sqlx::query("SELECT id, email FROM users")
             .fetch_all(pool)
             .await?;
         let mut user_map: HashMap<String, Uuid> = HashMap::new();
         for row in user_lookup {
-            user_map.insert(row.email, row.id);
+            let email: String = row.try_get("email")?;
+            let id: Uuid = row.try_get("id")?;
+            user_map.insert(email, id);
         }
         let timestamp: DateTime<Utc> =
             DateTime::parse_from_rfc3339("2025-12-31T10:00:00Z")
@@ -486,24 +488,24 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
 
         for (severity, email, name, message) in alerts {
             let employee_id = user_map.get(email).copied();
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO analytics_alerts (severity, employee_id, employee_name, message, timestamp)
                 VALUES ($1, $2, $3, $4, $5)
                 "#,
-                severity,
-                employee_id,
-                name,
-                message,
-                timestamp
             )
+            .bind(severity)
+            .bind(employee_id)
+            .bind(name)
+            .bind(message)
+            .bind(timestamp)
             .execute(pool)
             .await?;
         }
     }
 
     let recommendation_count: i64 =
-        sqlx::query_scalar!("SELECT COUNT(*) as \"count!\" FROM analytics_recommendations")
+        sqlx::query_scalar("SELECT COUNT(*) FROM analytics_recommendations")
             .fetch_one(pool)
             .await?;
     if recommendation_count == 0 {
@@ -539,17 +541,17 @@ async fn seed_analytics(pool: &PgPool) -> Result<()> {
         ];
 
         for (category, title, description, affected, priority) in recommendations {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO analytics_recommendations (category, title, description, affected_employees, priority)
                 VALUES ($1, $2, $3, $4, $5)
                 "#,
-                category,
-                title,
-                description,
-                affected,
-                priority
             )
+            .bind(category)
+            .bind(title)
+            .bind(description)
+            .bind(affected)
+            .bind(priority)
             .execute(pool)
             .await?;
         }
