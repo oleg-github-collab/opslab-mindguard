@@ -310,6 +310,60 @@ pub async fn insert_voice_log(
     Ok(id)
 }
 
+pub async fn insert_checkin_open_response(
+    pool: &PgPool,
+    crypto: &Crypto,
+    user_id: Uuid,
+    checkin_id: &str,
+    question_id: i32,
+    qtype: &str,
+    response_source: &str,
+    response_text: &str,
+    analysis: Option<&serde_json::Value>,
+    risk_score: Option<i16>,
+    urgent: bool,
+    audio_duration_seconds: Option<i32>,
+) -> Result<Uuid> {
+    let enc_response = crypto.encrypt_str(response_text)?;
+    let enc_ai_analysis = match analysis {
+        Some(val) => Some(crypto.encrypt_str(&val.to_string())?),
+        None => None,
+    };
+    let id = Uuid::new_v4();
+    sqlx::query!(
+        r#"
+        INSERT INTO checkin_open_responses (
+            id,
+            user_id,
+            checkin_id,
+            question_id,
+            question_type,
+            response_source,
+            enc_response,
+            enc_ai_analysis,
+            risk_score,
+            urgent,
+            audio_duration_seconds
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        "#,
+        id,
+        user_id,
+        checkin_id,
+        question_id,
+        qtype,
+        response_source,
+        enc_response,
+        enc_ai_analysis,
+        risk_score,
+        urgent,
+        audio_duration_seconds
+    )
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
+
 // ========== Daily Check-in Functions ==========
 
 /// Insert a single check-in answer

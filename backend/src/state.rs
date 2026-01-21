@@ -14,7 +14,14 @@ pub struct AppState {
     pub ai: Arc<AiService>,
     pub poll_engine: PollEngine,
     pub session_key: Vec<u8>,
-    pub checkin_sessions: Arc<RwLock<HashMap<i64, CheckIn>>>, // telegram_id -> CheckIn
+    pub checkin_sessions: Arc<RwLock<HashMap<i64, CheckInSession>>>, // telegram_id -> CheckInSession
+}
+
+#[derive(Clone)]
+pub struct CheckInSession {
+    pub checkin: CheckIn,
+    pub current_index: usize,
+    pub awaiting_open_question: Option<i32>,
 }
 
 pub type SharedState = Arc<AppState>;

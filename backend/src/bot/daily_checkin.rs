@@ -168,9 +168,9 @@ impl QuestionBank {
     /// Підтримуючі питання
     pub fn support_questions() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("Наскільки ти відчуваєш підтримку навколо?", "🤝"),
-            ("Чи є щось, що могло б полегшити твій день?", "💬"),
-            ("Наскільки ти відчуваєш безпеку говорити про труднощі?", "🛟"),
+            ("Що зараз найбільше допомагає відчувати підтримку?", "🤝"),
+            ("Що могло б полегшити твій день?", "💬"),
+            ("Що зробило б розмову про труднощі безпечнішою?", "🛟"),
         ]
     }
 
@@ -374,7 +374,7 @@ impl CheckInGenerator {
                 qtype: Self::qtype_to_string(*qtype),
                 text: text.to_string(),
                 emoji: emoji.to_string(),
-                scale: "1-10".to_string(),
+                scale: Self::scale_for_qtype(*qtype).to_string(),
             });
         }
 
@@ -413,7 +413,7 @@ impl CheckInGenerator {
                 qtype: Self::qtype_to_string(*qtype),
                 text: text.to_string(),
                 emoji: emoji.to_string(),
-                scale: "1-10".to_string(),
+                scale: Self::scale_for_qtype(*qtype).to_string(),
             });
         }
 
@@ -483,6 +483,13 @@ impl CheckInGenerator {
             QuestionType::Support => "support",
         }
         .to_string()
+    }
+
+    fn scale_for_qtype(qtype: QuestionType) -> &'static str {
+        match qtype {
+            QuestionType::Reflection | QuestionType::Support => "open",
+            _ => "1-10",
+        }
     }
 }
 
