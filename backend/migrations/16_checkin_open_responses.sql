@@ -23,12 +23,24 @@ CREATE INDEX IF NOT EXISTS idx_checkin_open_type_date
 
 ALTER TABLE checkin_open_responses ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY checkin_open_select_own
-    ON checkin_open_responses
-    FOR SELECT
-    USING (user_id = current_setting('app.current_user_id', true)::UUID);
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'checkin_open_responses' AND policyname = 'checkin_open_select_own'
+    ) THEN
+        CREATE POLICY checkin_open_select_own
+            ON checkin_open_responses
+            FOR SELECT
+            USING (user_id = current_setting('app.current_user_id', true)::UUID);
+    END IF;
+END $$;
 
-CREATE POLICY checkin_open_insert_own
-    ON checkin_open_responses
-    FOR INSERT
-    WITH CHECK (user_id = current_setting('app.current_user_id', true)::UUID);
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'checkin_open_responses' AND policyname = 'checkin_open_insert_own'
+    ) THEN
+        CREATE POLICY checkin_open_insert_own
+            ON checkin_open_responses
+            FOR INSERT
+            WITH CHECK (user_id = current_setting('app.current_user_id', true)::UUID);
+    END IF;
+END $$;
