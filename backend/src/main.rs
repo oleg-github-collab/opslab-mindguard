@@ -253,11 +253,19 @@ async fn run() -> anyhow::Result<()> {
         .layer(axum_middleware::from_fn(add_cache_headers))
         .layer(TraceLayer::new_for_http());
 
-    // Railway sets PORT automatically, prefer it over BIND_ADDR
-    let port = std::env::var("PORT").unwrap_or_else(|_| {
+    // Prefer PORT; on Railway, default to 8080 if PORT is missing.
+    let port = std::env::var("PORT").ok().filter(|v| !v.is_empty()).unwrap_or_else(|| {
+        if std::env::var("RAILWAY_ENVIRONMENT").is_ok() {
+            tracing::warn!("PORT not set; defaulting to 8080 for Railway");
+            return "8080".to_string();
+        }
+
         std::env::var("BIND_ADDR")
             .ok()
-            .and_then(|addr| addr.split(':').nth(1).map(|p| p.to_string()))
+            .and_then(|addr| {
+                let trimmed = addr.trim().trim_matches('"');
+                trimmed.rsplit_once(':').map(|(_, p)| p.to_string())
+            })
             .unwrap_or_else(|| "3000".to_string())
     });
     let addr = format!("0.0.0.0:{}", port);
