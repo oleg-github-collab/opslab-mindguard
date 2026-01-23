@@ -771,10 +771,10 @@
       background: var(--white);
     }
 
-    .risk-chip-critical { background: #dc2626; color: white; }
-    .risk-chip-high { background: #ffe1e1; }
-    .risk-chip-medium { background: #fff2c9; }
-    .risk-chip-low { background: #dff7e7; }
+    .risk-chip-critical { background: #dc2626; color: white; font-weight: 700; }
+    .risk-chip-high { background: #ffedd5; border: 1px solid #f97316; }
+    .risk-chip-medium { background: #fef3c7; border: 1px solid #f59e0b; }
+    .risk-chip-low { background: #dcfce7; border: 1px solid #22c55e; }
 
     .risk-top {
       border: 2px dashed var(--dark);
@@ -4664,12 +4664,12 @@
         data: {
           datasets: [{
             data: points,
-            backgroundColor: points.map(p => p.risk === 'critical' ? 'rgba(239, 68, 68, 0.8)'
-              : p.risk === 'high' ? 'rgba(239, 68, 68, 0.6)'
-              : p.risk === 'medium' ? 'rgba(251, 191, 36, 0.6)'
-              : 'rgba(34, 197, 94, 0.6)'),
+            backgroundColor: points.map(p => p.risk === 'critical' ? 'rgba(220, 38, 38, 0.85)'
+              : p.risk === 'high' ? 'rgba(249, 115, 22, 0.7)'
+              : p.risk === 'medium' ? 'rgba(251, 191, 36, 0.7)'
+              : 'rgba(34, 197, 94, 0.7)'),
             borderColor: points.map(p => p.risk === 'critical' ? '#dc2626'
-              : p.risk === 'high' ? '#ef4444'
+              : p.risk === 'high' ? '#f97316'
               : p.risk === 'medium' ? '#f59e0b'
               : '#22c55e'),
             borderWidth: 2,
@@ -4740,20 +4740,25 @@
         if (!points.length) {
           riskEl.innerHTML = '<div class="form-hint">Недостатньо даних для матриці ризиків.</div>';
         } else {
+          // Legend with color indicators
+          const legend = document.createElement('div');
+          legend.style.cssText = 'font-size: 12px; color: #6b7280; margin-bottom: 12px;';
+          legend.innerHTML = '🔴 Критичний &nbsp; 🟠 Високий &nbsp; 🟡 Середній &nbsp; 🟢 Низький';
+
           const row = document.createElement('div');
           row.className = 'risk-chip-row';
           const criticalChip = document.createElement('span');
           criticalChip.className = 'risk-chip risk-chip-critical';
-          criticalChip.innerHTML = `Критичний <span class="mono">${counts.critical || 0}</span>`;
+          criticalChip.innerHTML = `🔴 Критичний <span class="mono">${counts.critical || 0}</span>`;
           const highChip = document.createElement('span');
           highChip.className = 'risk-chip risk-chip-high';
-          highChip.innerHTML = `Високий <span class="mono">${counts.high || 0}</span>`;
+          highChip.innerHTML = `🟠 Високий <span class="mono">${counts.high || 0}</span>`;
           const mediumChip = document.createElement('span');
           mediumChip.className = 'risk-chip risk-chip-medium';
-          mediumChip.innerHTML = `Середній <span class="mono">${counts.medium || 0}</span>`;
+          mediumChip.innerHTML = `🟡 Середній <span class="mono">${counts.medium || 0}</span>`;
           const lowChip = document.createElement('span');
           lowChip.className = 'risk-chip risk-chip-low';
-          lowChip.innerHTML = `Низький <span class="mono">${counts.low || 0}</span>`;
+          lowChip.innerHTML = `🟢 Низький <span class="mono">${counts.low || 0}</span>`;
           row.append(criticalChip, highChip, mediumChip, lowChip);
 
           // Show top 5 risks with names
@@ -4770,20 +4775,25 @@
               align-items: center;
               padding: 8px 12px;
               margin: 4px 0;
-              background: ${person.risk === 'critical' ? 'rgba(239, 68, 68, 0.1)'
-                : person.risk === 'high' ? 'rgba(239, 68, 68, 0.08)'
-                : person.risk === 'medium' ? 'rgba(251, 191, 36, 0.08)'
-                : 'rgba(34, 197, 94, 0.08)'};
+              background: ${person.risk === 'critical' ? 'rgba(220, 38, 38, 0.12)'
+                : person.risk === 'high' ? 'rgba(249, 115, 22, 0.1)'
+                : person.risk === 'medium' ? 'rgba(251, 191, 36, 0.1)'
+                : 'rgba(34, 197, 94, 0.1)'};
               border-left: 3px solid ${person.risk === 'critical' ? '#dc2626'
-                : person.risk === 'high' ? '#ef4444'
+                : person.risk === 'high' ? '#f97316'
                 : person.risk === 'medium' ? '#f59e0b'
                 : '#22c55e'};
               border-radius: 4px;
             `;
 
+            const riskEmoji = person.risk === 'critical' ? '🔴'
+              : person.risk === 'high' ? '🟠'
+              : person.risk === 'medium' ? '🟡'
+              : '🟢';
+
             const nameDiv = document.createElement('div');
             nameDiv.style.cssText = 'font-weight: 600; font-size: 13px;';
-            nameDiv.textContent = `${idx + 1}. ${person.name}`;
+            nameDiv.textContent = `${riskEmoji} ${idx + 1}. ${person.name}`;
 
             const statsDiv = document.createElement('div');
             statsDiv.style.cssText = 'font-size: 12px; color: #6b7280;';
@@ -4793,7 +4803,7 @@
             topRisks.appendChild(personCard);
           });
 
-          riskEl.append(row, topRisks);
+          riskEl.append(legend, row, topRisks);
         }
       }
 
