@@ -699,6 +699,28 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
     }
 
     if let Some((session, question)) = pending_open_question(&state, telegram_id).await {
+        // Check if this question was already answered
+        let already_answered = {
+            let sessions = state.checkin_sessions.read().await;
+            if let Some(sess) = sessions.get(&telegram_id) {
+                sess.answered_questions
+                    .as_ref()
+                    .map(|set| set.contains(&question.id))
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        };
+
+        if already_answered {
+            bot.send_message(
+                msg.chat.id,
+                "✓ Вже відповіли на це питання. Очікуйте наступне питання або завершення чекіну.",
+            )
+            .await?;
+            return Ok(());
+        }
+
         if let Some(voice) = msg.voice() {
             if voice.duration > 300 {
                 bot.send_message(
@@ -1136,6 +1158,8 @@ pub async fn start_daily_checkin(
                 checkin: checkin.clone(),
                 current_index: 0,
                 awaiting_open_question: None,
+                urgent_alerts_sent: None,
+                answered_questions: None,
             },
         );
     }
@@ -1385,6 +1409,17 @@ async fn process_open_response(
         }
     };
 
+    // Mark question as answered
+    {
+        let mut sessions = state.checkin_sessions.write().await;
+        if let Some(sess) = sessions.get_mut(&telegram_id) {
+            if sess.answered_questions.is_none() {
+                sess.answered_questions = Some(std::collections::HashSet::new());
+            }
+            sess.answered_questions.as_mut().unwrap().insert(question.id);
+        }
+    }
+
     db::insert_checkin_open_response(
         &state.pool,
         &state.crypto,
@@ -1419,19 +1454,42 @@ async fn process_open_response(
             "⚠️ Високий ризик: зробіть паузу 5 хв. Практика: 4-7-8 дихання + складіть 3 пункти плану на найближчу годину. Якщо потрібно — напишіть \"паніка\" щоб отримати швидку підтримку.",
         )
         .await?;
-        if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
-            bot.send_message(
-                ChatId(admin_id),
-                format!("⚠️ URGENT | User {user_id} open response flagged risk_score=10"),
-            )
-            .await?;
-        }
-        if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
-            bot.send_message(
-                ChatId(jane_id),
-                format!("⚠️ URGENT | User {user_id} open response flagged risk_score=10"),
-            )
-            .await?;
+
+        // Send urgent alert only once per response (deduplicated by checkin_id + question_id)
+        let alert_key = format!("{}:{}", session.checkin.id, question.id);
+        let should_send_alert = {
+            let mut sessions = state.checkin_sessions.write().await;
+            if let Some(sess) = sessions.get_mut(&telegram_id) {
+                if sess.urgent_alerts_sent.is_none() {
+                    sess.urgent_alerts_sent = Some(std::collections::HashSet::new());
+                }
+                let alerts = sess.urgent_alerts_sent.as_mut().unwrap();
+                if alerts.contains(&alert_key) {
+                    false
+                } else {
+                    alerts.insert(alert_key);
+                    true
+                }
+            } else {
+                false
+            }
+        };
+
+        if should_send_alert {
+            if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
+                bot.send_message(
+                    ChatId(admin_id),
+                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
+                )
+                .await?;
+            }
+            if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
+                bot.send_message(
+                    ChatId(jane_id),
+                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
+                )
+                .await?;
+            }
         }
     }
 
@@ -1480,8 +1538,40 @@ async fn handle_callback(
                             .await?;
                         return Ok(());
                     }
+
+                    // Check if question was already answered in this session
+                    let already_answered = {
+                        let sessions = state.checkin_sessions.read().await;
+                        if let Some(sess) = sessions.get(&telegram_id) {
+                            sess.answered_questions
+                                .as_ref()
+                                .map(|set| set.contains(&question_id))
+                                .unwrap_or(false)
+                        } else {
+                            false
+                        }
+                    };
+
+                    if already_answered {
+                        bot.answer_callback_query(&callback.id)
+                            .text("✓ Вже відповіли на це питання")
+                            .await?;
+                        return Ok(());
+                    }
+
                     // Знайти питання за ID в поточному чекіні
                     if let Some(question) = checkin.questions.iter().find(|q| q.id == question_id) {
+                        // Mark question as answered
+                        {
+                            let mut sessions = state.checkin_sessions.write().await;
+                            if let Some(sess) = sessions.get_mut(&telegram_id) {
+                                if sess.answered_questions.is_none() {
+                                    sess.answered_questions = Some(std::collections::HashSet::new());
+                                }
+                                sess.answered_questions.as_mut().unwrap().insert(question_id);
+                            }
+                        }
+
                         // Зберегти відповідь в БД
                         db::insert_checkin_answer(
                             &state.pool,

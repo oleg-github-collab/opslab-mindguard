@@ -22,6 +22,8 @@ pub struct CheckInSession {
     pub checkin: CheckIn,
     pub current_index: usize,
     pub awaiting_open_question: Option<i32>,
+    pub urgent_alerts_sent: Option<std::collections::HashSet<String>>,
+    pub answered_questions: Option<std::collections::HashSet<i32>>,
 }
 
 pub type SharedState = Arc<AppState>;
