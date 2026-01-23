@@ -771,6 +771,7 @@
       background: var(--white);
     }
 
+    .risk-chip-critical { background: #dc2626; color: white; }
     .risk-chip-high { background: #ffe1e1; }
     .risk-chip-medium { background: #fff2c9; }
     .risk-chip-low { background: #dff7e7; }
@@ -4679,10 +4680,47 @@
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const point = context.raw;
+                  return [
+                    `👤 ${point.name}`,
+                    `Стрес: ${point.x.toFixed(1)}/40`,
+                    `Вигорання (MBI): ${point.y.toFixed(1)}%`,
+                    `PHQ-9: ${point.phq9.toFixed(1)}`,
+                    `Рівень ризику: ${point.risk === 'critical' ? 'Критичний' : point.risk === 'high' ? 'Високий' : point.risk === 'medium' ? 'Середній' : 'Низький'}`
+                  ];
+                }
+              },
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              padding: 12,
+              displayColors: false,
+              bodyFont: { size: 13 },
+              titleFont: { size: 14, weight: 'bold' }
+            }
           },
           scales: {
-            x: { beginAtZero: true, max: 40 },
-            y: { beginAtZero: true, max: 100 },
+            x: {
+              beginAtZero: true,
+              max: 40,
+              title: {
+                display: true,
+                text: 'Рівень стресу',
+                font: { size: 12, weight: 'bold' }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              max: 100,
+              title: {
+                display: true,
+                text: 'Вигорання (MBI %)',
+                font: { size: 12, weight: 'bold' }
+              }
+            },
           },
         },
       });
@@ -4704,31 +4742,58 @@
         } else {
           const row = document.createElement('div');
           row.className = 'risk-chip-row';
+          const criticalChip = document.createElement('span');
+          criticalChip.className = 'risk-chip risk-chip-critical';
+          criticalChip.innerHTML = `Критичний <span class="mono">${counts.critical || 0}</span>`;
           const highChip = document.createElement('span');
           highChip.className = 'risk-chip risk-chip-high';
-          highChip.innerHTML = `High <span class="mono">${counts.high || 0}</span>`;
+          highChip.innerHTML = `Високий <span class="mono">${counts.high || 0}</span>`;
           const mediumChip = document.createElement('span');
           mediumChip.className = 'risk-chip risk-chip-medium';
-          mediumChip.innerHTML = `Medium <span class="mono">${counts.medium || 0}</span>`;
+          mediumChip.innerHTML = `Середній <span class="mono">${counts.medium || 0}</span>`;
           const lowChip = document.createElement('span');
           lowChip.className = 'risk-chip risk-chip-low';
-          lowChip.innerHTML = `Low <span class="mono">${counts.low || 0}</span>`;
-          row.append(highChip, mediumChip, lowChip);
+          lowChip.innerHTML = `Низький <span class="mono">${counts.low || 0}</span>`;
+          row.append(criticalChip, highChip, mediumChip, lowChip);
 
-          const top = document.createElement('div');
-          top.className = 'risk-top';
-          const topLine = document.createElement('div');
-          topLine.textContent = 'Найвищий ризик:';
-          const topName = document.createElement('strong');
-          topName.textContent = topRisk?.name || '—';
-          const meta = document.createElement('div');
-          meta.className = 'risk-meta';
-          meta.textContent = topRisk
-            ? `MBI ${topRisk.y.toFixed(0)}% · Стрес ${topRisk.x.toFixed(0)}/40 · PHQ-9 ${topRisk.phq9.toFixed(0)}`
-            : '—';
-          top.append(topLine, topName, meta);
+          // Show top 5 risks with names
+          const topRisks = document.createElement('div');
+          topRisks.className = 'risk-top-list';
+          topRisks.innerHTML = '<div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Топ-5 ризиків (наведіть курсор на графік для деталей):</div>';
 
-          riskEl.append(row, top);
+          sorted.slice(0, 5).forEach((person, idx) => {
+            const personCard = document.createElement('div');
+            personCard.className = 'risk-person-card';
+            personCard.style.cssText = `
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 8px 12px;
+              margin: 4px 0;
+              background: ${person.risk === 'critical' ? 'rgba(239, 68, 68, 0.1)'
+                : person.risk === 'high' ? 'rgba(239, 68, 68, 0.08)'
+                : person.risk === 'medium' ? 'rgba(251, 191, 36, 0.08)'
+                : 'rgba(34, 197, 94, 0.08)'};
+              border-left: 3px solid ${person.risk === 'critical' ? '#dc2626'
+                : person.risk === 'high' ? '#ef4444'
+                : person.risk === 'medium' ? '#f59e0b'
+                : '#22c55e'};
+              border-radius: 4px;
+            `;
+
+            const nameDiv = document.createElement('div');
+            nameDiv.style.cssText = 'font-weight: 600; font-size: 13px;';
+            nameDiv.textContent = `${idx + 1}. ${person.name}`;
+
+            const statsDiv = document.createElement('div');
+            statsDiv.style.cssText = 'font-size: 12px; color: #6b7280;';
+            statsDiv.textContent = `MBI ${person.y.toFixed(0)}% · Стрес ${person.x.toFixed(0)} · PHQ-9 ${person.phq9.toFixed(0)}`;
+
+            personCard.append(nameDiv, statsDiv);
+            topRisks.appendChild(personCard);
+          });
+
+          riskEl.append(row, topRisks);
         }
       }
 

@@ -1300,6 +1300,13 @@ async fn advance_checkin_flow(
 ) -> Result<()> {
     let next_index = session.current_index + 1;
     if next_index < session.checkin.questions.len() {
+        // Update session current_index before sending next question
+        {
+            let mut sessions = state.checkin_sessions.write().await;
+            if let Some(sess) = sessions.get_mut(&telegram_id) {
+                sess.current_index = next_index;
+            }
+        }
         send_checkin_question(bot, state, chat_id, &session.checkin, next_index).await?;
         return Ok(());
     }
