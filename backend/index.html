@@ -4649,13 +4649,23 @@
       const employees = (advancedData.employees || []).filter(hasEmployeeData);
       const points = employees.map(emp => {
         const risk = calculateEmployeeRisk(emp.metrics);
+        // X axis: Combined psychological distress (PHQ-9 + GAD-7) / 2, max 27
+        const psychDistress = (emp.metrics.phq9 + emp.metrics.gad7) / 2;
+        // Y axis: Burnout (MBI), max 100
+        const burnout = emp.metrics.mbi;
+        // Bubble size: Stress level (0-40)
+        const bubbleSize = Math.min(30, Math.max(8, emp.metrics.stressLevel * 0.75));
+
         return {
-          x: emp.metrics.stressLevel,
-          y: emp.metrics.mbi,
-          r: Math.min(26, Math.max(10, emp.metrics.phq9 * 1.2)),
+          x: psychDistress,
+          y: burnout,
+          r: bubbleSize,
           name: emp.name,
           risk,
           phq9: emp.metrics.phq9,
+          gad7: emp.metrics.gad7,
+          stressLevel: emp.metrics.stressLevel,
+          who5: emp.metrics.who5,
         };
       });
 
@@ -4684,12 +4694,21 @@
               callbacks: {
                 label: function(context) {
                   const point = context.raw;
+                  const riskLabel = point.risk === 'critical' ? 'Критичний 🔴'
+                    : point.risk === 'high' ? 'Високий 🟠'
+                    : point.risk === 'medium' ? 'Середній 🟡'
+                    : 'Низький 🟢';
                   return [
                     `👤 ${point.name}`,
-                    `Стрес: ${point.x.toFixed(1)}/40`,
+                    `—————————————————`,
+                    `Психол. дистрес: ${point.x.toFixed(1)}/27`,
+                    `  • PHQ-9 (депресія): ${point.phq9.toFixed(1)}/27`,
+                    `  • GAD-7 (тривога): ${point.gad7.toFixed(1)}/21`,
                     `Вигорання (MBI): ${point.y.toFixed(1)}%`,
-                    `PHQ-9: ${point.phq9.toFixed(1)}`,
-                    `Рівень ризику: ${point.risk === 'critical' ? 'Критичний' : point.risk === 'high' ? 'Високий' : point.risk === 'medium' ? 'Середній' : 'Низький'}`
+                    `Стрес: ${point.stressLevel.toFixed(1)}/40 (розмір бульбашки)`,
+                    `WHO-5: ${point.who5.toFixed(1)}/100`,
+                    `—————————————————`,
+                    `Рівень ризику: ${riskLabel}`
                   ];
                 }
               },
@@ -4705,11 +4724,16 @@
           scales: {
             x: {
               beginAtZero: true,
-              max: 40,
+              max: 27,
               title: {
                 display: true,
-                text: 'Рівень стресу',
-                font: { size: 12, weight: 'bold' }
+                text: 'Психологічний дистрес (PHQ-9 + GAD-7) / 2',
+                font: { size: 11, weight: 'bold' }
+              },
+              ticks: {
+                callback: function(value) {
+                  return value.toFixed(0);
+                }
               }
             },
             y: {
@@ -4742,8 +4766,8 @@
         } else {
           // Legend with color indicators
           const legend = document.createElement('div');
-          legend.style.cssText = 'font-size: 12px; color: #6b7280; margin-bottom: 12px;';
-          legend.innerHTML = '🔴 Критичний &nbsp; 🟠 Високий &nbsp; 🟡 Середній &nbsp; 🟢 Низький';
+          legend.style.cssText = 'font-size: 11px; color: #6b7280; margin-bottom: 12px; line-height: 1.5;';
+          legend.innerHTML = '<strong>Осі:</strong> X = Психол. дистрес (PHQ-9 + GAD-7)/2 · Y = Вигорання (MBI) · Розмір = Стрес<br>🔴 Критичний &nbsp; 🟠 Високий &nbsp; 🟡 Середній &nbsp; 🟢 Низький';
 
           const row = document.createElement('div');
           row.className = 'risk-chip-row';
@@ -4797,7 +4821,7 @@
 
             const statsDiv = document.createElement('div');
             statsDiv.style.cssText = 'font-size: 12px; color: #6b7280;';
-            statsDiv.textContent = `MBI ${person.y.toFixed(0)}% · Стрес ${person.x.toFixed(0)} · PHQ-9 ${person.phq9.toFixed(0)}`;
+            statsDiv.textContent = `Дистрес ${person.x.toFixed(1)} · MBI ${person.y.toFixed(0)}% · Стрес ${person.stressLevel.toFixed(0)}`;
 
             personCard.append(nameDiv, statsDiv);
             topRisks.appendChild(personCard);
@@ -4842,7 +4866,7 @@
       ];
       fillMetricsGrid('riskMetrics', modalMetrics);
       const riskSummary = document.getElementById('riskSummary');
-      if (riskSummary) riskSummary.textContent = 'Матриця поєднує стрес, вигорання та PHQ-9 для швидкого пріоритизування 1:1.';
+      if (riskSummary) riskSummary.textContent = 'Матриця поєднує психологічний дистрес (PHQ-9 + GAD-7) на осі X, професійне вигорання (MBI) на осі Y, та загальний стрес (розмір бульбашки) для комплексного бачення ризиків та пріоритизації 1:1 розмов.';
     }
 
     function calculateForecast() {
