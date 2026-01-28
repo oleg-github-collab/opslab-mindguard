@@ -1482,6 +1482,26 @@
       margin-top: 0.5rem;
     }
 
+    .checkin-scale-buttons {
+      display: grid;
+      grid-template-columns: repeat(10, minmax(28px, 1fr));
+      gap: 0.35rem;
+      margin-top: 0.75rem;
+    }
+
+    .scale-pill {
+      border: 2px solid var(--dark);
+      background: var(--white);
+      font-weight: 700;
+      padding: 0.35rem 0;
+      cursor: pointer;
+    }
+
+    .scale-pill.active {
+      background: var(--primary);
+      color: var(--white);
+    }
+
     .checkin-textarea {
       width: 100%;
       min-height: 110px;
@@ -1494,6 +1514,13 @@
     .checkin-textarea:focus {
       outline: none;
       border-color: var(--primary);
+    }
+
+    .checkin-text-counter {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--gray);
+      text-align: right;
     }
 
     .audio-block {
@@ -1568,6 +1595,26 @@
       width: 100%;
     }
 
+    .audio-upload {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 2px solid var(--dark);
+      background: var(--white);
+      padding: 0.5rem 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .audio-file-input {
+      display: none;
+    }
+
+    .audio-file-name {
+      font-size: 0.8rem;
+      color: var(--gray);
+    }
+
     @media (max-width: 900px) {
       .checkin-status {
         align-items: flex-start;
@@ -1581,6 +1628,10 @@
     @media (max-width: 640px) {
       .checkin-status {
         padding: 1rem;
+      }
+
+      .checkin-frequency-grid {
+        grid-template-columns: 1fr;
       }
 
       .checkin-actions {
@@ -1601,6 +1652,12 @@
         align-items: flex-start;
       }
 
+      .checkin-question-emoji {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+      }
+
       .checkin-scale {
         flex-direction: column;
         align-items: stretch;
@@ -1608,6 +1665,10 @@
 
       .checkin-scale-value {
         align-self: flex-end;
+      }
+
+      .checkin-scale-buttons {
+        grid-template-columns: repeat(5, minmax(36px, 1fr));
       }
 
       .audio-controls {
@@ -6208,10 +6269,16 @@
       state.statusEl.textContent = '00:00';
       state.audioEl.src = '';
       state.audioEl.style.display = 'none';
-      state.recordBtn.disabled = false;
-      state.recordBtn.classList.remove('recording');
-      state.stopBtn.disabled = true;
-      state.clearBtn.disabled = true;
+      if (state.recordBtn) {
+        state.recordBtn.disabled = false;
+        state.recordBtn.classList.remove('recording');
+      }
+      if (state.stopBtn) {
+        state.stopBtn.disabled = true;
+      }
+      if (state.clearBtn) {
+        state.clearBtn.disabled = true;
+      }
       if (activeRecordingState === state) {
         activeRecordingState = null;
       }
@@ -6357,6 +6424,77 @@
       });
     }
 
+    function setupAudioUpload(questionId, fileInput, clearBtn, statusEl, audioEl) {
+      const state = {
+        questionId,
+        recorder: null,
+        stream: null,
+        chunks: [],
+        startTime: 0,
+        timer: null,
+        recording: false,
+        ignoreStop: false,
+        audioBase64: null,
+        audioMime: null,
+        durationSeconds: null,
+        blobUrl: null,
+        recordBtn: null,
+        stopBtn: null,
+        clearBtn,
+        statusEl,
+        audioEl,
+      };
+
+      checkinAudioStates.set(questionId, state);
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+
+        if (file.size > CHECKIN_MAX_AUDIO_BYTES) {
+          statusEl.textContent = '⚠️ Файл занадто великий. Спробуйте коротший запис.';
+          fileInput.value = '';
+          return;
+        }
+
+        try {
+          const base64 = await blobToBase64(file);
+          state.audioBase64 = base64;
+          state.audioMime = file.type || 'audio/ogg';
+          state.durationSeconds = null;
+
+          if (state.blobUrl) {
+            URL.revokeObjectURL(state.blobUrl);
+          }
+          state.blobUrl = URL.createObjectURL(file);
+          state.audioEl.src = state.blobUrl;
+          state.audioEl.style.display = 'block';
+
+          state.audioEl.onloadedmetadata = () => {
+            const duration = Math.round(state.audioEl.duration || 0);
+            if (duration) {
+              state.durationSeconds = duration;
+              statusEl.textContent = `Готово ${formatDuration(duration)}`;
+            } else {
+              statusEl.textContent = 'Готово до відтворення';
+            }
+          };
+
+          statusEl.textContent = 'Файл завантажено';
+          if (clearBtn) clearBtn.disabled = false;
+        } catch (error) {
+          statusEl.textContent = '❌ Не вдалося завантажити аудіо';
+        }
+      });
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          fileInput.value = '';
+          clearAudioState(state);
+        });
+      }
+    }
+
     function resetCheckinForm() {
       checkinSession = null;
       checkinAudioStates.forEach(state => clearAudioState(state));
@@ -6396,7 +6534,7 @@
         if (!hasOpenQuestions) {
           audioHint.classList.add('hidden');
         } else if (!audioSupported) {
-          audioHint.textContent = '🎧 Аудіозапис недоступний у цьому браузері. Використайте текст.';
+          audioHint.textContent = '🎧 Запис недоступний у цьому браузері. Можна додати аудіофайл або відповісти текстом.';
           audioHint.classList.remove('hidden');
         } else {
           audioHint.textContent = '🎧 Аудіо доступне для відкритих питань (потрібен доступ до мікрофона).';
@@ -6441,6 +6579,7 @@
 
       input.addEventListener('input', () => {
         valueEl.textContent = input.value;
+        updateScaleButtons(buttonsWrap, parseInt(input.value, 10));
       });
 
       scaleWrap.appendChild(input);
@@ -6455,10 +6594,36 @@
       labels.appendChild(left);
       labels.appendChild(right);
 
+      const buttonsWrap = document.createElement('div');
+      buttonsWrap.className = 'checkin-scale-buttons';
+
+      for (let i = 1; i <= 10; i += 1) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'scale-pill';
+        btn.textContent = String(i);
+        btn.addEventListener('click', () => {
+          input.value = String(i);
+          valueEl.textContent = String(i);
+          updateScaleButtons(buttonsWrap, i);
+        });
+        buttonsWrap.appendChild(btn);
+      }
+      updateScaleButtons(buttonsWrap, parseInt(input.value, 10));
+
       card.appendChild(header);
       card.appendChild(scaleWrap);
       card.appendChild(labels);
+      card.appendChild(buttonsWrap);
       return card;
+    }
+
+    function updateScaleButtons(container, value) {
+      if (!container) return;
+      Array.from(container.children).forEach(btn => {
+        const btnValue = parseInt(btn.textContent, 10);
+        btn.classList.toggle('active', btnValue === value);
+      });
     }
 
     function buildOpenQuestion(question, index, audioSupported) {
@@ -6492,9 +6657,18 @@
       hint.className = 'form-hint';
       hint.textContent = 'Можна відповісти текстом або аудіо. Одного формату достатньо.';
 
+      const counter = document.createElement('div');
+      counter.className = 'checkin-text-counter';
+      counter.textContent = '0 / 1500';
+
+      textarea.addEventListener('input', () => {
+        counter.textContent = `${textarea.value.length} / 1500`;
+      });
+
       card.appendChild(header);
       card.appendChild(textarea);
       card.appendChild(hint);
+      card.appendChild(counter);
 
       if (audioSupported) {
         const audioBlock = document.createElement('div');
@@ -6538,6 +6712,46 @@
         card.appendChild(audioBlock);
 
         setupAudioRecorder(question.id, recordBtn, stopBtn, clearBtn, statusEl, audioEl);
+      } else {
+        const audioBlock = document.createElement('div');
+        audioBlock.className = 'audio-block';
+        const controls = document.createElement('div');
+        controls.className = 'audio-controls';
+
+        const uploadLabel = document.createElement('label');
+        uploadLabel.className = 'audio-upload';
+        uploadLabel.textContent = '🎙️ Додати аудіо';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'audio/*';
+        fileInput.className = 'audio-file-input';
+        fileInput.setAttribute('capture', 'microphone');
+        uploadLabel.appendChild(fileInput);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'audio-btn';
+        clearBtn.textContent = 'Очистити';
+        clearBtn.disabled = true;
+
+        const statusEl = document.createElement('span');
+        statusEl.className = 'audio-status';
+        statusEl.textContent = 'Аудіо файл не додано';
+
+        const audioEl = document.createElement('audio');
+        audioEl.className = 'audio-player';
+        audioEl.controls = true;
+        audioEl.style.display = 'none';
+
+        controls.appendChild(uploadLabel);
+        controls.appendChild(clearBtn);
+        controls.appendChild(statusEl);
+        audioBlock.appendChild(controls);
+        audioBlock.appendChild(audioEl);
+        card.appendChild(audioBlock);
+
+        setupAudioUpload(question.id, fileInput, clearBtn, statusEl, audioEl);
       }
 
       return card;

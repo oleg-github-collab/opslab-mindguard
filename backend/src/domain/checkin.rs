@@ -7,6 +7,14 @@ pub const TEST_WEB_CHECKIN_EMAIL: &str = "work.olegkaminskyi@gmail.com";
 #[serde(rename_all = "snake_case")]
 pub enum CheckinFrequency {
     Daily,
+    #[serde(
+        rename = "every_3_days",
+        alias = "every3_days",
+        alias = "every3days",
+        alias = "every-3-days",
+        alias = "3days",
+        alias = "3_days"
+    )]
     Every3Days,
     Weekly,
 }
@@ -35,7 +43,9 @@ impl TryFrom<&str> for CheckinFrequency {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.trim().to_lowercase().as_str() {
             "daily" => Ok(CheckinFrequency::Daily),
-            "every_3_days" | "every-3-days" | "3days" | "3_days" => Ok(CheckinFrequency::Every3Days),
+            "every_3_days" | "every3_days" | "every3days" | "every-3-days" | "3days" | "3_days" => {
+                Ok(CheckinFrequency::Every3Days)
+            }
             "weekly" | "week" => Ok(CheckinFrequency::Weekly),
             _ => Err(()),
         }
