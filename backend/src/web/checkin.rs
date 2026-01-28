@@ -5,7 +5,7 @@ use crate::state::{SharedState, WebCheckInSession};
 use crate::time_utils;
 use crate::web::session::UserSession;
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
@@ -78,6 +78,11 @@ struct CheckinFrequencyPayload {
 }
 
 #[derive(Deserialize)]
+struct CheckinStartParams {
+    force: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct CheckinAnswerPayload {
     question_id: i32,
     value: Option<i16>,
@@ -143,6 +148,7 @@ async fn update_frequency(
 async fn start(
     UserSession(user_id): UserSession,
     State(state): State<SharedState>,
+    Query(params): Query<CheckinStartParams>,
 ) -> Result<Json<CheckinStartResponse>, (StatusCode, Json<CheckinErrorResponse>)> {
     let (user, schedule, frequency) = load_schedule(&state, user_id).await.map_err(|status| {
             (
@@ -166,7 +172,13 @@ async fn start(
         ));
     }
 
-    if !schedule.due {
+    let force = params
+        .force
+        .as_deref()
+        .map(|val| matches!(val.trim().to_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false);
+
+    if !schedule.due && !force {
         return Err((
             StatusCode::CONFLICT,
             Json(CheckinErrorResponse {

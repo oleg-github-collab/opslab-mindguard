@@ -2681,6 +2681,7 @@
 
           <div class="checkin-actions">
             <button id="checkin-start-btn" class="btn btn-primary" type="button">Почати чекін</button>
+            <button id="checkin-force-btn" class="btn btn-secondary hidden" type="button">Тестовий старт</button>
             <span id="checkin-start-hint" class="form-hint"></span>
           </div>
         </div>
@@ -3247,6 +3248,7 @@
     let checkinAudioStates = new Map();
     let activeRecordingState = null;
     let checkinPendingSection = null;
+    let checkinAutoStart = false;
     const TEST_CHECKIN_EMAIL = 'work.olegkaminskyi@gmail.com';
     const CHECKIN_MAX_AUDIO_SECONDS = 120;
     const CHECKIN_MAX_AUDIO_BYTES = 6_000_000;
@@ -3470,6 +3472,7 @@
       checkinAudioStates = new Map();
       activeRecordingState = null;
       checkinPendingSection = null;
+      checkinAutoStart = false;
     }
 
     function isAdmin() {
@@ -5992,6 +5995,7 @@
       const freqChip = document.getElementById('checkin-frequency-chip');
       const nextChip = document.getElementById('checkin-next-chip');
       const startBtn = document.getElementById('checkin-start-btn');
+      const forceBtn = document.getElementById('checkin-force-btn');
       const startHint = document.getElementById('checkin-start-hint');
       const frequencyGrid = document.getElementById('checkin-frequency-grid');
 
@@ -6023,8 +6027,19 @@
           startBtn.textContent = status.due_today ? 'Почати чекін' : 'Чекін недоступний';
         }
       }
+      if (forceBtn) {
+        const showForce = !status.due_today && isTestCheckinUser() && !checkinSession;
+        forceBtn.classList.toggle('hidden', !showForce);
+        forceBtn.disabled = !showForce;
+      }
       if (startHint && !checkinSession) {
-        startHint.textContent = status.due_today ? '' : `Наступний чекін ${status.next_due_date}`;
+        if (status.due_today) {
+          startHint.textContent = '';
+        } else if (isTestCheckinUser()) {
+          startHint.textContent = `Наступний чекін ${status.next_due_date}. Для тесту натисніть "Тестовий старт".`;
+        } else {
+          startHint.textContent = `Наступний чекін ${status.next_due_date}`;
+        }
       }
 
       document.querySelectorAll('input[name="checkin-frequency"]').forEach(input => {
@@ -6047,11 +6062,18 @@
       try {
         const status = await apiCall('/checkin/status');
         applyCheckinStatus(status);
+        if (checkinAutoStart) {
+          checkinAutoStart = false;
+          if (status?.due_today && !checkinSession) {
+            startCheckin();
+          }
+        }
       } catch (error) {
         if (titleEl) titleEl.textContent = 'Доступ обмежено';
         if (detailEl) detailEl.textContent = 'Розділ доступний лише для тестового користувача.';
         if (frequencyGrid) frequencyGrid.classList.add('hidden');
         if (startBtn) startBtn.disabled = true;
+        checkinAutoStart = false;
       }
     }
 
@@ -6461,20 +6483,25 @@
       return card;
     }
 
-    async function startCheckin() {
+    async function startCheckin(force = false) {
       if (!isTestCheckinUser()) return;
       const startBtn = document.getElementById('checkin-start-btn');
+      const forceBtn = document.getElementById('checkin-force-btn');
       const hintEl = document.getElementById('checkin-start-hint');
       const submitStatus = document.getElementById('checkin-submit-status');
       if (hintEl) hintEl.textContent = '';
       if (submitStatus) submitStatus.textContent = '';
       if (startBtn) {
         startBtn.disabled = true;
-        startBtn.textContent = 'Готуємо...';
+        startBtn.textContent = force ? 'Готуємо тест...' : 'Готуємо...';
+      }
+      if (forceBtn) {
+        forceBtn.disabled = true;
       }
 
       try {
-        const response = await fetch('/checkin/start', {
+        const endpoint = force ? '/checkin/start?force=1' : '/checkin/start';
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -6507,6 +6534,10 @@
         if (startBtn) {
           startBtn.textContent = 'Чекін у процесі';
           startBtn.disabled = true;
+        }
+        if (forceBtn) {
+          forceBtn.classList.add('hidden');
+          forceBtn.disabled = true;
         }
         if (hintEl) hintEl.textContent = 'Заповніть всі питання та натисніть "Зберегти відповіді".';
       } catch (error) {
@@ -6681,6 +6712,13 @@
     if (checkinStartBtn) {
       checkinStartBtn.addEventListener('click', () => {
         startCheckin();
+      });
+    }
+
+    const checkinForceBtn = document.getElementById('checkin-force-btn');
+    if (checkinForceBtn) {
+      checkinForceBtn.addEventListener('click', () => {
+        startCheckin(true);
       });
     }
 
@@ -7150,6 +7188,7 @@
       window.history.replaceState({}, document.title, window.location.pathname);
       if (openCheckin) {
         checkinPendingSection = 'checkin';
+        checkinAutoStart = true;
       }
       await loadApp();
     }
@@ -7185,6 +7224,7 @@
       const openCheckin = urlParams.get('checkin') === '1';
       if (openCheckin) {
         checkinPendingSection = 'checkin';
+        checkinAutoStart = true;
       }
       if (token) {
         try {
