@@ -11,7 +11,6 @@ mod web;
 mod time_utils;
 
 use crate::db::seed;
-use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::state::SharedState;
 use axum::{
     body::Body,
@@ -218,10 +217,6 @@ async fn run() -> anyhow::Result<()> {
                     }
                 }
 
-                if let Some(admin_due) = test_admin_due_reminder(&state, now).await {
-                    due_users.push(admin_due);
-                }
-
                 if !due_users.is_empty() {
                     tracing::info!("Sending smart reminders to {} users", due_users.len());
                     if let Err(e) = send_smart_reminders(&state, due_users).await {
@@ -278,6 +273,16 @@ async fn run() -> anyhow::Result<()> {
     tracing::info!("  - Smart reminders: every minute (timezone-aware)");
     tracing::info!("  - Weekly summaries: Fridays 17:00");
     tracing::info!("  - Session cleanup: hourly");
+
+    let shared_for_announcement = shared.clone();
+    tokio::spawn(async move {
+        if let Err(e) =
+            bot::enhanced_handlers::send_web_checkin_rollout_announcement(&shared_for_announcement)
+                .await
+        {
+            tracing::warn!("Web check-in rollout announcement failed: {}", e);
+        }
+    });
 
     let static_handler = ServeDir::new("static").not_found_service(ServeFile::new("index.html"));
 
@@ -540,64 +545,6 @@ async fn repair_migration_checksum(
     }
 
     Ok(())
-}
-
-async fn test_admin_due_reminder(
-    state: &SharedState,
-    now: chrono::DateTime<chrono::Utc>,
-) -> Option<DueReminder> {
-    let user = match db::find_user_by_email(&state.pool, TEST_WEB_CHECKIN_EMAIL).await {
-        Ok(Some(user)) => user,
-        Ok(None) => return None,
-        Err(e) => {
-            tracing::error!("Failed to fetch test admin reminder user: {}", e);
-            return None;
-        }
-    };
-
-    if !user.is_active {
-        return None;
-    }
-    let telegram_id = user.telegram_id?;
-
-    let prefs = match db::get_user_preferences(&state.pool, user.id).await {
-        Ok(prefs) => prefs,
-        Err(e) => {
-            tracing::error!("Failed to fetch preferences for test admin: {}", e);
-            return None;
-        }
-    };
-
-    if !prefs.notification_enabled {
-        return None;
-    }
-
-    let (local_date, local_hour, local_minute) =
-        time_utils::local_components(&prefs.timezone, now);
-
-    let is_due_time = local_hour > prefs.reminder_hour
-        || (local_hour == prefs.reminder_hour && local_minute >= prefs.reminder_minute);
-
-    if !is_due_time {
-        return None;
-    }
-
-    match db::mark_reminder_sent(&state.pool, user.id, local_date).await {
-        Ok(true) => Some(DueReminder {
-            user_id: user.id,
-            telegram_id,
-            local_date,
-        }),
-        Ok(false) => None,
-        Err(e) => {
-            tracing::error!(
-                "Failed to mark reminder sent for test admin {}: {}",
-                user.id,
-                e
-            );
-            None
-        }
-    }
 }
 
 /// #2 WOW Feature: Smart Reminders - надсилає чекіни користувачам у їхній вибраний час

@@ -2,7 +2,6 @@ pub mod seed;
 
 use crate::bot::daily_checkin::{CheckInAnswer, Metrics};
 use crate::crypto::Crypto;
-use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::domain::models::UserRole;
 use crate::time_utils;
 use anyhow::Result;
@@ -904,13 +903,10 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
-          AND u.role != 'ADMIN'
-          AND u.email != $1
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
         "#,
     )
-    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 
@@ -1059,7 +1055,6 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
             WHERE ca.created_at >= NOW() - INTERVAL '7 days'
               AND u.is_active = true
               AND u.role != 'ADMIN'
-              AND u.email != $1
             GROUP BY ca.user_id
         ),
         per_user AS (
@@ -1076,7 +1071,6 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
         FROM per_user
         "#
     )
-    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_one(pool)
     .await?;
 
@@ -1097,14 +1091,11 @@ pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
-          AND u.role != 'ADMIN'
-          AND u.email != $1
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
           AND COALESCE(p.notification_enabled, true) = true
         "#,
     )
-    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 
@@ -1118,6 +1109,60 @@ pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
     }
 
     Ok(out)
+}
+
+/// Get users who should receive the web check-in rollout announcement
+pub async fn get_web_checkin_announcement_candidates(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT u.id, u.telegram_id
+        FROM users u
+        LEFT JOIN user_preferences p ON u.id = p.user_id
+        WHERE u.telegram_id IS NOT NULL
+          AND u.is_active = true
+          AND COALESCE(p.onboarding_completed, false) = true
+          AND COALESCE(p.notification_enabled, true) = true
+          AND p.last_web_checkin_announcement_date IS NULL
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        let user_id: Uuid = row.try_get("id")?;
+        let telegram_id: Option<i64> = row.try_get("telegram_id")?;
+        if let Some(telegram_id) = telegram_id {
+            out.push((user_id, telegram_id));
+        }
+    }
+
+    Ok(out)
+}
+
+/// Mark web check-in rollout announcement as sent (idempotent)
+pub async fn mark_web_checkin_announcement_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    sent_date: NaiveDate,
+) -> Result<bool> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, last_web_checkin_announcement_date)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET last_web_checkin_announcement_date = EXCLUDED.last_web_checkin_announcement_date,
+            updated_at = NOW()
+        WHERE user_preferences.last_web_checkin_announcement_date IS NULL
+           OR user_preferences.last_web_checkin_announcement_date < EXCLUDED.last_web_checkin_announcement_date
+        "#,
+    )
+    .bind(user_id)
+    .bind(sent_date)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }
 
 // ---------- Kudos System (#17) ----------
@@ -1266,11 +1311,9 @@ pub async fn get_active_users(pool: &PgPool) -> Result<Vec<DbUser>> {
         FROM users
         WHERE is_active = true
           AND role != 'ADMIN'
-          AND email != $1
         ORDER BY created_at ASC
         "#,
     )
-    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 

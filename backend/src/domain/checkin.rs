@@ -1,8 +1,6 @@
 use chrono::{Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
 
-pub const TEST_WEB_CHECKIN_EMAIL: &str = "work.olegkaminskyi@gmail.com";
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckinFrequency {
@@ -86,8 +84,4 @@ pub fn schedule_for(
         days_until,
         last_date,
     }
-}
-
-pub fn is_test_web_checkin_email(email: &str) -> bool {
-    email.trim().eq_ignore_ascii_case(TEST_WEB_CHECKIN_EMAIL)
 }

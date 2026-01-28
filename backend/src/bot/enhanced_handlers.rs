@@ -1,16 +1,16 @@
 ///! Розширені handlers для Telegram бота з щоденними чекінами
 use crate::analytics::correlations;
-use crate::bot::daily_checkin::{CheckInGenerator, Metrics, MetricsCalculator};
+use crate::bot::daily_checkin::{Metrics, MetricsCalculator};
 use crate::bot::markdown::mdv2;
 use crate::db;
-use crate::domain::checkin::{is_test_web_checkin_email, schedule_for, CheckinFrequency};
+use crate::domain::checkin::{schedule_for, CheckinFrequency};
 use crate::services::ai::AiOutcome;
 use crate::services::wellness;
 use crate::state::SharedState;
 use crate::time_utils;
 use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use chrono::{Datelike, Utc};
+use chrono::Utc;
 use serde_json::json;
 use sqlx::{self, Row};
 use std::env;
@@ -639,7 +639,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
                 Привʼязка одноразова — для зміни звертайтесь до адміністратора.\n\n\
                 📋 Доступні команди:\n\
                 /help - Показати всі команди\n\
-                /checkin - Пройти щоденний чекін\n\
+                /checkin - Пройти веб-чекін\n\
                 /status - Подивитись свій стан\n\
                 /weblogin - Отримати посилання для входу\n\
                 /feedback - OpsLab Feedback (зовнішній)\n\n\
@@ -905,7 +905,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         msg.chat.id,
         mdv2(
             "📱 Команди бота:\n\n\
-            /checkin - Щоденний чекін (2-3 хв)\n\
+            /checkin - Веб-чекін (2-3 хв)\n\
             /status - Ваш поточний стан\n\
             /feedback - OpsLab Feedback\n\
             /settings - Налаштування\n\
@@ -1048,7 +1048,7 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
             /link email@example.com 1234\n\
             або просто: email@example.com 1234\n\n\
             📱 Основні команди:\n\n\
-            /checkin — Пройти щоденний чекін\n\
+            /checkin — Пройти веб-чекін\n\
             /status — Подивитись свій стан\n\
             /weblogin — Вхід у web dashboard\n\
             /feedback — Залишити feedback команді\n\
@@ -1105,7 +1105,7 @@ async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
         chat_id,
         mdv2(
             "📱 Команди бота:\n\n\
-            /checkin - Щоденний чекін\n\
+            /checkin - Веб-чекін\n\
             /status - Поточний стан\n\
             /feedback - OpsLab Feedback\n\
             /weblogin - Вхід у web dashboard\n\
@@ -1141,53 +1141,7 @@ pub async fn start_daily_checkin(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    if let Some(user) = db::find_user_by_id(&state.pool, user_id).await? {
-        if is_test_web_checkin_email(&user.email) {
-            send_web_checkin_reminder(bot, state, chat_id, user_id).await?;
-            return Ok(());
-        }
-    }
-
-    // #1 WOW Feature: Use adaptive check-in generation
-    let checkin = match CheckInGenerator::generate_adaptive_checkin(&state.pool, user_id).await {
-        Ok(c) => c,
-        Err(_) => {
-            // Fallback to standard if adaptive fails
-            let day_of_week = Utc::now().weekday().num_days_from_monday();
-            CheckInGenerator::generate_checkin(user_id, day_of_week)
-        }
-    };
-
-    // Зберегти чекін в сесії
-    {
-        let mut sessions = state.checkin_sessions.write().await;
-        sessions.insert(
-            chat_id.0,
-            crate::state::CheckInSession {
-                checkin: checkin.clone(),
-                current_index: 0,
-                awaiting_open_question: None,
-                urgent_alerts_sent: None,
-                answered_questions: None,
-            },
-        );
-    }
-
-    // Відправка привітання
-    bot.send_message(
-        chat_id,
-        mdv2(format!(
-            "📋 Щоденний чекін\n\n{}\n\n⏱️ Займе {}",
-            checkin.intro_message, checkin.estimated_time
-        )),
-    )
-    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-    .await?;
-
-    // Відправка першого питання
-    send_checkin_question(bot, state, chat_id, &checkin, 0).await?;
-
-    Ok(())
+    send_web_checkin_reminder(bot, state, chat_id, user_id).await
 }
 
 /// Відправка питання чекіну
@@ -1451,6 +1405,22 @@ async fn process_open_response(
         audio_duration_seconds,
     )
     .await?;
+
+    if source == "voice" {
+        if let Err(err) = db::insert_voice_log(
+            &state.pool,
+            &state.crypto,
+            user_id,
+            response_text,
+            Some(&outcome.ai_json),
+            outcome.risk_score,
+            outcome.urgent,
+        )
+        .await
+        {
+            tracing::warn!("Failed to store voice log for check-in response: {}", err);
+        }
+    }
 
     let advice = outcome
         .ai_json
@@ -1796,12 +1766,9 @@ async fn send_web_checkin_reminder(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    let user = db::find_user_by_id(&state.pool, user_id)
+    let _user = db::find_user_by_id(&state.pool, user_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-    if !is_test_web_checkin_email(&user.email) {
-        return Ok(());
-    }
 
     let prefs = db::get_user_preferences(&state.pool, user_id).await?;
     let frequency = CheckinFrequency::try_from(prefs.checkin_frequency.as_str())
@@ -1833,7 +1800,7 @@ async fn send_web_checkin_reminder(
     bot.send_message(
         chat_id,
         mdv2(format!(
-            "🧭 Нагадування Mindguard\n\n{}\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне 5 хвилин.",
+            "🧭 Нагадування Mindguard\n\n{}\n\n⚙️ Частоту чекінів можна обрати у веб-формі (щодня / кожні 3 дні / щотижня).\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне 5 хвилин.",
             status_line, login_url
         )),
     )
@@ -1850,9 +1817,6 @@ pub async fn send_web_checkin_followups(
     let user = db::find_user_by_id(&state.pool, user_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-    if !is_test_web_checkin_email(&user.email) {
-        return Ok(());
-    }
 
     let Some(telegram_id) = user.telegram_id else {
         return Ok(());
@@ -1886,6 +1850,7 @@ pub async fn send_web_checkin_followups(
     if count >= 21 {
         if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
             if MetricsCalculator::is_critical(&metrics) {
+                send_critical_alert(&bot, state, user_id, &metrics).await.ok();
                 bot.send_message(
                     chat_id,
                     mdv2(
@@ -1903,6 +1868,62 @@ pub async fn send_web_checkin_followups(
                 .ok();
             }
         }
+    }
+
+    Ok(())
+}
+
+/// One-time announcement: web check-ins for everyone
+pub async fn send_web_checkin_rollout_announcement(state: &SharedState) -> Result<()> {
+    let users = db::get_web_checkin_announcement_candidates(&state.pool).await?;
+    if users.is_empty() {
+        return Ok(());
+    }
+
+    let token = std::env::var("TELEGRAM_BOT_TOKEN")
+        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
+    let bot = teloxide::Bot::new(token);
+    let today = Utc::now().date_naive();
+
+    let message = mdv2(
+        "🆕 Оновлення Mindguard\n\n\
+        Чекіни тепер проходять у веб-апці, а Telegram лишається для нагадувань, порад та аналітики.\n\n\
+        Як це працює:\n\
+        1) Натисни /checkin або дочекайся щоденного нагадування.\n\
+        2) Відкриється веб-форма з питаннями.\n\
+        3) Обери частоту: щодня (2-3 питання), кожні 3 дні (10 питань) або щотижня (12 питань).\n\n\
+        Якщо щось не відкривається — повтори /checkin, бот надішле нове посилання.",
+    );
+
+    for (user_id, telegram_id) in users {
+        let chat_id = ChatId(telegram_id);
+        let result = bot
+            .send_message(chat_id, message.clone())
+            .parse_mode(ParseMode::MarkdownV2)
+            .await;
+
+        match result {
+            Ok(_) => {
+                if let Err(err) =
+                    db::mark_web_checkin_announcement_sent(&state.pool, user_id, today).await
+                {
+                    tracing::warn!(
+                        "Failed to mark web check-in announcement for {}: {}",
+                        user_id,
+                        err
+                    );
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to send web check-in announcement to {}: {}",
+                    user_id,
+                    err
+                );
+            }
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(35)).await;
     }
 
     Ok(())
@@ -1931,6 +1952,36 @@ fn build_login_url(token: &str, checkin: bool) -> String {
     } else {
         format!("{}/?token={}", base_url, token)
     }
+}
+
+/// Alert admins about urgent open responses
+pub async fn send_open_response_alert(
+    _state: &SharedState,
+    user_id: Uuid,
+    risk_score: i16,
+) -> Result<()> {
+    let admin_id = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]);
+    let jane_id = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]);
+
+    if admin_id.is_none() && jane_id.is_none() {
+        return Ok(());
+    }
+
+    let token = std::env::var("TELEGRAM_BOT_TOKEN")
+        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
+    let bot = teloxide::Bot::new(token);
+    let message = format!(
+        "⚠️ URGENT | User {user_id} open response flagged risk_score={risk_score}"
+    );
+
+    if let Some(admin) = admin_id {
+        bot.send_message(ChatId(admin), message.clone()).await.ok();
+    }
+    if let Some(jane) = jane_id {
+        bot.send_message(ChatId(jane), message.clone()).await.ok();
+    }
+
+    Ok(())
 }
 
 /// Відправка критичного алерту адмінам

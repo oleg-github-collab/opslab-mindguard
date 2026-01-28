@@ -1,6 +1,7 @@
 use crate::bot::daily_checkin::{CheckInGenerator, Question};
 use crate::db;
-use crate::domain::checkin::{schedule_for, CheckinFrequency, CheckinSchedule, is_test_web_checkin_email};
+use crate::domain::checkin::{schedule_for, CheckinFrequency, CheckinSchedule};
+use crate::domain::models::UserRole;
 use crate::state::{SharedState, WebCheckInSession};
 use crate::time_utils;
 use crate::web::session::UserSession;
@@ -98,15 +99,28 @@ struct CheckinSubmitPayload {
     answers: Vec<CheckinAnswerPayload>,
 }
 
+struct PreparedScaleAnswer {
+    question_id: i32,
+    qtype: String,
+    value: i16,
+}
+
+struct PreparedOpenResponse {
+    question_id: i32,
+    qtype: String,
+    source: String,
+    response_text: String,
+    analysis: serde_json::Value,
+    risk_score: i16,
+    urgent: bool,
+    duration: Option<i32>,
+}
+
 async fn status(
     UserSession(user_id): UserSession,
     State(state): State<SharedState>,
 ) -> Result<Json<CheckinStatusResponse>, StatusCode> {
-    let (user, schedule, frequency) = load_schedule(&state, user_id).await?;
-
-    if !is_test_web_checkin_email(&user.email) {
-        return Err(StatusCode::FORBIDDEN);
-    }
+    let (_user, schedule, frequency) = load_schedule(&state, user_id).await?;
 
     let (frequency_label, question_count_label, estimated_time) =
         frequency_metadata(frequency);
@@ -129,14 +143,10 @@ async fn update_frequency(
     State(state): State<SharedState>,
     Json(payload): Json<CheckinFrequencyPayload>,
 ) -> Result<Json<CheckinStatusResponse>, StatusCode> {
-    let user = db::find_user_by_id(&state.pool, user_id)
+    let _user = db::find_user_by_id(&state.pool, user_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    if !is_test_web_checkin_email(&user.email) {
-        return Err(StatusCode::FORBIDDEN);
-    }
 
     db::set_user_checkin_frequency(&state.pool, user_id, payload.frequency.as_str())
         .await
@@ -161,22 +171,13 @@ async fn start(
             )
         })?;
 
-    if !is_test_web_checkin_email(&user.email) {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(CheckinErrorResponse {
-                error: "not_allowed".to_string(),
-                next_due_date: None,
-                days_until: None,
-            }),
-        ));
-    }
-
     let force = params
         .force
         .as_deref()
         .map(|val| matches!(val.trim().to_lowercase().as_str(), "1" | "true" | "yes"))
         .unwrap_or(false);
+    let allow_force = matches!(user.role, UserRole::Admin | UserRole::Founder);
+    let force = force && allow_force;
 
     if !schedule.due && !force {
         return Err((
@@ -235,14 +236,10 @@ async fn submit(
     State(state): State<SharedState>,
     Json(payload): Json<CheckinSubmitPayload>,
 ) -> Result<Json<CheckinSubmitResponse>, StatusCode> {
-    let user = db::find_user_by_id(&state.pool, user_id)
+    let _user = db::find_user_by_id(&state.pool, user_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    if !is_test_web_checkin_email(&user.email) {
-        return Err(StatusCode::FORBIDDEN);
-    }
 
     let session = {
         let sessions = state.web_checkin_sessions.read().await;
@@ -273,6 +270,8 @@ async fn submit(
     let mut highest_risk = 0i16;
     let mut advice: Option<String> = None;
     let mut urgent = false;
+    let mut prepared_scales: Vec<PreparedScaleAnswer> = Vec::new();
+    let mut prepared_open: Vec<PreparedOpenResponse> = Vec::new();
 
     for question in &session.checkin.questions {
         let Some(answer) = answer_map.get(&question.id) else {
@@ -284,16 +283,11 @@ async fn submit(
             if !(1..=10).contains(&value) {
                 return Err(StatusCode::BAD_REQUEST);
             }
-            db::insert_checkin_answer(
-                &state.pool,
-                user_id,
-                question.id,
-                &question.qtype,
+            prepared_scales.push(PreparedScaleAnswer {
+                question_id: question.id,
+                qtype: question.qtype.clone(),
                 value,
-            )
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            saved_answers += 1;
+            });
             continue;
         }
 
@@ -329,7 +323,7 @@ async fn submit(
         } else {
             let audio_b64 = audio_b64.expect("audio payload missing");
             if !state.ai.is_enabled() {
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(StatusCode::SERVICE_UNAVAILABLE);
             }
             if audio_b64.len() > 8_000_000 {
                 return Err(StatusCode::PAYLOAD_TOO_LARGE);
@@ -350,56 +344,83 @@ async fn submit(
             )
         };
 
-        let outcome = analyze_open_response(
-            &state,
+        if !state.ai.is_enabled() {
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+
+        let outcome = analyze_open_response(&state, user_id, question, &response_text)
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+
+        prepared_open.push(PreparedOpenResponse {
+            question_id: question.id,
+            qtype: question.qtype.clone(),
+            source: source.to_string(),
+            response_text,
+            analysis: outcome.ai_json,
+            risk_score: outcome.risk_score,
+            urgent: outcome.urgent,
+            duration,
+        });
+    }
+
+    for answer in prepared_scales {
+        db::insert_checkin_answer(
+            &state.pool,
             user_id,
-            question,
-            &response_text,
+            answer.question_id,
+            &answer.qtype,
+            answer.value,
         )
-        .await;
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        saved_answers += 1;
+    }
 
-        let (analysis, risk_score, is_urgent, response_advice) = match outcome {
-            Ok(outcome) => {
-                let response_advice = outcome
-                    .ai_json
-                    .get("advice")
-                    .and_then(|v| v.as_str())
-                    .map(|val| val.to_string());
-                (
-                    Some(outcome.ai_json),
-                    Some(outcome.risk_score),
-                    outcome.urgent,
-                    response_advice,
-                )
-            }
-            Err(_) => (None, None, false, None),
-        };
-
+    for response in prepared_open {
         db::insert_checkin_open_response(
             &state.pool,
             &state.crypto,
             user_id,
             &session.checkin.id,
-            question.id,
-            &question.qtype,
-            source,
-            &response_text,
-            analysis.as_ref(),
-            risk_score,
-            is_urgent,
-            duration,
+            response.question_id,
+            &response.qtype,
+            &response.source,
+            &response.response_text,
+            Some(&response.analysis),
+            Some(response.risk_score),
+            response.urgent,
+            response.duration,
         )
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        saved_open += 1;
-        if let Some(score) = risk_score {
-            if score > highest_risk {
-                highest_risk = score;
-                advice = response_advice;
+        if response.source == "voice" {
+            if let Err(err) = db::insert_voice_log(
+                &state.pool,
+                &state.crypto,
+                user_id,
+                &response.response_text,
+                Some(&response.analysis),
+                response.risk_score,
+                response.urgent,
+            )
+            .await
+            {
+                tracing::warn!("Failed to store voice log for web check-in: {}", err);
             }
         }
-        if is_urgent {
+
+        saved_open += 1;
+        if response.risk_score > highest_risk {
+            highest_risk = response.risk_score;
+            advice = response
+                .analysis
+                .get("advice")
+                .and_then(|v| v.as_str())
+                .map(|val| val.to_string());
+        }
+        if response.urgent {
             urgent = true;
         }
     }
@@ -407,6 +428,15 @@ async fn submit(
     {
         let mut sessions = state.web_checkin_sessions.write().await;
         sessions.remove(&user_id);
+    }
+
+    if urgent {
+        if let Err(err) =
+            crate::bot::enhanced_handlers::send_open_response_alert(&state, user_id, highest_risk)
+                .await
+        {
+            tracing::warn!("Failed to send urgent alert for web check-in: {}", err);
+        }
     }
 
     if let Err(err) = crate::bot::enhanced_handlers::send_web_checkin_followups(&state, user_id).await {
@@ -485,6 +515,10 @@ fn audio_mime_and_filename(raw_mime: Option<&str>) -> (&'static str, &'static st
     let lower = raw_mime.unwrap_or("").to_lowercase();
     if lower.contains("webm") {
         ("audio/webm", "voice.webm")
+    } else if lower.contains("mp4") || lower.contains("m4a") {
+        ("audio/mp4", "voice.m4a")
+    } else if lower.contains("aac") {
+        ("audio/aac", "voice.aac")
     } else if lower.contains("wav") {
         ("audio/wav", "voice.wav")
     } else if lower.contains("mpeg") || lower.contains("mp3") {

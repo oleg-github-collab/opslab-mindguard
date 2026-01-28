@@ -72,7 +72,7 @@ impl AiService {
         metrics: Option<&Metrics>,
     ) -> Result<AiOutcome> {
         let client = self.client()?;
-        let mut retries = 0;
+        let mut last_err: Option<anyhow::Error> = None;
         let mut system_prompt = String::from(
             "You are a mental health triage assistant for OpsLab Mindguard.\n\
 Input: transcription text + brief context (last 3 days).\n\
@@ -101,71 +101,80 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
 
         let contains_urgent = contains_urgent_keywords(transcript);
 
-        loop {
-            let messages = vec![
-                ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
-                    role: Role::System,
-                    content: system_prompt.to_string(),
-                    name: None,
-                }),
-                ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                    role: Role::User,
-                    content: ChatCompletionRequestUserMessageContent::Text(format!(
-                        "Context (last 3 days): {context}\nTranscription:\n{transcript}"
-                    )),
-                    name: None,
-                }),
-            ];
+        for model in ["gpt-4o", "gpt-4o-mini"] {
+            let mut retries = 0;
+            loop {
+                let messages = vec![
+                    ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                        role: Role::System,
+                        content: system_prompt.to_string(),
+                        name: None,
+                    }),
+                    ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                        role: Role::User,
+                        content: ChatCompletionRequestUserMessageContent::Text(format!(
+                            "Context (last 3 days): {context}\nTranscription:\n{transcript}"
+                        )),
+                        name: None,
+                    }),
+                ];
 
-            let request = CreateChatCompletionRequestArgs::default()
-                .model("gpt-4o")
-                .messages(messages)
-                .response_format(ChatCompletionResponseFormat {
-                    r#type: ChatCompletionResponseFormatType::JsonObject,
-                })
-                .temperature(0.2)
-                .max_tokens(300u16)
-                .build()?;
+                let request = CreateChatCompletionRequestArgs::default()
+                    .model(model)
+                    .messages(messages)
+                    .response_format(ChatCompletionResponseFormat {
+                        r#type: ChatCompletionResponseFormatType::JsonObject,
+                    })
+                    .temperature(0.2)
+                    .max_tokens(300u16)
+                    .build()?;
 
-            match client.chat().create(request).await {
-                Ok(resp) => {
-                    let content = resp
-                        .choices
-                        .first()
-                        .and_then(|c| c.message.content.clone())
-                        .unwrap_or_default();
-                    let json = parse_ai_json(&content);
-                    let mut risk_score =
-                        json.get("risk_score").and_then(|v| v.as_i64()).unwrap_or(1) as i16;
-                    if risk_score < 1 {
-                        risk_score = 1;
-                    } else if risk_score > 10 {
-                        risk_score = 10;
+                match client.chat().create(request).await {
+                    Ok(resp) => {
+                        let content = resp
+                            .choices
+                            .first()
+                            .and_then(|c| c.message.content.clone())
+                            .unwrap_or_default();
+                        let json = parse_ai_json(&content);
+                        let mut risk_score =
+                            json.get("risk_score").and_then(|v| v.as_i64()).unwrap_or(1) as i16;
+                        if risk_score < 1 {
+                            risk_score = 1;
+                        } else if risk_score > 10 {
+                            risk_score = 10;
+                        }
+                        let urgent = contains_urgent || risk_score >= 9;
+                        if urgent {
+                            risk_score = 10;
+                        }
+                        let mut normalized = normalize_ai_json(
+                            json,
+                            "Зроби коротку паузу, подихай 4-7-8 і обери одну просту дію на зараз.",
+                        );
+                        if let Some(obj) = normalized.as_object_mut() {
+                            obj.insert("risk_score".to_string(), serde_json::json!(risk_score));
+                        }
+                        return Ok(AiOutcome {
+                            transcript: transcript.to_string(),
+                            ai_json: normalized,
+                            risk_score,
+                            urgent,
+                        });
                     }
-                    let urgent = contains_urgent || risk_score >= 9;
-                    if urgent {
-                        risk_score = 10;
+                    Err(err) => {
+                        retries += 1;
+                        last_err = Some(anyhow!(err.to_string()));
+                        if retries > 3 {
+                            break;
+                        }
+                        sleep(Duration::from_millis(500 * retries)).await;
                     }
-                    let mut normalized = normalize_ai_json(json, "Зроби коротку паузу, подихай 4-7-8 і обери одну просту дію на зараз.");
-                    if let Some(obj) = normalized.as_object_mut() {
-                        obj.insert("risk_score".to_string(), serde_json::json!(risk_score));
-                    }
-                    return Ok(AiOutcome {
-                        transcript: transcript.to_string(),
-                        ai_json: normalized,
-                        risk_score,
-                        urgent,
-                    });
-                }
-                Err(err) => {
-                    retries += 1;
-                    if retries > 3 {
-                        return Err(anyhow!("OpenAI error: {err}"));
-                    }
-                    sleep(Duration::from_millis(500 * retries)).await;
                 }
             }
         }
+
+        Err(last_err.unwrap_or_else(|| anyhow!("OpenAI error")))
     }
 
     pub fn encrypt_payload(&self, value: &serde_json::Value) -> Result<String> {
