@@ -1568,6 +1568,63 @@
       width: 100%;
     }
 
+    @media (max-width: 900px) {
+      .checkin-status {
+        align-items: flex-start;
+      }
+
+      .checkin-status-meta {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .checkin-status {
+        padding: 1rem;
+      }
+
+      .checkin-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .checkin-actions .btn {
+        width: 100%;
+        text-align: center;
+      }
+
+      .checkin-question {
+        padding: 1.25rem;
+      }
+
+      .checkin-question-header {
+        align-items: flex-start;
+      }
+
+      .checkin-scale {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .checkin-scale-value {
+        align-self: flex-end;
+      }
+
+      .audio-controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .audio-record-btn {
+        width: 56px;
+        height: 56px;
+      }
+
+      .audio-status {
+        text-align: center;
+      }
+    }
+
     /* ===== ADMIN USERS ===== */
     .admin-toolbar {
       display: flex;
@@ -3445,12 +3502,15 @@
         }
       }
 
-      // Load initial data
-      await loadMindguardData();
-
       if (checkinPendingSection === 'checkin' && isTestCheckinUser()) {
         checkinPendingSection = null;
         switchSection('checkin');
+      }
+
+      try {
+        await loadMindguardData();
+      } catch (error) {
+        console.error('Mindguard data load failed:', error);
       }
     }
 
@@ -6064,8 +6124,8 @@
         applyCheckinStatus(status);
         if (checkinAutoStart) {
           checkinAutoStart = false;
-          if (status?.due_today && !checkinSession) {
-            startCheckin();
+          if (!checkinSession) {
+            startCheckin(!status?.due_today);
           }
         }
       } catch (error) {
@@ -6525,7 +6585,9 @@
         const formCard = document.getElementById('checkin-form-card');
         const introEl = document.getElementById('checkin-intro');
         if (introEl) {
-          introEl.textContent = `${payload.intro_message} (≈ ${payload.estimated_time})`;
+          const count = payload.questions ? payload.questions.length : 0;
+          const countLabel = count ? `, ${count} питань` : '';
+          introEl.textContent = `${payload.intro_message} (≈ ${payload.estimated_time}${countLabel})`;
         }
         if (formCard) {
           formCard.classList.remove('hidden');
