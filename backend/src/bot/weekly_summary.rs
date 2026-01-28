@@ -3,6 +3,7 @@
 use crate::bot::daily_checkin::Metrics;
 use crate::bot::markdown::mdv2;
 use crate::db::{self, TeamAverage};
+use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::state::SharedState;
 use anyhow::Result;
 use chrono::{Duration, Utc};
@@ -345,7 +346,23 @@ impl WeeklySummary {
 /// Відправити weekly summaries всім користувачам
 pub async fn send_weekly_summaries(state: &SharedState) -> Result<()> {
     // Отримати всіх користувачів з Telegram ID
-    let users = db::get_all_telegram_users(&state.pool).await?;
+    let mut users = db::get_all_telegram_users(&state.pool).await?;
+
+    if let Ok(Some(admin)) = db::find_user_by_email(&state.pool, TEST_WEB_CHECKIN_EMAIL).await {
+        if admin.is_active {
+            if let Some(telegram_id) = admin.telegram_id {
+                let eligible = db::get_user_preferences(&state.pool, admin.id)
+                    .await
+                    .ok()
+                    .map(|prefs| prefs.notification_enabled && prefs.onboarding_completed)
+                    .unwrap_or(true);
+
+                if eligible && !users.iter().any(|(user_id, _)| *user_id == admin.id) {
+                    users.push((admin.id, telegram_id));
+                }
+            }
+        }
+    }
 
     tracing::info!("Sending weekly summaries to {} users", users.len());
 

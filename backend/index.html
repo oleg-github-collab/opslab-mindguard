@@ -1347,6 +1347,227 @@
       font-weight: 700;
     }
 
+    /* ===== WEB CHECKIN ===== */
+    .checkin-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      align-items: center;
+      justify-content: space-between;
+      border: 3px solid var(--dark);
+      padding: 1.25rem;
+      background: linear-gradient(135deg, #fff4ea 0%, #ffffff 60%, #eefbff 100%);
+      box-shadow: 6px 6px 0 var(--dark);
+      margin-bottom: 1.5rem;
+    }
+
+    .checkin-status-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .checkin-status-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .checkin-frequency-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-bottom: 1.5rem;
+    }
+
+    .frequency-card {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      border: 3px solid var(--dark);
+      padding: 1rem;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .frequency-card:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
+    }
+
+    .frequency-card.selected {
+      border-color: var(--primary);
+      background: #fff1e6;
+    }
+
+    .frequency-card input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .checkin-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .checkin-question {
+      border: 3px solid var(--dark);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      background: var(--white);
+      box-shadow: 4px 4px 0 var(--dark);
+    }
+
+    .checkin-question-header {
+      display: flex;
+      gap: 0.9rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .checkin-question-emoji {
+      width: 46px;
+      height: 46px;
+      border: 3px solid var(--dark);
+      background: var(--secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 3px 3px 0 var(--dark);
+      flex-shrink: 0;
+    }
+
+    .checkin-question-text {
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .checkin-question-type {
+      font-size: 0.8rem;
+      color: var(--gray);
+      margin-top: 0.25rem;
+    }
+
+    .checkin-scale {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .checkin-scale input[type="range"] {
+      flex: 1;
+      accent-color: var(--primary);
+    }
+
+    .checkin-scale-value {
+      min-width: 48px;
+      padding: 0.35rem 0.6rem;
+      border: 2px solid var(--dark);
+      background: var(--gray-light);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .checkin-scale-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--gray);
+      margin-top: 0.5rem;
+    }
+
+    .checkin-textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 1rem;
+      border: 3px solid var(--dark);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .checkin-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .audio-block {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 2px dashed var(--dark);
+    }
+
+    .audio-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .audio-record-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 3px solid var(--dark);
+      background: var(--danger);
+      color: var(--white);
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 4px 4px 0 var(--dark);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .audio-record-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--dark);
+    }
+
+    .audio-record-btn.recording {
+      background: var(--accent);
+      animation: recordPulse 1.2s infinite ease-in-out;
+    }
+
+    @keyframes recordPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.07); }
+      100% { transform: scale(1); }
+    }
+
+    .audio-btn {
+      padding: 0.5rem 0.95rem;
+      border: 2px solid var(--dark);
+      background: var(--white);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .audio-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .audio-status {
+      padding: 0.3rem 0.6rem;
+      border: 2px solid var(--dark);
+      background: #fff4ea;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .audio-player {
+      margin-top: 0.6rem;
+      width: 100%;
+    }
+
     /* ===== ADMIN USERS ===== */
     .admin-toolbar {
       display: flex;
@@ -1848,6 +2069,7 @@
         <div class="nav-panel" id="nav-panel">
           <ul class="nav-menu">
             <li><a href="#" class="nav-link active" data-section="mindguard">📊 Mindguard</a></li>
+            <li><a href="#" class="nav-link hidden" data-section="checkin" id="checkin-link">📝 Web-чекін</a></li>
             <li><a href="#" class="nav-link hidden" data-section="advanced" id="advanced-link">🧠 Advanced</a></li>
             <li><a href="#" class="nav-link" data-section="pulse">🗣 Pulse Rooms</a></li>
             <li><a href="https://opslab-feedback-production.up.railway.app/" class="nav-link nav-link-external" target="_blank" rel="noopener">💬 Стіна плачу</a></li>
@@ -2417,6 +2639,67 @@
       </div>
     </div>
 
+    <!-- ===== WEB CHECKIN SECTION ===== -->
+    <div id="checkin-section" class="section">
+      <div class="container">
+        <div class="card">
+          <div class="card-header">📝 Web-чекін (тест для адміністратора)</div>
+          <div class="checkin-status">
+            <div class="checkin-status-main">
+              <div id="checkin-status-title" class="checkin-status-title">Завантаження...</div>
+              <div id="checkin-status-detail" class="form-hint"></div>
+            </div>
+            <div class="checkin-status-meta">
+              <span id="checkin-frequency-chip" class="status-chip">—</span>
+              <span id="checkin-next-chip" class="status-chip">—</span>
+            </div>
+          </div>
+
+          <div class="checkin-frequency-grid" id="checkin-frequency-grid">
+            <label class="frequency-card">
+              <input type="radio" name="checkin-frequency" value="daily" />
+              <div>
+                <div class="mono">Щодня</div>
+                <div class="form-hint">2-3 питання, швидкий пульс команди</div>
+              </div>
+            </label>
+            <label class="frequency-card">
+              <input type="radio" name="checkin-frequency" value="every_3_days" />
+              <div>
+                <div class="mono">Кожні 3 дні</div>
+                <div class="form-hint">10 питань, глибший зріз</div>
+              </div>
+            </label>
+            <label class="frequency-card">
+              <input type="radio" name="checkin-frequency" value="weekly" />
+              <div>
+                <div class="mono">Щотижня</div>
+                <div class="form-hint">Повний тест, детальна картина</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="checkin-actions">
+            <button id="checkin-start-btn" class="btn btn-primary" type="button">Почати чекін</button>
+            <span id="checkin-start-hint" class="form-hint"></span>
+          </div>
+        </div>
+
+        <div class="card hidden" id="checkin-form-card">
+          <div class="card-header">✅ Заповнення чекіну</div>
+          <div id="checkin-intro" class="form-hint" style="margin-bottom: 1rem;"></div>
+          <div id="checkin-questions"></div>
+          <div class="form-hint" id="checkin-audio-hint" style="margin-bottom: 1rem;">
+            🎧 Аудіо доступне для відкритих питань (потрібен доступ до мікрофона).
+          </div>
+          <div class="checkin-actions">
+            <button id="checkin-submit-btn" class="btn btn-primary" type="button">Зберегти відповіді</button>
+            <span id="checkin-submit-status" class="form-hint"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== ADVANCED ANALYTICS SECTION ===== -->
     <div id="advanced-section" class="section">
       <div class="container">
@@ -2960,6 +3243,13 @@
     let pulseRooms = [];
     let activePulseRoom = null;
     let pulseMessages = [];
+    let checkinSession = null;
+    let checkinAudioStates = new Map();
+    let activeRecordingState = null;
+    let checkinPendingSection = null;
+    const TEST_CHECKIN_EMAIL = 'work.olegkaminskyi@gmail.com';
+    const CHECKIN_MAX_AUDIO_SECONDS = 120;
+    const CHECKIN_MAX_AUDIO_BYTES = 6_000_000;
 
     // ===== API HELPERS =====
     async function apiCall(endpoint, options = {}) {
@@ -3088,6 +3378,9 @@
       if ((section === 'admin' || section === 'advanced') && !isAdmin()) {
         return;
       }
+      if (section === 'checkin' && !isTestCheckinUser()) {
+        return;
+      }
       currentSection = section;
 
       // Update nav
@@ -3109,6 +3402,8 @@
       } else if (section === 'admin') {
         loadTeamHeatmap();
         loadAdminUsers();
+      } else if (section === 'checkin') {
+        loadCheckinStatus();
       }
     }
 
@@ -3123,6 +3418,7 @@
 
       const adminLink = document.getElementById('admin-link');
       const advancedLink = document.getElementById('advanced-link');
+      const checkinLink = document.getElementById('checkin-link');
       if (isAdmin()) {
         adminLink.classList.remove('hidden');
         if (advancedLink) {
@@ -3139,8 +3435,21 @@
         document.body.classList.add('employee-view');
       }
 
+      if (checkinLink) {
+        if (isTestCheckinUser()) {
+          checkinLink.classList.remove('hidden');
+        } else {
+          checkinLink.classList.add('hidden');
+        }
+      }
+
       // Load initial data
       await loadMindguardData();
+
+      if (checkinPendingSection === 'checkin' && isTestCheckinUser()) {
+        checkinPendingSection = null;
+        switchSection('checkin');
+      }
     }
 
     function showLogin() {
@@ -3157,10 +3466,19 @@
       pulseRooms = [];
       activePulseRoom = null;
       pulseMessages = [];
+      checkinSession = null;
+      checkinAudioStates = new Map();
+      activeRecordingState = null;
+      checkinPendingSection = null;
     }
 
     function isAdmin() {
       return currentUser?.role === 'ADMIN' || currentUser?.role === 'FOUNDER';
+    }
+
+    function isTestCheckinUser() {
+      const email = currentUser?.email?.toLowerCase();
+      return email === TEST_CHECKIN_EMAIL;
     }
 
     // ===== MINDGUARD DATA =====
@@ -5658,6 +5976,662 @@
       renderOnboarding();
     }
 
+    // ===== WEB CHECKIN =====
+    function updateCheckinFrequencyCards() {
+      document.querySelectorAll('.frequency-card').forEach(card => {
+        const input = card.querySelector('input[name="checkin-frequency"]');
+        const selected = input ? input.checked : false;
+        card.classList.toggle('selected', selected);
+      });
+    }
+
+    function applyCheckinStatus(status) {
+      if (!status) return;
+      const titleEl = document.getElementById('checkin-status-title');
+      const detailEl = document.getElementById('checkin-status-detail');
+      const freqChip = document.getElementById('checkin-frequency-chip');
+      const nextChip = document.getElementById('checkin-next-chip');
+      const startBtn = document.getElementById('checkin-start-btn');
+      const startHint = document.getElementById('checkin-start-hint');
+      const frequencyGrid = document.getElementById('checkin-frequency-grid');
+
+      if (frequencyGrid) frequencyGrid.classList.remove('hidden');
+
+      const nextDays = Math.max(0, status.days_until);
+      const lastText = status.last_checkin_date ? `Останній чекін: ${status.last_checkin_date}. ` : '';
+
+      if (titleEl) {
+        titleEl.textContent = status.due_today ? 'Сьогодні час чекіну' : 'Чекін вже виконано';
+      }
+      if (detailEl) {
+        detailEl.textContent = status.due_today
+          ? `Очікується ${status.question_count_label} питань, приблизно ${status.estimated_time}.`
+          : `${lastText}Наступний чекін: ${status.next_due_date}.`;
+      }
+      if (freqChip) {
+        freqChip.textContent = `${status.frequency_label} · ${status.question_count_label} питань`;
+      }
+      if (nextChip) {
+        nextChip.textContent = status.due_today ? 'Доступно сьогодні' : `Через ${nextDays} дн.`;
+      }
+      if (startBtn) {
+        if (checkinSession) {
+          startBtn.disabled = true;
+          startBtn.textContent = 'Чекін у процесі';
+        } else {
+          startBtn.disabled = !status.due_today;
+          startBtn.textContent = status.due_today ? 'Почати чекін' : 'Чекін недоступний';
+        }
+      }
+      if (startHint && !checkinSession) {
+        startHint.textContent = status.due_today ? '' : `Наступний чекін ${status.next_due_date}`;
+      }
+
+      document.querySelectorAll('input[name="checkin-frequency"]').forEach(input => {
+        input.checked = input.value === status.frequency;
+      });
+      updateCheckinFrequencyCards();
+    }
+
+    async function loadCheckinStatus() {
+      if (!isTestCheckinUser()) return;
+      const titleEl = document.getElementById('checkin-status-title');
+      const detailEl = document.getElementById('checkin-status-detail');
+      const startBtn = document.getElementById('checkin-start-btn');
+      const frequencyGrid = document.getElementById('checkin-frequency-grid');
+
+      if (titleEl) titleEl.textContent = 'Завантаження...';
+      if (detailEl) detailEl.textContent = '';
+      if (startBtn && !checkinSession) startBtn.disabled = true;
+
+      try {
+        const status = await apiCall('/checkin/status');
+        applyCheckinStatus(status);
+      } catch (error) {
+        if (titleEl) titleEl.textContent = 'Доступ обмежено';
+        if (detailEl) detailEl.textContent = 'Розділ доступний лише для тестового користувача.';
+        if (frequencyGrid) frequencyGrid.classList.add('hidden');
+        if (startBtn) startBtn.disabled = true;
+      }
+    }
+
+    async function updateCheckinFrequency(value) {
+      if (!isTestCheckinUser()) return;
+      const hintEl = document.getElementById('checkin-start-hint');
+      if (hintEl) hintEl.textContent = 'Зберігаємо частоту...';
+      try {
+        const status = await apiCall('/checkin/frequency', {
+          method: 'POST',
+          body: JSON.stringify({ frequency: value }),
+        });
+        applyCheckinStatus(status);
+        if (hintEl) hintEl.textContent = '✅ Частоту оновлено';
+      } catch (error) {
+        if (hintEl) hintEl.textContent = `❌ ${error.message}`;
+      }
+    }
+
+    function isAudioSupported() {
+      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    }
+
+    function pickAudioMimeType() {
+      if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) {
+        return '';
+      }
+      const candidates = [
+        'audio/ogg;codecs=opus',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+      ];
+      return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+    }
+
+    function formatDuration(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function clearAudioState(state) {
+      if (!state) return;
+      if (state.timer) {
+        clearInterval(state.timer);
+        state.timer = null;
+      }
+      if (state.recorder && state.recording) {
+        state.ignoreStop = true;
+        try {
+          state.recorder.stop();
+        } catch (_) {
+          state.ignoreStop = false;
+        }
+      } else {
+        state.ignoreStop = false;
+      }
+      if (state.stream) {
+        state.stream.getTracks().forEach(track => track.stop());
+        state.stream = null;
+      }
+      if (state.blobUrl) {
+        URL.revokeObjectURL(state.blobUrl);
+        state.blobUrl = null;
+      }
+      state.recording = false;
+      state.recorder = null;
+      state.chunks = [];
+      state.audioBase64 = null;
+      state.audioMime = null;
+      state.durationSeconds = null;
+      state.statusEl.textContent = '00:00';
+      state.audioEl.src = '';
+      state.audioEl.style.display = 'none';
+      state.recordBtn.disabled = false;
+      state.recordBtn.classList.remove('recording');
+      state.stopBtn.disabled = true;
+      state.clearBtn.disabled = true;
+      if (activeRecordingState === state) {
+        activeRecordingState = null;
+      }
+    }
+
+    function setupAudioRecorder(questionId, recordBtn, stopBtn, clearBtn, statusEl, audioEl) {
+      const state = {
+        questionId,
+        recorder: null,
+        stream: null,
+        chunks: [],
+        startTime: 0,
+        timer: null,
+        recording: false,
+        ignoreStop: false,
+        audioBase64: null,
+        audioMime: null,
+        durationSeconds: null,
+        blobUrl: null,
+        recordBtn,
+        stopBtn,
+        clearBtn,
+        statusEl,
+        audioEl,
+      };
+
+      checkinAudioStates.set(questionId, state);
+
+      recordBtn.addEventListener('click', async () => {
+        if (!isAudioSupported()) {
+          statusEl.textContent = 'Аудіо недоступне у цьому браузері';
+          return;
+        }
+
+        if (activeRecordingState && activeRecordingState !== state) {
+          if (activeRecordingState.recorder && activeRecordingState.recording) {
+            activeRecordingState.recorder.stop();
+          }
+        }
+
+        if (state.audioBase64) {
+          clearAudioState(state);
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mimeType = pickAudioMimeType();
+          const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+          state.stream = stream;
+          state.recorder = recorder;
+          state.chunks = [];
+          state.startTime = Date.now();
+          state.recording = true;
+          activeRecordingState = state;
+          state.recordBtn.classList.add('recording');
+          state.recordBtn.disabled = true;
+          state.stopBtn.disabled = false;
+          state.clearBtn.disabled = true;
+          statusEl.textContent = '00:00';
+
+          state.timer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+            statusEl.textContent = formatDuration(elapsed);
+            if (elapsed >= CHECKIN_MAX_AUDIO_SECONDS && state.recorder && state.recording) {
+              state.recorder.stop();
+            }
+          }, 1000);
+
+          recorder.addEventListener('dataavailable', event => {
+            if (event.data && event.data.size > 0) {
+              state.chunks.push(event.data);
+            }
+          });
+
+          recorder.addEventListener('stop', async () => {
+            if (state.ignoreStop) {
+              state.ignoreStop = false;
+              return;
+            }
+            state.recording = false;
+            if (activeRecordingState === state) {
+              activeRecordingState = null;
+            }
+            if (state.timer) {
+              clearInterval(state.timer);
+              state.timer = null;
+            }
+            if (state.stream) {
+              state.stream.getTracks().forEach(track => track.stop());
+              state.stream = null;
+            }
+
+            const mime = recorder.mimeType || mimeType || 'audio/webm';
+            const blob = new Blob(state.chunks, { type: mime });
+            state.chunks = [];
+
+            if (blob.size > CHECKIN_MAX_AUDIO_BYTES) {
+              statusEl.textContent = '⚠️ Запис занадто довгий, скоротіть відповідь';
+              clearAudioState(state);
+              return;
+            }
+
+            try {
+              const base64 = await blobToBase64(blob);
+              state.audioBase64 = base64;
+              state.audioMime = mime;
+              state.durationSeconds = Math.max(
+                1,
+                Math.round((Date.now() - state.startTime) / 1000)
+              );
+              state.blobUrl = URL.createObjectURL(blob);
+              state.audioEl.src = state.blobUrl;
+              state.audioEl.style.display = 'block';
+              statusEl.textContent = `Готово ${formatDuration(state.durationSeconds)}`;
+              state.recordBtn.disabled = false;
+              state.recordBtn.classList.remove('recording');
+              state.stopBtn.disabled = true;
+              state.clearBtn.disabled = false;
+            } catch (error) {
+              statusEl.textContent = '❌ Не вдалося зберегти аудіо';
+              clearAudioState(state);
+            }
+          });
+
+          recorder.start(200);
+        } catch (error) {
+          statusEl.textContent = '❌ Немає доступу до мікрофона';
+          state.recordBtn.disabled = false;
+          state.recordBtn.classList.remove('recording');
+          state.stopBtn.disabled = true;
+        }
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if (state.recorder && state.recording) {
+          state.recorder.stop();
+        }
+      });
+
+      clearBtn.addEventListener('click', () => {
+        clearAudioState(state);
+      });
+    }
+
+    function resetCheckinForm() {
+      checkinSession = null;
+      checkinAudioStates.forEach(state => clearAudioState(state));
+      checkinAudioStates.clear();
+      const formCard = document.getElementById('checkin-form-card');
+      const introEl = document.getElementById('checkin-intro');
+      const questionsEl = document.getElementById('checkin-questions');
+      const audioHint = document.getElementById('checkin-audio-hint');
+
+      if (formCard) formCard.classList.add('hidden');
+      if (introEl) introEl.textContent = '';
+      if (questionsEl) questionsEl.innerHTML = '';
+      if (audioHint) audioHint.classList.add('hidden');
+    }
+
+    function renderCheckinQuestions(questions) {
+      const container = document.getElementById('checkin-questions');
+      if (!container) return;
+      container.innerHTML = '';
+      checkinAudioStates.forEach(state => clearAudioState(state));
+      checkinAudioStates.clear();
+
+      const audioSupported = isAudioSupported();
+      let hasOpenQuestions = false;
+
+      questions.forEach((question, index) => {
+        if (question.scale === '1-10') {
+          container.appendChild(buildScaleQuestion(question, index));
+        } else {
+          hasOpenQuestions = true;
+          container.appendChild(buildOpenQuestion(question, index, audioSupported));
+        }
+      });
+
+      const audioHint = document.getElementById('checkin-audio-hint');
+      if (audioHint) {
+        if (!hasOpenQuestions) {
+          audioHint.classList.add('hidden');
+        } else if (!audioSupported) {
+          audioHint.textContent = '🎧 Аудіозапис недоступний у цьому браузері. Використайте текст.';
+          audioHint.classList.remove('hidden');
+        } else {
+          audioHint.textContent = '🎧 Аудіо доступне для відкритих питань (потрібен доступ до мікрофона).';
+          audioHint.classList.remove('hidden');
+        }
+      }
+    }
+
+    function buildScaleQuestion(question, index) {
+      const card = document.createElement('div');
+      card.className = 'checkin-question';
+
+      const header = document.createElement('div');
+      header.className = 'checkin-question-header';
+      const emoji = document.createElement('div');
+      emoji.className = 'checkin-question-emoji';
+      emoji.textContent = question.emoji || '📝';
+      const headerText = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'checkin-question-text';
+      title.textContent = question.text;
+      const meta = document.createElement('div');
+      meta.className = 'checkin-question-type';
+      meta.textContent = `Шкала 1–10 · Питання ${index + 1}`;
+      headerText.appendChild(title);
+      headerText.appendChild(meta);
+      header.appendChild(emoji);
+      header.appendChild(headerText);
+
+      const scaleWrap = document.createElement('div');
+      scaleWrap.className = 'checkin-scale';
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = '1';
+      input.max = '10';
+      input.step = '1';
+      input.value = '5';
+      input.setAttribute('data-checkin-scale', question.id);
+      const valueEl = document.createElement('div');
+      valueEl.className = 'checkin-scale-value';
+      valueEl.textContent = input.value;
+
+      input.addEventListener('input', () => {
+        valueEl.textContent = input.value;
+      });
+
+      scaleWrap.appendChild(input);
+      scaleWrap.appendChild(valueEl);
+
+      const labels = document.createElement('div');
+      labels.className = 'checkin-scale-labels';
+      const left = document.createElement('span');
+      left.textContent = '1 — мінімум';
+      const right = document.createElement('span');
+      right.textContent = '10 — максимум';
+      labels.appendChild(left);
+      labels.appendChild(right);
+
+      card.appendChild(header);
+      card.appendChild(scaleWrap);
+      card.appendChild(labels);
+      return card;
+    }
+
+    function buildOpenQuestion(question, index, audioSupported) {
+      const card = document.createElement('div');
+      card.className = 'checkin-question';
+
+      const header = document.createElement('div');
+      header.className = 'checkin-question-header';
+      const emoji = document.createElement('div');
+      emoji.className = 'checkin-question-emoji';
+      emoji.textContent = question.emoji || '📝';
+      const headerText = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'checkin-question-text';
+      title.textContent = question.text;
+      const meta = document.createElement('div');
+      meta.className = 'checkin-question-type';
+      meta.textContent = `Відкрите питання · Питання ${index + 1}`;
+      headerText.appendChild(title);
+      headerText.appendChild(meta);
+      header.appendChild(emoji);
+      header.appendChild(headerText);
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'checkin-textarea';
+      textarea.placeholder = 'Коротка відповідь (або залиште пустим і запишіть аудіо)...';
+      textarea.maxLength = 1500;
+      textarea.setAttribute('data-checkin-text', question.id);
+
+      const hint = document.createElement('div');
+      hint.className = 'form-hint';
+      hint.textContent = 'Можна відповісти текстом або аудіо. Одного формату достатньо.';
+
+      card.appendChild(header);
+      card.appendChild(textarea);
+      card.appendChild(hint);
+
+      if (audioSupported) {
+        const audioBlock = document.createElement('div');
+        audioBlock.className = 'audio-block';
+        const controls = document.createElement('div');
+        controls.className = 'audio-controls';
+
+        const recordBtn = document.createElement('button');
+        recordBtn.type = 'button';
+        recordBtn.className = 'audio-record-btn';
+        recordBtn.textContent = '●';
+        recordBtn.title = 'Почати запис';
+
+        const stopBtn = document.createElement('button');
+        stopBtn.type = 'button';
+        stopBtn.className = 'audio-btn';
+        stopBtn.textContent = 'Зупинити';
+        stopBtn.disabled = true;
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'audio-btn';
+        clearBtn.textContent = 'Очистити';
+        clearBtn.disabled = true;
+
+        const statusEl = document.createElement('span');
+        statusEl.className = 'audio-status';
+        statusEl.textContent = '00:00';
+
+        const audioEl = document.createElement('audio');
+        audioEl.className = 'audio-player';
+        audioEl.controls = true;
+        audioEl.style.display = 'none';
+
+        controls.appendChild(recordBtn);
+        controls.appendChild(stopBtn);
+        controls.appendChild(clearBtn);
+        controls.appendChild(statusEl);
+        audioBlock.appendChild(controls);
+        audioBlock.appendChild(audioEl);
+        card.appendChild(audioBlock);
+
+        setupAudioRecorder(question.id, recordBtn, stopBtn, clearBtn, statusEl, audioEl);
+      }
+
+      return card;
+    }
+
+    async function startCheckin() {
+      if (!isTestCheckinUser()) return;
+      const startBtn = document.getElementById('checkin-start-btn');
+      const hintEl = document.getElementById('checkin-start-hint');
+      const submitStatus = document.getElementById('checkin-submit-status');
+      if (hintEl) hintEl.textContent = '';
+      if (submitStatus) submitStatus.textContent = '';
+      if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'Готуємо...';
+      }
+
+      try {
+        const response = await fetch('/checkin/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          if (payload?.error === 'not_due') {
+            if (hintEl) {
+              hintEl.textContent = `Наступний чекін ${payload.next_due_date || ''}`;
+            }
+          } else {
+            if (hintEl) hintEl.textContent = '❌ Не вдалося розпочати чекін';
+          }
+          await loadCheckinStatus();
+          return;
+        }
+
+        checkinSession = payload;
+        renderCheckinQuestions(payload.questions || []);
+        const formCard = document.getElementById('checkin-form-card');
+        const introEl = document.getElementById('checkin-intro');
+        if (introEl) {
+          introEl.textContent = `${payload.intro_message} (≈ ${payload.estimated_time})`;
+        }
+        if (formCard) {
+          formCard.classList.remove('hidden');
+          formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (startBtn) {
+          startBtn.textContent = 'Чекін у процесі';
+          startBtn.disabled = true;
+        }
+        if (hintEl) hintEl.textContent = 'Заповніть всі питання та натисніть "Зберегти відповіді".';
+      } catch (error) {
+        if (hintEl) hintEl.textContent = `❌ ${error.message}`;
+        await loadCheckinStatus();
+      }
+    }
+
+    function collectCheckinAnswers() {
+      if (!checkinSession?.questions) {
+        throw new Error('Чекін не активний.');
+      }
+
+      for (const state of checkinAudioStates.values()) {
+        if (state.recording) {
+          throw new Error('Зупиніть запис аудіо перед відправкою.');
+        }
+      }
+
+      const answers = [];
+      const missing = [];
+
+      checkinSession.questions.forEach((question, index) => {
+        if (question.scale === '1-10') {
+          const input = document.querySelector(`[data-checkin-scale="${question.id}"]`);
+          const value = input ? parseInt(input.value, 10) : NaN;
+          if (!Number.isFinite(value) || value < 1 || value > 10) {
+            missing.push(index + 1);
+            return;
+          }
+          answers.push({
+            question_id: question.id,
+            value,
+          });
+        } else {
+          const textarea = document.querySelector(`[data-checkin-text="${question.id}"]`);
+          const text = textarea ? textarea.value.trim() : '';
+          const audioState = checkinAudioStates.get(question.id);
+          const hasAudio = !!audioState?.audioBase64;
+
+          if (!text && !hasAudio) {
+            missing.push(index + 1);
+            return;
+          }
+
+          const payload = {
+            question_id: question.id,
+            text: text || null,
+            audio_base64: text ? null : audioState?.audioBase64 || null,
+            audio_mime: text ? null : audioState?.audioMime || null,
+            audio_duration_seconds: text ? null : audioState?.durationSeconds || null,
+          };
+          answers.push(payload);
+        }
+      });
+
+      if (missing.length) {
+        throw new Error(`Заповніть відповіді на питання: ${missing.join(', ')}`);
+      }
+
+      return answers;
+    }
+
+    async function submitCheckin() {
+      if (!checkinSession) return;
+      const submitBtn = document.getElementById('checkin-submit-btn');
+      const statusEl = document.getElementById('checkin-submit-status');
+      if (submitBtn) submitBtn.disabled = true;
+      if (statusEl) statusEl.textContent = 'Зберігаємо відповіді...';
+
+      try {
+        const answers = collectCheckinAnswers();
+        const response = await fetch('/checkin/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            checkin_id: checkinSession.checkin_id,
+            answers,
+          }),
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          if (statusEl) {
+            statusEl.textContent = payload?.error
+              ? `❌ ${payload.error}`
+              : '❌ Не вдалося зберегти відповіді';
+          }
+          return;
+        }
+
+        const advice = payload?.advice ? ` ${payload.advice}` : '';
+        const message = payload?.urgent
+          ? `⚠️ Є сигнал ризику.${advice}`
+          : `✅ Відповіді збережено.${advice}`;
+        if (statusEl) {
+          statusEl.textContent = message;
+        }
+        resetCheckinForm();
+        await loadCheckinStatus();
+        const hintEl = document.getElementById('checkin-start-hint');
+        if (hintEl) {
+          hintEl.textContent = message;
+        }
+      } catch (error) {
+        if (statusEl) statusEl.textContent = `❌ ${error.message}`;
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result ? reader.result.toString() : '';
+          const base64 = result.includes(',') ? result.split(',')[1] : '';
+          resolve(base64);
+        };
+        reader.onerror = () => reject(new Error('File read failed'));
+        reader.readAsDataURL(blob);
+      });
+    }
+
     function renderOnboarding() {
       const card = document.getElementById('onboarding-card');
       if (!card || !telegramStatus) return;
@@ -5702,6 +6676,27 @@
         completeBtn.disabled = !telegramStatus.connected;
       }
     }
+
+    const checkinStartBtn = document.getElementById('checkin-start-btn');
+    if (checkinStartBtn) {
+      checkinStartBtn.addEventListener('click', () => {
+        startCheckin();
+      });
+    }
+
+    const checkinSubmitBtn = document.getElementById('checkin-submit-btn');
+    if (checkinSubmitBtn) {
+      checkinSubmitBtn.addEventListener('click', () => {
+        submitCheckin();
+      });
+    }
+
+    document.querySelectorAll('input[name="checkin-frequency"]').forEach(input => {
+      input.addEventListener('change', () => {
+        updateCheckinFrequency(input.value);
+        updateCheckinFrequencyCards();
+      });
+    });
 
     const onboardingScrollBtn = document.getElementById('onboarding-scroll-settings');
     if (onboardingScrollBtn) {
@@ -6146,13 +7141,16 @@
       });
     }
 
-    async function loginWithToken(token) {
+    async function loginWithToken(token, openCheckin) {
       const data = await apiCall('/auth/token-login', {
         method: 'POST',
         body: JSON.stringify({ token }),
       });
       currentUser = data;
       window.history.replaceState({}, document.title, window.location.pathname);
+      if (openCheckin) {
+        checkinPendingSection = 'checkin';
+      }
       await loadApp();
     }
 
@@ -6184,9 +7182,13 @@
     (async function() {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
+      const openCheckin = urlParams.get('checkin') === '1';
+      if (openCheckin) {
+        checkinPendingSection = 'checkin';
+      }
       if (token) {
         try {
-          await loginWithToken(token);
+          await loginWithToken(token, openCheckin);
           return;
         } catch (error) {
           showLogin();

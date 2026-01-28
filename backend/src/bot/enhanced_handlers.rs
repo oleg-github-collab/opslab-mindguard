@@ -3,6 +3,7 @@ use crate::analytics::correlations;
 use crate::bot::daily_checkin::{CheckInGenerator, Metrics, MetricsCalculator};
 use crate::bot::markdown::mdv2;
 use crate::db;
+use crate::domain::checkin::{is_test_web_checkin_email, schedule_for, CheckinFrequency};
 use crate::services::ai::AiOutcome;
 use crate::services::wellness;
 use crate::state::SharedState;
@@ -672,6 +673,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
+            checkin_frequency: "daily".to_string(),
         });
 
     if !prefs.onboarding_completed {
@@ -1139,6 +1141,13 @@ pub async fn start_daily_checkin(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
+    if let Some(user) = db::find_user_by_id(&state.pool, user_id).await? {
+        if is_test_web_checkin_email(&user.email) {
+            send_web_checkin_reminder(bot, state, chat_id, user_id).await?;
+            return Ok(());
+        }
+    }
+
     // #1 WOW Feature: Use adaptive check-in generation
     let checkin = match CheckInGenerator::generate_adaptive_checkin(&state.pool, user_id).await {
         Ok(c) => c,
@@ -1761,22 +1770,8 @@ async fn send_web_login_link(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    // Generate secure random token
-    let token: String = (0..32)
-        .map(|_| format!("{:02x}", rand::random::<u8>()))
-        .collect();
-
-    // Store token in database (expires in 5 minutes)
-    sqlx::query(
-        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '5 minutes')"
-    )
-    .bind(user_id)
-    .bind(&token)
-    .execute(&state.pool)
-    .await?;
-
-    let base_url = app_base_url();
-    let login_url = format!("{}/?token={}", base_url, token);
+    let token = create_login_token(state, user_id).await?;
+    let login_url = build_login_url(&token, false);
 
     bot.send_message(
         chat_id,
@@ -1793,6 +1788,149 @@ async fn send_web_login_link(
     .await?;
 
     Ok(())
+}
+
+async fn send_web_checkin_reminder(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+) -> Result<()> {
+    let user = db::find_user_by_id(&state.pool, user_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("user not found"))?;
+    if !is_test_web_checkin_email(&user.email) {
+        return Ok(());
+    }
+
+    let prefs = db::get_user_preferences(&state.pool, user_id).await?;
+    let frequency = CheckinFrequency::try_from(prefs.checkin_frequency.as_str())
+        .unwrap_or(CheckinFrequency::Daily);
+    let last_checkin_at = db::get_last_checkin_date(&state.pool, user_id).await?;
+    let today = time_utils::local_components(&prefs.timezone, Utc::now()).0;
+    let last_local = last_checkin_at
+        .map(|dt| time_utils::local_components(&prefs.timezone, dt).0);
+    let schedule = schedule_for(frequency, last_local, today);
+
+    let (label, questions) = match frequency {
+        CheckinFrequency::Daily => ("короткий чекін", "2-3 питання"),
+        CheckinFrequency::Every3Days => ("глибший чекін", "10 питань"),
+        CheckinFrequency::Weekly => ("повний тест", "12 питань"),
+    };
+
+    let status_line = if schedule.due {
+        format!("Сьогодні за графіком: {label} ({questions}).")
+    } else {
+        format!(
+            "Сьогодні без чекіну. Наступний за графіком: {}.",
+            schedule.next_due_date
+        )
+    };
+
+    let token = create_login_token(state, user_id).await?;
+    let login_url = build_login_url(&token, true);
+
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "🧭 Нагадування Mindguard\n\n{}\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне 5 хвилин.",
+            status_line, login_url
+        )),
+    )
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn send_web_checkin_followups(
+    state: &SharedState,
+    user_id: Uuid,
+) -> Result<()> {
+    let user = db::find_user_by_id(&state.pool, user_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("user not found"))?;
+    if !is_test_web_checkin_email(&user.email) {
+        return Ok(());
+    }
+
+    let Some(telegram_id) = user.telegram_id else {
+        return Ok(());
+    };
+
+    let token = std::env::var("TELEGRAM_BOT_TOKEN")
+        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
+    let bot = teloxide::Bot::new(token);
+    let chat_id = ChatId(telegram_id);
+
+    bot.send_message(
+        chat_id,
+        mdv2(
+            "✅ Web-чекін збережено!\n\n\
+            Дякую за відповіді. Рекомендації та нагадування залишаються у Telegram.",
+        ),
+    )
+    .parse_mode(ParseMode::MarkdownV2)
+    .await
+    .ok();
+
+    if let Err(e) = send_quick_actions(&bot, state, chat_id, user_id).await {
+        tracing::warn!("Failed to send quick actions for web checkin: {}", e);
+    }
+
+    if let Err(e) = maybe_send_plan_nudge(&bot, state, chat_id, user_id).await {
+        tracing::warn!("Failed to send plan nudge for web checkin: {}", e);
+    }
+
+    let count = db::get_checkin_answer_count(&state.pool, user_id, 10).await?;
+    if count >= 21 {
+        if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
+            if MetricsCalculator::is_critical(&metrics) {
+                bot.send_message(
+                    chat_id,
+                    mdv2(
+                        "⚠️ Важливе повідомлення\n\n\
+                        Твої показники вказують на необхідність звернення до фахівця.\n\n\
+                        Рекомендуємо:\n\
+                        • Поговорити з керівником\n\
+                        • Звернутися до психолога\n\
+                        • Взяти відпочинок\n\n\
+                        Твоє здоров'я - найважливіше! 💚",
+                    ),
+                )
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await
+                .ok();
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn create_login_token(state: &SharedState, user_id: Uuid) -> Result<String> {
+    let token: String = (0..32)
+        .map(|_| format!("{:02x}", rand::random::<u8>()))
+        .collect();
+
+    sqlx::query(
+        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '5 minutes')"
+    )
+    .bind(user_id)
+    .bind(&token)
+    .execute(&state.pool)
+    .await?;
+
+    Ok(token)
+}
+
+fn build_login_url(token: &str, checkin: bool) -> String {
+    let base_url = app_base_url();
+    if checkin {
+        format!("{}/?token={}&checkin=1", base_url, token)
+    } else {
+        format!("{}/?token={}", base_url, token)
+    }
 }
 
 /// Відправка критичного алерту адмінам
@@ -2142,6 +2280,7 @@ async fn handle_settime_command(
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
+                checkin_frequency: "daily".to_string(),
             });
         bot.send_message(
             chat_id,
@@ -2176,6 +2315,7 @@ async fn handle_settime_command(
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
+                checkin_frequency: "daily".to_string(),
             });
         let (hour, minute) =
             db::calculate_best_reminder_time_local(&state.pool, user_id, &prefs.timezone).await?;
@@ -2246,6 +2386,7 @@ async fn handle_settime_command(
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
+            checkin_frequency: "daily".to_string(),
         });
 
     bot.send_message(
@@ -2386,6 +2527,7 @@ async fn send_wellness_plan(
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
+            checkin_frequency: "daily".to_string(),
         });
     let (local_date, _, _) = time_utils::local_components(&prefs.timezone, Utc::now());
 

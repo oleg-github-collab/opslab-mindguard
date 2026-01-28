@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod analytics;
 pub mod auth;
+pub mod checkin;
 pub mod dashboard;
 pub mod insights;
 pub mod kudos;
@@ -21,6 +22,7 @@ pub fn routes(state: SharedState) -> Router {
         .route("/health", get(health))
         .nest("/api", analytics::router(state.clone()))
         .nest("/auth", auth::router(state.clone()))
+        .nest("/checkin", checkin::router(state.clone()))
         .nest("/dashboard", dashboard::router(state.clone()))
         .nest("/insights", insights::router(state.clone()))
         .nest("/kudos", kudos::router(state.clone()))

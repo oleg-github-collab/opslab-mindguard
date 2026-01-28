@@ -6,6 +6,7 @@ use chrono::{Datelike, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::domain::checkin::CheckinFrequency;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuestionType {
@@ -426,6 +427,137 @@ impl CheckInGenerator {
             intro_message: Self::get_intro_message(day_of_week),
             estimated_time: "2-3 хвилини".to_string(),
         }
+    }
+
+    /// Генерує web-чекін залежно від вибраної частоти
+    pub async fn generate_web_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+        frequency: CheckinFrequency,
+    ) -> Result<CheckIn, anyhow::Error> {
+        match frequency {
+            CheckinFrequency::Daily => Self::generate_adaptive_checkin(pool, user_id).await,
+            CheckinFrequency::Every3Days => Self::generate_deep_checkin(pool, user_id).await,
+            CheckinFrequency::Weekly => Self::generate_full_checkin(pool, user_id).await,
+        }
+    }
+
+    async fn generate_deep_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+    ) -> Result<CheckIn, anyhow::Error> {
+        let day_of_week = Utc::now().weekday().num_days_from_monday();
+        let base_types = vec![
+            QuestionType::Mood,
+            QuestionType::Energy,
+            QuestionType::Stress,
+            QuestionType::Sleep,
+            QuestionType::Workload,
+            QuestionType::Motivation,
+            QuestionType::Focus,
+            QuestionType::Wellbeing,
+            QuestionType::Reflection,
+            QuestionType::Support,
+        ];
+
+        let mut prioritized = AdaptiveQuestionEngine::analyze_priority(pool, user_id)
+            .await
+            .unwrap_or_default();
+        prioritized.retain(|t| base_types.contains(t));
+
+        let mut question_types = Vec::new();
+        for qtype in prioritized {
+            if !question_types.contains(&qtype) {
+                question_types.push(qtype);
+            }
+        }
+        for qtype in base_types {
+            if !question_types.contains(&qtype) {
+                question_types.push(qtype);
+            }
+        }
+
+        let questions = Self::build_questions(&question_types);
+        Ok(CheckIn {
+            id: format!("web_checkin_{}_every3", Utc::now().format("%Y%m%d")),
+            user_id,
+            date: Utc::now(),
+            day_of_week,
+            questions,
+            intro_message: "Сьогодні глибший чекін (10 питань). Поділись, як ти почуваєшся останні дні."
+                .to_string(),
+            estimated_time: "6-8 хвилин".to_string(),
+        })
+    }
+
+    async fn generate_full_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+    ) -> Result<CheckIn, anyhow::Error> {
+        let day_of_week = Utc::now().weekday().num_days_from_monday();
+        let base_types = vec![
+            QuestionType::Mood,
+            QuestionType::Energy,
+            QuestionType::Stress,
+            QuestionType::Workload,
+            QuestionType::Focus,
+            QuestionType::Motivation,
+            QuestionType::Sleep,
+            QuestionType::Wellbeing,
+            QuestionType::Reflection,
+            QuestionType::Support,
+        ];
+
+        let mut question_types = base_types.clone();
+
+        let mut extras = AdaptiveQuestionEngine::analyze_priority(pool, user_id)
+            .await
+            .unwrap_or_default();
+        extras.retain(|t| base_types.contains(t));
+        extras.dedup();
+
+        for qtype in extras {
+            if question_types.len() >= 12 {
+                break;
+            }
+            question_types.push(qtype);
+        }
+
+        while question_types.len() < 12 {
+            question_types.push(QuestionType::Mood);
+            if question_types.len() < 12 {
+                question_types.push(QuestionType::Stress);
+            }
+        }
+
+        let questions = Self::build_questions(&question_types);
+        Ok(CheckIn {
+            id: format!("web_checkin_{}_weekly", Utc::now().format("%Y%m%d")),
+            user_id,
+            date: Utc::now(),
+            day_of_week,
+            questions,
+            intro_message: "Повний тижневий тест: більше деталей про стан, енергію та відновлення."
+                .to_string(),
+            estimated_time: "10-12 хвилин".to_string(),
+        })
+    }
+
+    fn build_questions(question_types: &[QuestionType]) -> Vec<Question> {
+        question_types
+            .iter()
+            .enumerate()
+            .map(|(idx, qtype)| {
+                let (text, emoji) = QuestionBank::get_random_question(*qtype);
+                Question {
+                    id: idx as i32 + 1,
+                    qtype: Self::qtype_to_string(*qtype),
+                    text: text.to_string(),
+                    emoji: emoji.to_string(),
+                    scale: Self::scale_for_qtype(*qtype).to_string(),
+                }
+            })
+            .collect()
     }
 
     /// Вибір типів питань залежно від дня тижня

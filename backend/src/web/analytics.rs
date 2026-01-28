@@ -1,4 +1,5 @@
 use crate::db;
+use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::domain::models::UserRole;
 use crate::state::SharedState;
 use crate::web::session::UserSession;
@@ -322,9 +323,12 @@ async fn fetch_users(
             r#"
             SELECT id, email, enc_name
             FROM users
+            WHERE role != 'ADMIN'
+              AND email != $1
             ORDER BY created_at ASC
             "#,
         )
+        .bind(TEST_WEB_CHECKIN_EMAIL)
         .fetch_all(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

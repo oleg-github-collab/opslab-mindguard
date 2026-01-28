@@ -2,10 +2,12 @@ use crate::bot::daily_checkin::CheckIn;
 use crate::crypto::Crypto;
 use crate::domain::polling::PollEngine;
 use crate::services::ai::AiService;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -15,6 +17,7 @@ pub struct AppState {
     pub poll_engine: PollEngine,
     pub session_key: Vec<u8>,
     pub checkin_sessions: Arc<RwLock<HashMap<i64, CheckInSession>>>, // telegram_id -> CheckInSession
+    pub web_checkin_sessions: Arc<RwLock<HashMap<Uuid, WebCheckInSession>>>, // user_id -> WebCheckInSession
 }
 
 #[derive(Clone)]
@@ -24,6 +27,13 @@ pub struct CheckInSession {
     pub awaiting_open_question: Option<i32>,
     pub urgent_alerts_sent: Option<std::collections::HashSet<String>>,
     pub answered_questions: Option<std::collections::HashSet<i32>>,
+}
+
+#[derive(Clone)]
+pub struct WebCheckInSession {
+    pub checkin: CheckIn,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
 }
 
 pub type SharedState = Arc<AppState>;

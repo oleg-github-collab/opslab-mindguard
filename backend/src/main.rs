@@ -11,6 +11,7 @@ mod web;
 mod time_utils;
 
 use crate::db::seed;
+use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::state::SharedState;
 use axum::{
     body::Body,
@@ -96,13 +97,7 @@ async fn run() -> anyhow::Result<()> {
 
     // Run database migrations
     tracing::info!("Running database migrations...");
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to run database migrations: {}", e);
-            e
-        })?;
+    run_migrations(&pool).await?;
     tracing::info!("Database migrations completed");
 
     let (enc_key_source, enc_key_bytes) = load_key_material(&[
@@ -152,6 +147,8 @@ async fn run() -> anyhow::Result<()> {
 
     let poll_engine = domain::polling::PollEngine::new();
     let checkin_sessions = Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+    let web_checkin_sessions =
+        Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
     let shared: SharedState = Arc::new(state::AppState {
         pool,
         crypto,
@@ -159,6 +156,7 @@ async fn run() -> anyhow::Result<()> {
         poll_engine,
         session_key,
         checkin_sessions,
+        web_checkin_sessions,
     });
 
     // Setup scheduler for daily check-ins and weekly summaries
@@ -220,6 +218,10 @@ async fn run() -> anyhow::Result<()> {
                     }
                 }
 
+                if let Some(admin_due) = test_admin_due_reminder(&state, now).await {
+                    due_users.push(admin_due);
+                }
+
                 if !due_users.is_empty() {
                     tracing::info!("Sending smart reminders to {} users", due_users.len());
                     if let Err(e) = send_smart_reminders(&state, due_users).await {
@@ -257,6 +259,15 @@ async fn run() -> anyhow::Result<()> {
                 sessions.clear();
                 if before_count > 0 {
                     tracing::info!("Cleaned up {} expired check-in sessions", before_count);
+                }
+
+                let mut web_sessions = state.web_checkin_sessions.write().await;
+                let before_web = web_sessions.len();
+                let now = chrono::Utc::now();
+                web_sessions.retain(|_, session| session.expires_at > now);
+                let removed_web = before_web.saturating_sub(web_sessions.len());
+                if removed_web > 0 {
+                    tracing::info!("Cleaned up {} expired web check-in sessions", removed_web);
                 }
             })
         })?)
@@ -458,6 +469,133 @@ async fn connect_with_retry(database_url: &str) -> anyhow::Result<PgPool> {
                 );
                 tokio::time::sleep(backoff).await;
             }
+        }
+    }
+}
+
+async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
+    let migrator = sqlx::migrate!("./migrations");
+    match migrator.run(pool).await {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if let sqlx::migrate::MigrateError::VersionMismatch(version) = err {
+                tracing::error!("Migration {} checksum mismatch detected", version);
+                if allow_migration_repair() {
+                    tracing::warn!("Repairing migration checksum for version {}", version);
+                    repair_migration_checksum(pool, &migrator, version).await?;
+                    migrator.run(pool).await.map_err(|e| {
+                        tracing::error!("Failed to run migrations after repair: {}", e);
+                        e
+                    })?;
+                    Ok(())
+                } else {
+                    tracing::error!(
+                        "Set ALLOW_MIGRATION_REPAIR=1 to sync the checksum for version {}",
+                        version
+                    );
+                    Err(err.into())
+                }
+            } else {
+                tracing::error!("Failed to run database migrations: {}", err);
+                Err(err.into())
+            }
+        }
+    }
+}
+
+fn allow_migration_repair() -> bool {
+    if let Ok(val) = std::env::var("ALLOW_MIGRATION_REPAIR") {
+        let lower = val.trim().to_lowercase();
+        return matches!(lower.as_str(), "true" | "1" | "yes");
+    }
+
+    std::env::var("RAILWAY_ENVIRONMENT").is_ok()
+        || std::env::var("RAILWAY_PROJECT_ID").is_ok()
+}
+
+async fn repair_migration_checksum(
+    pool: &PgPool,
+    migrator: &sqlx::migrate::Migrator,
+    version: i64,
+) -> anyhow::Result<()> {
+    let migration = migrator
+        .iter()
+        .find(|m| m.version == version)
+        .ok_or_else(|| anyhow::anyhow!("Migration {} not found", version))?;
+
+    let result = sqlx::query(
+        r#"
+        UPDATE _sqlx_migrations
+        SET checksum = $1
+        WHERE version = $2
+        "#,
+    )
+    .bind(migration.checksum.as_ref())
+    .bind(version)
+    .execute(pool)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        tracing::warn!("No migration row updated for version {}", version);
+    }
+
+    Ok(())
+}
+
+async fn test_admin_due_reminder(
+    state: &SharedState,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Option<DueReminder> {
+    let user = match db::find_user_by_email(&state.pool, TEST_WEB_CHECKIN_EMAIL).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return None,
+        Err(e) => {
+            tracing::error!("Failed to fetch test admin reminder user: {}", e);
+            return None;
+        }
+    };
+
+    if !user.is_active {
+        return None;
+    }
+    let telegram_id = user.telegram_id?;
+
+    let prefs = match db::get_user_preferences(&state.pool, user.id).await {
+        Ok(prefs) => prefs,
+        Err(e) => {
+            tracing::error!("Failed to fetch preferences for test admin: {}", e);
+            return None;
+        }
+    };
+
+    if !prefs.notification_enabled {
+        return None;
+    }
+
+    let (local_date, local_hour, local_minute) =
+        time_utils::local_components(&prefs.timezone, now);
+
+    let is_due_time = local_hour > prefs.reminder_hour
+        || (local_hour == prefs.reminder_hour && local_minute >= prefs.reminder_minute);
+
+    if !is_due_time {
+        return None;
+    }
+
+    match db::mark_reminder_sent(&state.pool, user.id, local_date).await {
+        Ok(true) => Some(DueReminder {
+            user_id: user.id,
+            telegram_id,
+            local_date,
+        }),
+        Ok(false) => None,
+        Err(e) => {
+            tracing::error!(
+                "Failed to mark reminder sent for test admin {}: {}",
+                user.id,
+                e
+            );
+            None
         }
     }
 }

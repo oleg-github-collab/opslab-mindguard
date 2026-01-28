@@ -2,6 +2,7 @@ pub mod seed;
 
 use crate::bot::daily_checkin::{CheckInAnswer, Metrics};
 use crate::crypto::Crypto;
+use crate::domain::checkin::TEST_WEB_CHECKIN_EMAIL;
 use crate::domain::models::UserRole;
 use crate::time_utils;
 use anyhow::Result;
@@ -49,6 +50,7 @@ pub struct UserPreferences {
     pub last_plan_nudge_date: Option<NaiveDate>,
     pub onboarding_completed: bool,
     pub onboarding_completed_at: Option<DateTime<Utc>>,
+    pub checkin_frequency: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -765,6 +767,27 @@ pub async fn set_user_onboarding_complete(
     Ok(())
 }
 
+pub async fn set_user_checkin_frequency(
+    pool: &PgPool,
+    user_id: Uuid,
+    frequency: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, checkin_frequency)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET checkin_frequency = $2,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(frequency)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get user preferences with defaults
 pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPreferences> {
     let row = sqlx::query(
@@ -777,7 +800,8 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             last_reminder_date,
             last_plan_nudge_date,
             COALESCE(onboarding_completed, false) as onboarding_completed,
-            onboarding_completed_at
+            onboarding_completed_at,
+            COALESCE(checkin_frequency, 'daily') as checkin_frequency
         FROM user_preferences
         WHERE user_id = $1
         "#,
@@ -796,6 +820,10 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             last_plan_nudge_date: row.try_get::<Option<NaiveDate>, _>("last_plan_nudge_date")?,
             onboarding_completed: row.try_get::<bool, _>("onboarding_completed")?,
             onboarding_completed_at: row.try_get::<Option<DateTime<Utc>>, _>("onboarding_completed_at")?,
+            checkin_frequency: row
+                .try_get::<String, _>("checkin_frequency")?
+                .trim()
+                .to_string(),
         })
     } else {
         Ok(UserPreferences {
@@ -807,6 +835,7 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
+            checkin_frequency: "daily".to_string(),
         })
     }
 }
@@ -876,10 +905,12 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
           AND u.role != 'ADMIN'
+          AND u.email != $1
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
         "#,
     )
+    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 
@@ -1027,6 +1058,8 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
             JOIN users u ON u.id = ca.user_id
             WHERE ca.created_at >= NOW() - INTERVAL '7 days'
               AND u.is_active = true
+              AND u.role != 'ADMIN'
+              AND u.email != $1
             GROUP BY ca.user_id
         ),
         per_user AS (
@@ -1043,6 +1076,7 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
         FROM per_user
         "#
     )
+    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_one(pool)
     .await?;
 
@@ -1064,11 +1098,13 @@ pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
           AND u.role != 'ADMIN'
+          AND u.email != $1
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
           AND COALESCE(p.notification_enabled, true) = true
         "#,
     )
+    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 
@@ -1230,9 +1266,11 @@ pub async fn get_active_users(pool: &PgPool) -> Result<Vec<DbUser>> {
         FROM users
         WHERE is_active = true
           AND role != 'ADMIN'
+          AND email != $1
         ORDER BY created_at ASC
         "#,
     )
+    .bind(TEST_WEB_CHECKIN_EMAIL)
     .fetch_all(pool)
     .await?;
 

@@ -175,14 +175,24 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
     }
 
     pub async fn transcribe_voice(&self, audio_bytes: Vec<u8>) -> Result<String> {
+        self.transcribe_audio(audio_bytes, "audio/ogg", "voice.ogg")
+            .await
+    }
+
+    pub async fn transcribe_audio(
+        &self,
+        audio_bytes: Vec<u8>,
+        mime: &str,
+        filename: &str,
+    ) -> Result<String> {
         let api_key = self.api_key()?;
         let form = reqwest::multipart::Form::new()
             .text("model", "whisper-1")
             .part(
                 "file",
                 reqwest::multipart::Part::bytes(audio_bytes)
-                    .file_name("voice.ogg")
-                    .mime_str("audio/ogg")?,
+                    .file_name(filename.to_string())
+                    .mime_str(mime)?,
             );
 
         let resp = reqwest::Client::new()
