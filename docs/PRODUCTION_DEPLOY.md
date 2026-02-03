@@ -5,7 +5,7 @@
 ### 1. Deterministic Build (Cargo.lock + SQLX_OFFLINE)
 - ✅ `GENERATE_LOCKFILE.sh` script готовий
 - ✅ `Dockerfile` налаштований з `SQLX_OFFLINE=true`
-- ✅ Копіює `Cargo.lock` та `.sqlx`
+- ✅ Копіює `Cargo.lock` та `sqlx-data.json`
 
 **Виконайте перед деплоєм:**
 ```bash
@@ -16,7 +16,7 @@ export DATABASE_URL="postgresql://user:password@localhost/mindguard"
 ./GENERATE_LOCKFILE.sh
 
 # Закомітьте файли
-git add Cargo.lock .sqlx
+git add Cargo.lock sqlx-data.json
 git commit -m "Add production build artifacts"
 git push origin main
 ```
@@ -149,7 +149,7 @@ openssl rand -base64 32  # SESSION_KEY
 ./GENERATE_LOCKFILE.sh
 
 # 2. Закомітьте
-git add Cargo.lock .sqlx
+git add Cargo.lock sqlx-data.json
 git commit -m "Production build artifacts"
 
 # 3. Push to Railway

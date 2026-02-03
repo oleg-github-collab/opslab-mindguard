@@ -75,7 +75,8 @@ railway variables set RUST_LOG="info"
 1. ✅ Create Railway project
 2. ✅ Add PostgreSQL database
 3. ✅ Copy env vars from `RAILWAY_ENV_VARS_PRIVATE.txt`
-4. ✅ Generate .sqlx offline cache
-5. ⏳ Deploy
+4. ⏳ Get external DATABASE_URL for sqlx-data.json generation
+5. ⏳ Generate real sqlx-data.json
+6. ⏳ Deploy
 
 See [DATABASE_URL_NOTE.md](DATABASE_URL_NOTE.md) for important info about internal vs external URLs.

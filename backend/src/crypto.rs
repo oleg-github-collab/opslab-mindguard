@@ -27,15 +27,10 @@ impl Crypto {
         let key_bytes = general_purpose::STANDARD
             .decode(key_b64)
             .map_err(|_| CryptoError::InvalidKey)?;
-        Self::from_key_bytes(&key_bytes)
-    }
-
-    pub fn from_key_bytes(key_bytes: &[u8]) -> Result<Self, CryptoError> {
         if key_bytes.len() != 32 {
             return Err(CryptoError::InvalidKey);
         }
-        let cipher =
-            Aes256Gcm::new_from_slice(key_bytes).map_err(|_| CryptoError::InvalidKey)?;
+        let cipher = Aes256Gcm::new_from_slice(&key_bytes).map_err(|_| CryptoError::InvalidKey)?;
         Ok(Self { cipher })
     }
 

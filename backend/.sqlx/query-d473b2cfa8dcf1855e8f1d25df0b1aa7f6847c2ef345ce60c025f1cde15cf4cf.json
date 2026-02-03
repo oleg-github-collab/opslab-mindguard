@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH daily_data AS (\n            SELECT\n                DATE(created_at) as day,\n                AVG(CASE WHEN question_type = 'sleep' THEN value ELSE NULL END) as sleep,\n                AVG(CASE WHEN question_type = 'mood' THEN value ELSE NULL END) as mood\n            FROM checkin_answers\n            WHERE user_id = $1\n              AND created_at >= NOW() - INTERVAL '30 days'\n            GROUP BY DATE(created_at)\n            HAVING\n                AVG(CASE WHEN question_type = 'sleep' THEN value ELSE NULL END) IS NOT NULL\n                AND AVG(CASE WHEN question_type = 'mood' THEN value ELSE NULL END) IS NOT NULL\n        )\n        SELECT\n            CORR(sleep, mood) as \"correlation\"\n        FROM daily_data\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "correlation",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d473b2cfa8dcf1855e8f1d25df0b1aa7f6847c2ef345ce60c025f1cde15cf4cf"
+}

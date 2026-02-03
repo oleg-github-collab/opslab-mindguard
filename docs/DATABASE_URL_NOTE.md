@@ -34,14 +34,12 @@ postgresql://postgres:PASSWORD@roundhouse.proxy.rlwy.net:PORT/railway
 
 ## Що робити далі
 
-Для генерації `.sqlx` потрібне **підключення до PostgreSQL**. Це може бути:
-- External URL з Railway, або
-- локальна Postgres (наприклад, через Homebrew/Docker).
+Для генерації `sqlx-data.json` потрібен **External URL**.
 
 **Надайте мені External/Public URL**, і я:
 1. Оновлю `.env`
 2. Запущу міграції
-3. Згенерую `.sqlx`
+3. Згенерую `sqlx-data.json`
 4. Закомічу на GitHub
 
 Або якщо хочете зробити самі:
@@ -53,8 +51,8 @@ export DATABASE_URL="postgresql://postgres:PASSWORD@roundhouse.proxy.rlwy.net:PO
 ./GENERATE_LOCKFILE.sh
 
 # 3. Закомітьте
-git add .sqlx
-git commit -m "Add real .sqlx from Railway Postgres"
+git add sqlx-data.json
+git commit -m "Add real sqlx-data.json from Railway Postgres"
 git push origin main
 ```
 

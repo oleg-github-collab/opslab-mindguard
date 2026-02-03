@@ -36,15 +36,15 @@ impl PollEngine {
         let mut type_scores: Vec<(String, chrono::DateTime<Utc>)> = Vec::new();
 
         for qtype in &question_types {
-            let last_answer: Option<chrono::DateTime<Utc>> = sqlx::query_scalar(
+            let last_answer = sqlx::query_scalar!(
                 r#"
-                SELECT MAX(created_at)
+                SELECT MAX(created_at) as "last_answered"
                 FROM checkin_answers
                 WHERE user_id = $1 AND question_type = $2
                 "#,
+                user_id,
+                qtype
             )
-            .bind(user_id)
-            .bind(qtype)
             .fetch_one(pool)
             .await?;
 

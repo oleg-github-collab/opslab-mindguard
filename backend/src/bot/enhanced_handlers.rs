@@ -1,18 +1,17 @@
 ///! Розширені handlers для Telegram бота з щоденними чекінами
 use crate::analytics::correlations;
-use crate::bot::daily_checkin::{Metrics, MetricsCalculator};
+use crate::bot::daily_checkin::{CheckInGenerator, Metrics, MetricsCalculator};
 use crate::bot::markdown::mdv2;
 use crate::db;
-use crate::domain::checkin::{schedule_for, CheckinFrequency};
 use crate::services::ai::AiOutcome;
 use crate::services::wellness;
 use crate::state::SharedState;
 use crate::time_utils;
 use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use serde_json::json;
-use sqlx::{self, Row};
+use sqlx;
 use std::env;
 use teloxide::net::Download;
 use teloxide::prelude::*;
@@ -639,7 +638,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
                 Привʼязка одноразова — для зміни звертайтесь до адміністратора.\n\n\
                 📋 Доступні команди:\n\
                 /help - Показати всі команди\n\
-                /checkin - Пройти веб-чекін\n\
+                /checkin - Пройти щоденний чекін\n\
                 /status - Подивитись свій стан\n\
                 /weblogin - Отримати посилання для входу\n\
                 /feedback - OpsLab Feedback (зовнішній)\n\n\
@@ -673,7 +672,6 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
-            checkin_frequency: "daily".to_string(),
         });
 
     if !prefs.onboarding_completed {
@@ -698,116 +696,6 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
 
         send_onboarding_gate(bot, msg.chat.id, &prefs).await?;
         return Ok(());
-    }
-
-    if let Some((session, question)) = pending_open_question(&state, telegram_id).await {
-        // Check if this question was already answered
-        let already_answered = {
-            let sessions = state.checkin_sessions.read().await;
-            if let Some(sess) = sessions.get(&telegram_id) {
-                sess.answered_questions
-                    .as_ref()
-                    .map(|set| set.contains(&question.id))
-                    .unwrap_or(false)
-            } else {
-                false
-            }
-        };
-
-        if already_answered {
-            bot.send_message(
-                msg.chat.id,
-                "✓ Вже відповіли на це питання. Очікуйте наступне питання або завершення чекіну.",
-            )
-            .await?;
-            return Ok(());
-        }
-
-        if let Some(voice) = msg.voice() {
-            if voice.duration > 300 {
-                bot.send_message(
-                    msg.chat.id,
-                    "⏱️ Голосове може тривати до 5 хв. Будь ласка, надішли коротше.",
-                )
-                .await?;
-                return Ok(());
-            }
-            if !state.ai.is_enabled() {
-                bot.send_message(
-                    msg.chat.id,
-                    "Голосовий аналіз тимчасово недоступний. Надішліть відповідь текстом.",
-                )
-                .await?;
-                return Ok(());
-            }
-
-            bot.send_message(
-                msg.chat.id,
-                "🎧 Отримав голосове. Розшифровую і аналізую, це займе до 30 секунд...",
-            )
-            .await?;
-
-            let file = bot.get_file(voice.file.id.clone()).await?;
-            let mut bytes: Vec<u8> = Vec::new();
-            bot.download_file(&file.path, &mut bytes).await?;
-
-            let transcript = match state.ai.transcribe_voice(bytes).await {
-                Ok(text) => text,
-                Err(e) => {
-                    tracing::error!("Voice transcription failed: {}", e);
-                    bot.send_message(
-                        msg.chat.id,
-                        "Не вдалося розпізнати голосове. Спробуй ще раз або напиши текстом.",
-                    )
-                    .await?;
-                    return Ok(());
-                }
-            };
-
-            process_open_response(
-                bot,
-                &state,
-                msg.chat.id,
-                telegram_id,
-                user.id,
-                session,
-                question,
-                &transcript,
-                "voice",
-                Some(voice.duration as i32),
-            )
-            .await?;
-            return Ok(());
-        }
-
-        if let Some(text) = text.as_deref() {
-            if !text.trim().starts_with('/') {
-                let trimmed = text.trim();
-                if trimmed.is_empty() {
-                    bot.send_message(
-                        msg.chat.id,
-                        "Будь ласка, напиши відповідь текстом або надішли голосове.",
-                    )
-                    .await?;
-                    return Ok(());
-                }
-
-                process_open_response(
-                    bot,
-                    &state,
-                    msg.chat.id,
-                    telegram_id,
-                    user.id,
-                    session,
-                    question,
-                    trimmed,
-                    "text",
-                    None,
-                )
-                .await?;
-                return Ok(());
-            }
-        }
     }
 
     // Handle voice messages
@@ -868,6 +756,10 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             send_settings(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
             }
+            "/kudos" => {
+                handle_kudos_command(bot, &state, msg.chat.id, user.id, &cmd.args).await?;
+                return Ok(());
+            }
             "/plan" => {
             send_wellness_plan(bot, &state, msg.chat.id, user.id).await?;
             return Ok(());
@@ -905,17 +797,17 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
         msg.chat.id,
         mdv2(
             "📱 Команди бота:\n\n\
-            /checkin - Веб-чекін (2-3 хв)\n\
+            /checkin - Щоденний чекін (2-3 хв)\n\
             /status - Ваш поточний стан\n\
             /feedback - OpsLab Feedback\n\
             /settings - Налаштування\n\
             /settime - Встановити час чекіну ⏰\n\
             /timezone - Часовий пояс\n\
             /notify - Нагадування on/off\n\
-            /kudos - Подяка колезі (1-2 речення) 🎉\n\
+            /kudos - Подякувати колезі 🎉\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
-            /pulse - Анонімні кімнати для фідбеку\n\
+            /pulse - Pulse rooms\n\
             /insight - Персональний інсайт\n\
             /help - Допомога\n\
             /weblogin - Вхід у web\n\
@@ -1037,31 +929,31 @@ async fn send_start_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> 
         chat_id,
         mdv2(format!(
             "👋 Привіт! Я OpsLab Mindguard Bot\n\n\
-            Допомагаю тримати баланс між роботою та життям через:\n\n\
-            ✅ Швидкі щоденні чекіни (2-3 хв)\n\
-            📊 Аналітику вашого ментального здоров'я\n\
-            💬 Командний feedback та підтримку\n\
-            🎯 Персональні інсайти та рекомендації\n\n\
-            🔗 Як почати?\n\n\
-            Якщо ви ще не привʼязали Telegram:\n\
-            Надішліть email та 4-значний код (не пароль!):\n\n\
-            /link email@example.com 1234\n\
-            або просто: email@example.com 1234\n\n\
-            📱 Основні команди:\n\n\
-            /checkin — Пройти веб-чекін\n\
-            /status — Подивитись свій стан\n\
-            /weblogin — Вхід у web dashboard\n\
-            /feedback — Залишити feedback команді\n\
-            /kudos — Подякувати колезі\n\
-            /pulse — Анонімні кімнати для обговорень\n\
-            /settings — Налаштувати час нагадувань\n\
-            /help — Повна допомога\n\n\
-            🚀 Швидкий старт:\n\n\
-            1️⃣ Привʼяжіть Telegram через /link\n\
-            2️⃣ Відкрийте dashboard: {base_url}\n\
-            3️⃣ Налаштуйте зручний час для чекінів\n\
-            4️⃣ Отримуйте нагадування та відстежуйте прогрес\n\n\
-            💡 Все конфіденційно, безпечно та анонімізовано для команди.",
+            Мʼяко допомагаю відстежувати ментальне здоров'я й тримати баланс:\n\n\
+            🔹 Щоденні чекіни (2-3 хв) у ваш час\n\
+            🔹 Голосова підтримка з AI-аналізом\n\
+            🔹 OpsLab Feedback — зовнішній сервіс для фідбеку\n\
+            🔹 Web dashboard — повна аналітика\n\n\
+            Якщо ви ще не привʼязані:\n\
+            надішліть email та 4-значний код доступу (це не пароль від пошти):\n\
+            /link email@opslab.uk 1234\n\
+            або просто: email@opslab.uk 1234\n\n\
+            Головні команди:\n\
+            /checkin - Пройти чекін зараз\n\
+            /status - Мій поточний стан\n\
+            /weblogin - Отримати посилання для входу в dashboard\n\
+            /feedback - OpsLab Feedback\n\
+            /plan - План Wellness OS\n\
+            /goals - Персональні цілі\n\
+            /pulse - Pulse rooms\n\
+            /insight - Персональний інсайт\n\
+            /settings - Налаштування та час нагадувань\n\
+            /help - Допомога\n\n\
+            💡 Швидкий старт:\n\
+            1. Відкрий web dashboard: {base_url}\n\
+            2. Переглянь метрики та оновлюй час нагадувань\n\
+            3. Чекіни приходять у вибраний час\n\n\
+            Час нагадувань можна змінити в /settings або /settime",
         )),
     )
     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
@@ -1105,7 +997,7 @@ async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
         chat_id,
         mdv2(
             "📱 Команди бота:\n\n\
-            /checkin - Веб-чекін\n\
+            /checkin - Щоденний чекін\n\
             /status - Поточний стан\n\
             /feedback - OpsLab Feedback\n\
             /weblogin - Вхід у web dashboard\n\
@@ -1113,10 +1005,10 @@ async fn send_help_message(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
             /timezone - Часовий пояс\n\
             /notify - Нагадування on/off\n\
             /settings - Налаштування\n\
-            /kudos - Подяка колезі (1-2 речення, зʼявляється у тижневому підсумку)\n\
+            /kudos - Подяка колезі\n\
             /plan - План Wellness OS\n\
             /goals - Персональні цілі\n\
-            /pulse - Анонімні кімнати для командного фідбеку (у web)\n\
+            /pulse - Pulse rooms\n\
             /insight - Персональний інсайт\n\n\
             🔗 Привʼязка Telegram:\n\
             /start email@opslab.uk 1234\n\
@@ -1141,13 +1033,42 @@ pub async fn start_daily_checkin(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    send_web_checkin_reminder(bot, state, chat_id, user_id).await
+    // #1 WOW Feature: Use adaptive check-in generation
+    let checkin = match CheckInGenerator::generate_adaptive_checkin(&state.pool, user_id).await {
+        Ok(c) => c,
+        Err(_) => {
+            // Fallback to standard if adaptive fails
+            let day_of_week = Utc::now().weekday().num_days_from_monday();
+            CheckInGenerator::generate_checkin(user_id, day_of_week)
+        }
+    };
+
+    // Зберегти чекін в сесії
+    {
+        let mut sessions = state.checkin_sessions.write().await;
+        sessions.insert(chat_id.0, checkin.clone());
+    }
+
+    // Відправка привітання
+    bot.send_message(
+        chat_id,
+        mdv2(format!(
+            "📋 Щоденний чекін\n\n{}\n\n⏱️ Займе {}",
+            checkin.intro_message, checkin.estimated_time
+        )),
+    )
+    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+    .await?;
+
+    // Відправка першого питання
+    send_checkin_question(bot, chat_id, &checkin, 0).await?;
+
+    Ok(())
 }
 
 /// Відправка питання чекіну
 async fn send_checkin_question(
     bot: &teloxide::Bot,
-    state: &SharedState,
     chat_id: ChatId,
     checkin: &crate::bot::daily_checkin::CheckIn,
     question_index: usize,
@@ -1157,37 +1078,6 @@ async fn send_checkin_question(
     }
 
     let question = &checkin.questions[question_index];
-    let is_open = is_open_question(&question.qtype, &question.scale);
-
-    {
-        let mut sessions = state.checkin_sessions.write().await;
-        if let Some(session) = sessions.get_mut(&chat_id.0) {
-            session.current_index = question_index;
-            session.awaiting_open_question = if is_open { Some(question.id) } else { None };
-        }
-    }
-
-    if is_open {
-        let keyboard = InlineKeyboardMarkup::new(vec![vec![
-            InlineKeyboardButton::callback("⏭️ Пропустити", "skip_checkin".to_string()),
-        ]]);
-
-        bot.send_message(
-            chat_id,
-            mdv2(format!(
-                "{} Питання {}/{}\n\n{}\n\nВідповідь текстом або голосом (до 5 хв). Голос буде розшифровано.",
-                question.emoji,
-                question_index + 1,
-                checkin.questions.len(),
-                question.text
-            )),
-        )
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .reply_markup(keyboard)
-        .await?;
-
-        return Ok(());
-    }
 
     // Створення inline клавіатури з кнопками 1-10
     let mut rows = vec![];
@@ -1233,255 +1123,6 @@ async fn send_checkin_question(
     Ok(())
 }
 
-fn is_open_question(qtype: &str, scale: &str) -> bool {
-    matches!(qtype, "reflection" | "support") || scale != "1-10"
-}
-
-async fn pending_open_question(
-    state: &SharedState,
-    telegram_id: i64,
-) -> Option<(crate::state::CheckInSession, crate::bot::daily_checkin::Question)> {
-    let sessions = state.checkin_sessions.read().await;
-    let session = sessions.get(&telegram_id)?.clone();
-    let question_id = session.awaiting_open_question?;
-    let question = session
-        .checkin
-        .questions
-        .iter()
-        .find(|q| q.id == question_id)?
-        .clone();
-    Some((session, question))
-}
-
-async fn advance_checkin_flow(
-    bot: &teloxide::Bot,
-    state: &SharedState,
-    chat_id: ChatId,
-    telegram_id: i64,
-    user_id: Uuid,
-    session: &crate::state::CheckInSession,
-) -> Result<()> {
-    let next_index = session.current_index + 1;
-    if next_index < session.checkin.questions.len() {
-        // Update session current_index before sending next question
-        {
-            let mut sessions = state.checkin_sessions.write().await;
-            if let Some(sess) = sessions.get_mut(&telegram_id) {
-                sess.current_index = next_index;
-            }
-        }
-        send_checkin_question(bot, state, chat_id, &session.checkin, next_index).await?;
-        return Ok(());
-    }
-
-    {
-        let mut sessions = state.checkin_sessions.write().await;
-        sessions.remove(&telegram_id);
-    }
-
-    complete_checkin(bot, state, chat_id, user_id).await
-}
-
-async fn complete_checkin(
-    bot: &teloxide::Bot,
-    state: &SharedState,
-    chat_id: ChatId,
-    user_id: Uuid,
-) -> Result<()> {
-    bot.send_message(
-        chat_id,
-        mdv2(
-            "✅ Чекін завершено! Дякую! 🙏\n\n\
-        Твої дані збережені та будуть використані для аналізу.\n\
-        Продовжуй проходити щоденні чекіни для повної картини.\n\n\
-        Побачимось завтра! 👋",
-        ),
-    )
-    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-    .await?;
-
-    send_quick_actions(bot, state, chat_id, user_id).await.ok();
-
-    if let Err(e) = maybe_send_plan_nudge(bot, state, chat_id, user_id).await {
-        tracing::warn!("Failed to send plan nudge: {}", e);
-    }
-
-    let count = db::get_checkin_answer_count(&state.pool, user_id, 10).await?;
-    if count >= 21 {
-        if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
-            if MetricsCalculator::is_critical(&metrics) {
-                send_critical_alert(bot, state, user_id, &metrics).await?;
-
-                bot.send_message(
-                    chat_id,
-                    mdv2(
-                        "⚠️ Важливе повідомлення\n\n\
-                    Твої показники вказують на необхідність звернення до фахівця.\n\n\
-                    Рекомендуємо:\n\
-                    • Поговорити з керівником\n\
-                    • Звернутися до психолога\n\
-                    • Взяти відпочинок\n\n\
-                    Твоє здоров'я - найважливіше! 💚",
-                    ),
-                )
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .await?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-async fn process_open_response(
-    bot: &teloxide::Bot,
-    state: &SharedState,
-    chat_id: ChatId,
-    telegram_id: i64,
-    user_id: Uuid,
-    session: crate::state::CheckInSession,
-    question: crate::bot::daily_checkin::Question,
-    response_text: &str,
-    source: &str,
-    audio_duration_seconds: Option<i32>,
-) -> Result<()> {
-    let mut context = recent_context(state, user_id).await.unwrap_or_default();
-    if !context.is_empty() {
-        context.push('\n');
-    }
-    context.push_str(&format!("Question: {} ({})", question.text, question.qtype));
-
-    let metrics = db::calculate_user_metrics(&state.pool, user_id)
-        .await
-        .ok()
-        .flatten();
-
-    let outcome: AiOutcome = match state
-        .ai
-        .analyze_transcript(response_text, &context, metrics.as_ref())
-        .await
-    {
-        Ok(result) => result,
-        Err(e) => {
-            tracing::error!("Open response analysis failed: {}", e);
-            AiOutcome {
-                transcript: response_text.to_string(),
-                ai_json: json!({
-                    "sentiment": "unknown",
-                    "emotion_tags": [],
-                    "risk_score": 1,
-                    "topics": [],
-                    "advice": "Дякую, що поділився. Зроби коротку паузу, попий води та обери одну маленьку дію на зараз."
-                }),
-                risk_score: 1,
-                urgent: false,
-            }
-        }
-    };
-
-    // Mark question as answered
-    {
-        let mut sessions = state.checkin_sessions.write().await;
-        if let Some(sess) = sessions.get_mut(&telegram_id) {
-            if sess.answered_questions.is_none() {
-                sess.answered_questions = Some(std::collections::HashSet::new());
-            }
-            sess.answered_questions.as_mut().unwrap().insert(question.id);
-        }
-    }
-
-    db::insert_checkin_open_response(
-        &state.pool,
-        &state.crypto,
-        user_id,
-        &session.checkin.id,
-        question.id,
-        &question.qtype,
-        source,
-        response_text,
-        Some(&outcome.ai_json),
-        Some(outcome.risk_score),
-        outcome.urgent,
-        audio_duration_seconds,
-    )
-    .await?;
-
-    if source == "voice" {
-        if let Err(err) = db::insert_voice_log(
-            &state.pool,
-            &state.crypto,
-            user_id,
-            response_text,
-            Some(&outcome.ai_json),
-            outcome.risk_score,
-            outcome.urgent,
-        )
-        .await
-        {
-            tracing::warn!("Failed to store voice log for check-in response: {}", err);
-        }
-    }
-
-    let advice = outcome
-        .ai_json
-        .get("advice")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Дякую. Подбай про себе сьогодні.");
-
-    bot.send_message(
-        chat_id,
-        format!("✅ Відповідь збережено.\n\nПідтримка на зараз: {advice}"),
-    )
-    .await?;
-
-    if outcome.urgent {
-        bot.send_message(
-            chat_id,
-            "⚠️ Високий ризик: зробіть паузу 5 хв. Практика: 4-7-8 дихання + складіть 3 пункти плану на найближчу годину. Якщо потрібно — напишіть \"паніка\" щоб отримати швидку підтримку.",
-        )
-        .await?;
-
-        // Send urgent alert only once per response (deduplicated by checkin_id + question_id)
-        let alert_key = format!("{}:{}", session.checkin.id, question.id);
-        let should_send_alert = {
-            let mut sessions = state.checkin_sessions.write().await;
-            if let Some(sess) = sessions.get_mut(&telegram_id) {
-                if sess.urgent_alerts_sent.is_none() {
-                    sess.urgent_alerts_sent = Some(std::collections::HashSet::new());
-                }
-                let alerts = sess.urgent_alerts_sent.as_mut().unwrap();
-                if alerts.contains(&alert_key) {
-                    false
-                } else {
-                    alerts.insert(alert_key);
-                    true
-                }
-            } else {
-                false
-            }
-        };
-
-        if should_send_alert {
-            if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
-                bot.send_message(
-                    ChatId(admin_id),
-                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
-                )
-                .await?;
-            }
-            if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
-                bot.send_message(
-                    ChatId(jane_id),
-                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
-                )
-                .await?;
-            }
-        }
-    }
-
-    advance_checkin_flow(bot, state, chat_id, telegram_id, user_id, &session).await
-}
-
 /// Обробка callback queries (відповіді на кнопки)
 async fn handle_callback(
     bot: &teloxide::Bot,
@@ -1503,19 +1144,17 @@ async fn handle_callback(
                 let telegram_id = msg.chat.id.0;
 
                 // Отримати чекін з сесії
-                    let session = {
-                        let sessions = state.checkin_sessions.read().await;
-                        sessions.get(&telegram_id).cloned()
-                    };
+                let checkin = {
+                    let sessions = state.checkin_sessions.read().await;
+                    sessions.get(&telegram_id).cloned()
+                };
 
-                let Some(session) = session else {
+                let Some(checkin) = checkin else {
                     bot.answer_callback_query(&callback.id)
                         .text("❌ Сесія чекіну завершена. Натисни /checkin щоб почати знову")
                         .await?;
                     return Ok(());
                 };
-
-                let checkin = session.checkin;
 
                 if let Ok(Some(user)) = db::find_user_by_telegram(&state.pool, telegram_id).await {
                     if !user.is_active {
@@ -1524,40 +1163,8 @@ async fn handle_callback(
                             .await?;
                         return Ok(());
                     }
-
-                    // Check if question was already answered in this session
-                    let already_answered = {
-                        let sessions = state.checkin_sessions.read().await;
-                        if let Some(sess) = sessions.get(&telegram_id) {
-                            sess.answered_questions
-                                .as_ref()
-                                .map(|set| set.contains(&question_id))
-                                .unwrap_or(false)
-                        } else {
-                            false
-                        }
-                    };
-
-                    if already_answered {
-                        bot.answer_callback_query(&callback.id)
-                            .text("✓ Вже відповіли на це питання")
-                            .await?;
-                        return Ok(());
-                    }
-
                     // Знайти питання за ID в поточному чекіні
                     if let Some(question) = checkin.questions.iter().find(|q| q.id == question_id) {
-                        // Mark question as answered
-                        {
-                            let mut sessions = state.checkin_sessions.write().await;
-                            if let Some(sess) = sessions.get_mut(&telegram_id) {
-                                if sess.answered_questions.is_none() {
-                                    sess.answered_questions = Some(std::collections::HashSet::new());
-                                }
-                                sess.answered_questions.as_mut().unwrap().insert(question_id);
-                            }
-                        }
-
                         // Зберегти відповідь в БД
                         db::insert_checkin_answer(
                             &state.pool,
@@ -1588,15 +1195,64 @@ async fn handle_callback(
 
                         if next_index < checkin.questions.len() {
                             // Відправити наступне питання
-                            send_checkin_question(bot, &state, msg.chat.id, &checkin, next_index)
-                                .await?;
+                            send_checkin_question(bot, msg.chat.id, &checkin, next_index).await?;
                         } else {
                             // Чекін завершено - видалити з сесії
                             {
                                 let mut sessions = state.checkin_sessions.write().await;
                                 sessions.remove(&telegram_id);
                             }
-                            complete_checkin(bot, &state, msg.chat.id, user.id).await?;
+
+                            bot.send_message(
+                                msg.chat.id,
+                                mdv2(
+                                    "✅ Чекін завершено! Дякую! 🙏\n\n\
+                                Твої дані збережені та будуть використані для аналізу.\n\
+                                Продовжуй проходити щоденні чекіни для повної картини.\n\n\
+                                Побачимось завтра! 👋",
+                                ),
+                            )
+                            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                            .await?;
+
+                            // #5 WOW Feature: Quick Actions after check-in
+                            send_quick_actions(bot, &state, msg.chat.id, user.id)
+                                .await
+                                .ok();
+
+                            // Gentle nudge for Wellness OS plan
+                            if let Err(e) = maybe_send_plan_nudge(bot, &state, msg.chat.id, user.id).await {
+                                tracing::warn!("Failed to send plan nudge: {}", e);
+                            }
+
+                            // Перевірити чи потрібно надіслати критичний алерт
+                            let count =
+                                db::get_checkin_answer_count(&state.pool, user.id, 10).await?;
+                            if count >= 21 {
+                                if let Ok(Some(metrics)) =
+                                    db::calculate_user_metrics(&state.pool, user.id).await
+                                {
+                                    if MetricsCalculator::is_critical(&metrics) {
+                                        send_critical_alert(bot, &state, user.id, &metrics).await?;
+
+                                        // Сповістити користувача
+                                        bot.send_message(
+                                            msg.chat.id,
+                                            mdv2(
+                                                "⚠️ Важливе повідомлення\n\n\
+                                            Твої показники вказують на необхідність звернення до фахівця.\n\n\
+                                            Рекомендуємо:\n\
+                                            • Поговорити з керівником\n\
+                                            • Звернутися до психолога\n\
+                                            • Взяти відпочинок\n\n\
+                                            Твоє здоров'я - найважливіше! 💚",
+                                            )
+                                        )
+                                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                                        .await?;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1609,10 +1265,6 @@ async fn handle_callback(
 
         if let Some(msg) = callback.message {
             bot.delete_message(msg.chat.id, msg.id).await.ok();
-            {
-                let mut sessions = state.checkin_sessions.write().await;
-                sessions.remove(&msg.chat.id.0);
-            }
             bot.send_message(
                 msg.chat.id,
                 "⏭️ Чекін пропущено.\n\n\
@@ -1740,15 +1392,29 @@ async fn send_web_login_link(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    let token = create_login_token(state, user_id).await?;
-    let login_url = build_login_url(&token, false);
+    // Generate secure random token
+    let token: String = (0..32)
+        .map(|_| format!("{:02x}", rand::random::<u8>()))
+        .collect();
+
+    // Store token in database (expires in 2 hours)
+    sqlx::query(
+        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '2 hours')"
+    )
+    .bind(user_id)
+    .bind(&token)
+    .execute(&state.pool)
+    .await?;
+
+    let base_url = app_base_url();
+    let login_url = format!("{}/?token={}", base_url, token);
 
     bot.send_message(
         chat_id,
         mdv2(format!(
             "🔐 Ваше персональне посилання для входу:\n\n\
             {}\n\n\
-            ⏱ Посилання дійсне 5 хвилин\n\
+            ⏱ Посилання дійсне 2 години\n\
             🔒 Одноразове використання\n\n\
             Просто перейдіть за посиланням - вхід виконається автоматично!",
             login_url
@@ -1756,230 +1422,6 @@ async fn send_web_login_link(
     )
     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
     .await?;
-
-    Ok(())
-}
-
-async fn send_web_checkin_reminder(
-    bot: &teloxide::Bot,
-    state: &SharedState,
-    chat_id: ChatId,
-    user_id: Uuid,
-) -> Result<()> {
-    let _user = db::find_user_by_id(&state.pool, user_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-
-    let prefs = db::get_user_preferences(&state.pool, user_id).await?;
-    let frequency = CheckinFrequency::try_from(prefs.checkin_frequency.as_str())
-        .unwrap_or(CheckinFrequency::Daily);
-    let last_checkin_at = db::get_last_checkin_date(&state.pool, user_id).await?;
-    let today = time_utils::local_components(&prefs.timezone, Utc::now()).0;
-    let last_local = last_checkin_at
-        .map(|dt| time_utils::local_components(&prefs.timezone, dt).0);
-    let schedule = schedule_for(frequency, last_local, today);
-
-    let (label, questions) = match frequency {
-        CheckinFrequency::Daily => ("короткий чекін", "2-3 питання"),
-        CheckinFrequency::Every3Days => ("глибший чекін", "10 питань"),
-        CheckinFrequency::Weekly => ("повний тест", "12 питань"),
-    };
-
-    let status_line = if schedule.due {
-        format!("Сьогодні за графіком: {label} ({questions}).")
-    } else {
-        format!(
-            "Сьогодні без чекіну. Наступний за графіком: {}.",
-            schedule.next_due_date
-        )
-    };
-
-    let token = create_login_token(state, user_id).await?;
-    let login_url = build_login_url(&token, true);
-
-    bot.send_message(
-        chat_id,
-        mdv2(format!(
-            "🧭 Нагадування Mindguard\n\n{}\n\n⚙️ Частоту чекінів можна обрати у веб-формі (щодня / кожні 3 дні / щотижня).\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне 5 хвилин.",
-            status_line, login_url
-        )),
-    )
-    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-    .await?;
-
-    Ok(())
-}
-
-pub async fn send_web_checkin_followups(
-    state: &SharedState,
-    user_id: Uuid,
-) -> Result<()> {
-    let user = db::find_user_by_id(&state.pool, user_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-
-    let Some(telegram_id) = user.telegram_id else {
-        return Ok(());
-    };
-
-    let token = std::env::var("TELEGRAM_BOT_TOKEN")
-        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
-    let bot = teloxide::Bot::new(token);
-    let chat_id = ChatId(telegram_id);
-
-    bot.send_message(
-        chat_id,
-        mdv2(
-            "✅ Web-чекін збережено!\n\n\
-            Дякую за відповіді. Рекомендації та нагадування залишаються у Telegram.",
-        ),
-    )
-    .parse_mode(ParseMode::MarkdownV2)
-    .await
-    .ok();
-
-    if let Err(e) = send_quick_actions(&bot, state, chat_id, user_id).await {
-        tracing::warn!("Failed to send quick actions for web checkin: {}", e);
-    }
-
-    if let Err(e) = maybe_send_plan_nudge(&bot, state, chat_id, user_id).await {
-        tracing::warn!("Failed to send plan nudge for web checkin: {}", e);
-    }
-
-    let count = db::get_checkin_answer_count(&state.pool, user_id, 10).await?;
-    if count >= 21 {
-        if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
-            if MetricsCalculator::is_critical(&metrics) {
-                send_critical_alert(&bot, state, user_id, &metrics).await.ok();
-                bot.send_message(
-                    chat_id,
-                    mdv2(
-                        "⚠️ Важливе повідомлення\n\n\
-                        Твої показники вказують на необхідність звернення до фахівця.\n\n\
-                        Рекомендуємо:\n\
-                        • Поговорити з керівником\n\
-                        • Звернутися до психолога\n\
-                        • Взяти відпочинок\n\n\
-                        Твоє здоров'я - найважливіше! 💚",
-                    ),
-                )
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .await
-                .ok();
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// One-time announcement: web check-ins for everyone
-pub async fn send_web_checkin_rollout_announcement(state: &SharedState) -> Result<()> {
-    let users = db::get_web_checkin_announcement_candidates(&state.pool).await?;
-    if users.is_empty() {
-        return Ok(());
-    }
-
-    let token = std::env::var("TELEGRAM_BOT_TOKEN")
-        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
-    let bot = teloxide::Bot::new(token);
-    let today = Utc::now().date_naive();
-
-    let message = mdv2(
-        "🆕 Оновлення Mindguard\n\n\
-        Чекіни тепер проходять у веб-апці, а Telegram лишається для нагадувань, порад та аналітики.\n\n\
-        Як це працює:\n\
-        1) Натисни /checkin або дочекайся щоденного нагадування.\n\
-        2) Відкриється веб-форма з питаннями.\n\
-        3) Обери частоту: щодня (2-3 питання), кожні 3 дні (10 питань) або щотижня (12 питань).\n\n\
-        Якщо щось не відкривається — повтори /checkin, бот надішле нове посилання.",
-    );
-
-    for (user_id, telegram_id) in users {
-        let chat_id = ChatId(telegram_id);
-        let result = bot
-            .send_message(chat_id, message.clone())
-            .parse_mode(ParseMode::MarkdownV2)
-            .await;
-
-        match result {
-            Ok(_) => {
-                if let Err(err) =
-                    db::mark_web_checkin_announcement_sent(&state.pool, user_id, today).await
-                {
-                    tracing::warn!(
-                        "Failed to mark web check-in announcement for {}: {}",
-                        user_id,
-                        err
-                    );
-                }
-            }
-            Err(err) => {
-                tracing::warn!(
-                    "Failed to send web check-in announcement to {}: {}",
-                    user_id,
-                    err
-                );
-            }
-        }
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(35)).await;
-    }
-
-    Ok(())
-}
-
-async fn create_login_token(state: &SharedState, user_id: Uuid) -> Result<String> {
-    let token: String = (0..32)
-        .map(|_| format!("{:02x}", rand::random::<u8>()))
-        .collect();
-
-    sqlx::query(
-        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '5 minutes')"
-    )
-    .bind(user_id)
-    .bind(&token)
-    .execute(&state.pool)
-    .await?;
-
-    Ok(token)
-}
-
-fn build_login_url(token: &str, checkin: bool) -> String {
-    let base_url = app_base_url();
-    if checkin {
-        format!("{}/?token={}&checkin=1", base_url, token)
-    } else {
-        format!("{}/?token={}", base_url, token)
-    }
-}
-
-/// Alert admins about urgent open responses
-pub async fn send_open_response_alert(
-    _state: &SharedState,
-    user_id: Uuid,
-    risk_score: i16,
-) -> Result<()> {
-    let admin_id = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]);
-    let jane_id = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]);
-
-    if admin_id.is_none() && jane_id.is_none() {
-        return Ok(());
-    }
-
-    let token = std::env::var("TELEGRAM_BOT_TOKEN")
-        .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
-    let bot = teloxide::Bot::new(token);
-    let message = format!(
-        "⚠️ URGENT | User {user_id} open response flagged risk_score={risk_score}"
-    );
-
-    if let Some(admin) = admin_id {
-        bot.send_message(ChatId(admin), message.clone()).await.ok();
-    }
-    if let Some(jane) = jane_id {
-        bot.send_message(ChatId(jane), message.clone()).await.ok();
-    }
 
     Ok(())
 }
@@ -2043,15 +1485,6 @@ async fn handle_voice(
     user_id: Uuid,
     file_id: String,
 ) -> Result<()> {
-    if !state.ai.is_enabled() {
-        bot.send_message(
-            msg.chat.id,
-            "Голосовий аналіз тимчасово недоступний. Надішліть відповідь текстом.",
-        )
-        .await?;
-        return Ok(());
-    }
-
     bot.send_message(
         msg.chat.id,
         "🎧 Отримав голосове. Аналізую, це займе до 30 секунд...",
@@ -2281,7 +1714,7 @@ async fn handle_group(bot: &teloxide::Bot, state: SharedState, msg: Message) -> 
 }
 
 async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
-    let logs = sqlx::query(
+    let logs = sqlx::query!(
         r#"
         SELECT enc_transcript, created_at
         FROM voice_logs
@@ -2289,19 +1722,17 @@ async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
         ORDER BY created_at DESC
         LIMIT 3
         "#,
+        user_id
     )
-    .bind(user_id)
     .fetch_all(&state.pool)
     .await?;
 
     let mut parts = Vec::new();
     for log in logs {
-        let enc_transcript: String = log.try_get("enc_transcript")?;
-        let created_at: chrono::DateTime<chrono::Utc> = log.try_get("created_at")?;
-        if let Ok(text) = state.crypto.decrypt_str(&enc_transcript) {
+        if let Ok(text) = state.crypto.decrypt_str(&log.enc_transcript) {
             parts.push(format!(
                 "{}: {}",
-                created_at.with_timezone(&Utc).date_naive(),
+                log.created_at.with_timezone(&Utc).date_naive(),
                 text
             ));
         }
@@ -2331,7 +1762,6 @@ async fn handle_settime_command(
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
-                checkin_frequency: "daily".to_string(),
             });
         bot.send_message(
             chat_id,
@@ -2366,7 +1796,6 @@ async fn handle_settime_command(
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
-                checkin_frequency: "daily".to_string(),
             });
         let (hour, minute) =
             db::calculate_best_reminder_time_local(&state.pool, user_id, &prefs.timezone).await?;
@@ -2437,7 +1866,6 @@ async fn handle_settime_command(
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
-            checkin_frequency: "daily".to_string(),
         });
 
     bot.send_message(
@@ -2467,11 +1895,11 @@ async fn handle_kudos_command(
         bot.send_message(
             chat_id,
             mdv2(
-                "🎉 Kudos — коротка подяка колезі за конкретну дію.\n\n\
+                "🎉 Kudos - подяка колезі!\n\n\
             Формат: /kudos @email повідомлення\n\n\
             Приклад:\n\
-            /kudos @jane.davydiuk@opslab.uk Дякую за підтримку на демо — це пришвидшило рішення! 💙\n\n\
-            Порада: напишіть «дія → вплив» у 1-2 реченнях.",
+            /kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙\n\n\
+            Колега отримає твоє повідомлення в Telegram!",
             ),
         )
         .parse_mode(ParseMode::MarkdownV2)
@@ -2487,7 +1915,7 @@ async fn handle_kudos_command(
             mdv2(
                 "❌ Неправильний формат.\n\n\
             Використай: /kudos @email повідомлення\n\n\
-            Приклад: /kudos @jane.davydiuk@opslab.uk Дякую за підтримку! 💙",
+            Приклад: /kudos @jane.davydiuk@opslab.uk дякую! 💙",
             ),
         )
         .parse_mode(ParseMode::MarkdownV2)
@@ -2526,11 +1954,7 @@ async fn handle_kudos_command(
     // Notify sender
     bot.send_message(
         chat_id,
-        mdv2(format!(
-            "✅ Kudos відправлено {}! 🎉\n\
-            Отримувач побачить повідомлення у Telegram та в тижневому підсумку.",
-            recipient_email
-        )),
+        mdv2(format!("✅ Kudos відправлено {}! 🎉", recipient_email)),
     )
     .parse_mode(ParseMode::MarkdownV2)
     .await?;
@@ -2578,7 +2002,6 @@ async fn send_wellness_plan(
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
-            checkin_frequency: "daily".to_string(),
         });
     let (local_date, _, _) = time_utils::local_components(&prefs.timezone, Utc::now());
 
@@ -2730,9 +2153,9 @@ async fn send_pulse_info(bot: &teloxide::Bot, chat_id: ChatId) -> Result<()> {
         chat_id,
         mdv2(format!(
             "🗣 Pulse rooms\n\n\
-            Тематичні кімнати для командного фідбеку та сигналів.\n\
-            Можна писати анонімно, частина кімнат проходить модерацію.\n\n\
-            Відкрий у web: {base_url} → Pulse Rooms",
+            Анонімні командні обговорення з модерацією.\n\
+            Перейди у web та відкрий Pulse Rooms.\n\n\
+            🔗 {base_url}"
         )),
     )
     .parse_mode(ParseMode::MarkdownV2)

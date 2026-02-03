@@ -61,9 +61,9 @@ echo ""
 
 # Step 4: Generate SQLx offline data
 echo "Step 4/4: Generating SQLx offline query data..."
-cargo sqlx prepare
+cargo sqlx prepare --merged
 echo "✓ SQLx metadata generated"
-ls -lh .sqlx
+ls -lh sqlx-data.json
 echo ""
 
 # Verify offline build works
@@ -82,10 +82,10 @@ echo "========================================="
 echo ""
 echo "Files generated:"
 echo "  ✓ Cargo.lock - $(ls -lh Cargo.lock | awk '{print $5}')"
-echo "  ✓ .sqlx - $(ls -ld .sqlx | awk '{print $5}')"
+echo "  ✓ sqlx-data.json - $(ls -lh sqlx-data.json | awk '{print $5}')"
 echo ""
 echo "Next steps:"
-echo "  1. git add Cargo.lock .sqlx"
+echo "  1. git add Cargo.lock sqlx-data.json"
 echo "  2. git commit -m 'Add build artifacts for production'"
 echo "  3. git push origin main"
 echo ""

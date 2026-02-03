@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT MAX(created_at) as \"last_answered\"\n                FROM checkin_answers\n                WHERE user_id = $1 AND question_type = $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_answered",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6d4444f668c9554e03b97a850b99046a93d3e698cd24ed8a911cc002596c2b00"
+}

@@ -5,7 +5,7 @@ use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use chrono::Utc;
 use serde_json::json;
-use sqlx::{self, Row};
+use sqlx;
 use std::env;
 use teloxide::net::Download;
 use teloxide::prelude::*;
@@ -128,15 +128,6 @@ async fn handle_voice(
     user_id: Uuid,
     file_id: String,
 ) -> Result<()> {
-    if !state.ai.is_enabled() {
-        bot.send_message(
-            msg.chat.id,
-            "Голосовий аналіз тимчасово недоступний. Надішліть відповідь текстом.",
-        )
-        .await?;
-        return Ok(());
-    }
-
     let file = bot.get_file(file_id).await?;
     let mut bytes: Vec<u8> = Vec::new();
     bot.download_file(&file.path, &mut bytes).await?;
@@ -227,7 +218,7 @@ fn parse_answer(text: &str) -> Option<(i32, i16)> {
 }
 
 async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
-    let logs = sqlx::query(
+    let logs = sqlx::query!(
         r#"
         SELECT enc_transcript, created_at
         FROM voice_logs
@@ -235,19 +226,17 @@ async fn recent_context(state: &SharedState, user_id: Uuid) -> Result<String> {
         ORDER BY created_at DESC
         LIMIT 3
         "#,
+        user_id
     )
-    .bind(user_id)
     .fetch_all(&state.pool)
     .await?;
 
     let mut parts = Vec::new();
     for log in logs {
-        let enc_transcript: String = log.try_get("enc_transcript")?;
-        let created_at: chrono::DateTime<chrono::Utc> = log.try_get("created_at")?;
-        if let Ok(text) = state.crypto.decrypt_str(&enc_transcript) {
+        if let Ok(text) = state.crypto.decrypt_str(&log.enc_transcript) {
             parts.push(format!(
                 "{}: {}",
-                created_at.with_timezone(&Utc).date_naive(),
+                log.created_at.with_timezone(&Utc).date_naive(),
                 text
             ));
         }

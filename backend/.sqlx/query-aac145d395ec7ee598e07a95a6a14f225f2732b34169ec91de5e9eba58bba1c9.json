@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, user_id, enc_content, category as \"category: PostCategory\", ai_categorized, created_at\n        FROM wall_posts\n        ORDER BY created_at DESC\n        LIMIT 100\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "enc_content",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "category: PostCategory",
+        "type_info": {
+          "Custom": {
+            "name": "post_category",
+            "kind": {
+              "Enum": [
+                "COMPLAINT",
+                "SUGGESTION",
+                "CELEBRATION",
+                "QUESTION",
+                "SUPPORT_NEEDED"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ai_categorized",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "aac145d395ec7ee598e07a95a6a14f225f2732b34169ec91de5e9eba58bba1c9"
+}

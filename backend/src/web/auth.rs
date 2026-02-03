@@ -34,7 +34,6 @@ pub struct LoginResponse {
     pub user_id: Uuid,
     pub role: UserRole,
     pub name: String,
-    pub email: String,
 }
 
 pub fn router(state: SharedState) -> Router {
@@ -93,7 +92,6 @@ async fn login(
         user_id: user.id,
         role: user.role.clone(),
         name,
-        email: user.email.clone(),
     };
 
     let token = session::sign_session(user.id, &user.role, &state.session_key)
@@ -180,7 +178,6 @@ async fn token_login(
         user_id: user.id,
         role: user.role.clone(),
         name,
-        email: user.email.clone(),
     };
 
     let session_token = session::sign_session(user.id, &user.role, &state.session_key)

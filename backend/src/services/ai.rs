@@ -23,46 +23,20 @@ pub struct AiOutcome {
 
 #[derive(Clone)]
 pub struct AiService {
-    client: Option<Client<OpenAIConfig>>,
+    client: Client<OpenAIConfig>,
     crypto: Arc<Crypto>,
-    api_key: Option<String>,
+    api_key: String,
 }
 
 impl AiService {
-    pub fn new(api_key: Option<String>, crypto: Arc<Crypto>) -> Self {
-        let api_key = api_key.and_then(|val| {
-            let trimmed = val.trim().to_string();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed)
-            }
-        });
-        let client = api_key.as_ref().map(|key| {
-            let config = OpenAIConfig::new().with_api_key(key.clone());
-            Client::with_config(config)
-        });
+    pub fn new(api_key: String, crypto: Arc<Crypto>) -> Self {
+        let config = OpenAIConfig::new().with_api_key(api_key.clone());
+        let client = Client::with_config(config);
         Self {
             client,
             crypto,
             api_key,
         }
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        self.api_key.is_some()
-    }
-
-    fn client(&self) -> Result<&Client<OpenAIConfig>> {
-        self.client
-            .as_ref()
-            .ok_or_else(|| anyhow!("OpenAI API key not configured"))
-    }
-
-    fn api_key(&self) -> Result<&str> {
-        self.api_key
-            .as_deref()
-            .ok_or_else(|| anyhow!("OpenAI API key not configured"))
     }
 
     pub async fn analyze_transcript(
@@ -71,8 +45,7 @@ impl AiService {
         context: &str,
         metrics: Option<&Metrics>,
     ) -> Result<AiOutcome> {
-        let client = self.client()?;
-        let mut last_err: Option<anyhow::Error> = None;
+        let mut retries = 0;
         let mut system_prompt = String::from(
             "You are a mental health triage assistant for OpsLab Mindguard.\n\
 Input: transcription text + brief context (last 3 days).\n\
@@ -101,80 +74,71 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
 
         let contains_urgent = contains_urgent_keywords(transcript);
 
-        for model in ["gpt-4o", "gpt-4o-mini"] {
-            let mut retries = 0;
-            loop {
-                let messages = vec![
-                    ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
-                        role: Role::System,
-                        content: system_prompt.to_string(),
-                        name: None,
-                    }),
-                    ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                        role: Role::User,
-                        content: ChatCompletionRequestUserMessageContent::Text(format!(
-                            "Context (last 3 days): {context}\nTranscription:\n{transcript}"
-                        )),
-                        name: None,
-                    }),
-                ];
+        loop {
+            let messages = vec![
+                ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                    role: Role::System,
+                    content: system_prompt.to_string(),
+                    name: None,
+                }),
+                ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                    role: Role::User,
+                    content: ChatCompletionRequestUserMessageContent::Text(format!(
+                        "Context (last 3 days): {context}\nTranscription:\n{transcript}"
+                    )),
+                    name: None,
+                }),
+            ];
 
-                let request = CreateChatCompletionRequestArgs::default()
-                    .model(model)
-                    .messages(messages)
-                    .response_format(ChatCompletionResponseFormat {
-                        r#type: ChatCompletionResponseFormatType::JsonObject,
-                    })
-                    .temperature(0.2)
-                    .max_tokens(300u16)
-                    .build()?;
+            let request = CreateChatCompletionRequestArgs::default()
+                .model("gpt-4o")
+                .messages(messages)
+                .response_format(ChatCompletionResponseFormat {
+                    r#type: ChatCompletionResponseFormatType::JsonObject,
+                })
+                .temperature(0.2)
+                .max_tokens(300u16)
+                .build()?;
 
-                match client.chat().create(request).await {
-                    Ok(resp) => {
-                        let content = resp
-                            .choices
-                            .first()
-                            .and_then(|c| c.message.content.clone())
-                            .unwrap_or_default();
-                        let json = parse_ai_json(&content);
-                        let mut risk_score =
-                            json.get("risk_score").and_then(|v| v.as_i64()).unwrap_or(1) as i16;
-                        if risk_score < 1 {
-                            risk_score = 1;
-                        } else if risk_score > 10 {
-                            risk_score = 10;
-                        }
-                        let urgent = contains_urgent || risk_score >= 9;
-                        if urgent {
-                            risk_score = 10;
-                        }
-                        let mut normalized = normalize_ai_json(
-                            json,
-                            "Зроби коротку паузу, подихай 4-7-8 і обери одну просту дію на зараз.",
-                        );
-                        if let Some(obj) = normalized.as_object_mut() {
-                            obj.insert("risk_score".to_string(), serde_json::json!(risk_score));
-                        }
-                        return Ok(AiOutcome {
-                            transcript: transcript.to_string(),
-                            ai_json: normalized,
-                            risk_score,
-                            urgent,
-                        });
+            match self.client.chat().create(request).await {
+                Ok(resp) => {
+                    let content = resp
+                        .choices
+                        .first()
+                        .and_then(|c| c.message.content.clone())
+                        .unwrap_or_default();
+                    let json = parse_ai_json(&content);
+                    let mut risk_score =
+                        json.get("risk_score").and_then(|v| v.as_i64()).unwrap_or(1) as i16;
+                    if risk_score < 1 {
+                        risk_score = 1;
+                    } else if risk_score > 10 {
+                        risk_score = 10;
                     }
-                    Err(err) => {
-                        retries += 1;
-                        last_err = Some(anyhow!(err.to_string()));
-                        if retries > 3 {
-                            break;
-                        }
-                        sleep(Duration::from_millis(500 * retries)).await;
+                    let urgent = contains_urgent || risk_score >= 9;
+                    if urgent {
+                        risk_score = 10;
                     }
+                    let mut normalized = normalize_ai_json(json, "Зроби коротку паузу, подихай 4-7-8 і обери одну просту дію на зараз.");
+                    if let Some(obj) = normalized.as_object_mut() {
+                        obj.insert("risk_score".to_string(), serde_json::json!(risk_score));
+                    }
+                    return Ok(AiOutcome {
+                        transcript: transcript.to_string(),
+                        ai_json: normalized,
+                        risk_score,
+                        urgent,
+                    });
+                }
+                Err(err) => {
+                    retries += 1;
+                    if retries > 3 {
+                        return Err(anyhow!("OpenAI error: {err}"));
+                    }
+                    sleep(Duration::from_millis(500 * retries)).await;
                 }
             }
         }
-
-        Err(last_err.unwrap_or_else(|| anyhow!("OpenAI error")))
     }
 
     pub fn encrypt_payload(&self, value: &serde_json::Value) -> Result<String> {
@@ -184,29 +148,18 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
     }
 
     pub async fn transcribe_voice(&self, audio_bytes: Vec<u8>) -> Result<String> {
-        self.transcribe_audio(audio_bytes, "audio/ogg", "voice.ogg")
-            .await
-    }
-
-    pub async fn transcribe_audio(
-        &self,
-        audio_bytes: Vec<u8>,
-        mime: &str,
-        filename: &str,
-    ) -> Result<String> {
-        let api_key = self.api_key()?;
         let form = reqwest::multipart::Form::new()
             .text("model", "whisper-1")
             .part(
                 "file",
                 reqwest::multipart::Part::bytes(audio_bytes)
-                    .file_name(filename.to_string())
-                    .mime_str(mime)?,
+                    .file_name("voice.ogg")
+                    .mime_str("audio/ogg")?,
             );
 
         let resp = reqwest::Client::new()
             .post("https://api.openai.com/v1/audio/transcriptions")
-            .bearer_auth(api_key)
+            .bearer_auth(&self.api_key)
             .multipart(form)
             .send()
             .await?
@@ -220,7 +173,6 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
     }
 
     pub async fn group_coach_response(&self, mention_text: &str) -> Result<String> {
-        let client = self.client()?;
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
                 role: Role::System,
@@ -241,7 +193,7 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
             .messages(messages)
             .build()?;
 
-        let resp = client.chat().create(request).await?;
+        let resp = self.client.chat().create(request).await?;
         let content = resp
             .choices
             .first()
@@ -255,7 +207,6 @@ WHO-5: {:.1}/100, PHQ-9: {:.1}/27, GAD-7: {:.1}/21, Burnout: {:.1}%, Sleep: {:.1
         metrics: &Metrics,
         correlations: &[CorrelationInsight],
     ) -> Result<String> {
-        let client = self.client()?;
         let correlations_text = if correlations.is_empty() {
             "No strong correlations found.".to_string()
         } else {
@@ -308,7 +259,7 @@ Compose the insight now.",
             .max_tokens(200u16)
             .build()?;
 
-        let resp = client.chat().create(request).await?;
+        let resp = self.client.chat().create(request).await?;
         let content = resp
             .choices
             .first()

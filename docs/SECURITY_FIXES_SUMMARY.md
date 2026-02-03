@@ -9,7 +9,7 @@
 **Виправлення:**
 - 📄 [GENERATE_LOCKFILE.sh](GENERATE_LOCKFILE.sh) - автоматичний скрипт
 - 📄 [Dockerfile:5](Dockerfile#L5) - `ENV SQLX_OFFLINE=true`
-- 📄 [Dockerfile:8,11](Dockerfile#L8) - копіює `Cargo.lock` та `.sqlx`
+- 📄 [Dockerfile:8,11](Dockerfile#L8) - копіює `Cargo.lock` та `sqlx-data.json`
 
 **Дія:** Запустіть `./GENERATE_LOCKFILE.sh` локально (деталі: [BUILD_LOCALLY.md](BUILD_LOCALLY.md))
 
@@ -159,9 +159,9 @@
 ### Перед деплоєм
 
 - [ ] Запустіть `./GENERATE_LOCKFILE.sh` локально
-- [ ] Перевірте створення `Cargo.lock` та `.sqlx`
+- [ ] Перевірте створення `Cargo.lock` та `sqlx-data.json`
 - [ ] Видаліть `*.PLACEHOLDER` файли
-- [ ] Закомітьте: `git add Cargo.lock .sqlx`
+- [ ] Закомітьте: `git add Cargo.lock sqlx-data.json`
 - [ ] Push: `git push origin main`
 
 ### На Railway

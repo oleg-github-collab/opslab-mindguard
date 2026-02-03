@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE telegram_pins\n        SET used = true\n        WHERE user_id = $1 AND used = false\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2e2a643c4d5c86bcc8b0b4084fb886d48cedce6f595ce05b305afc43bd8bf3a9"
+}

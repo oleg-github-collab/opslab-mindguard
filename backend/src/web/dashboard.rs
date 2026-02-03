@@ -142,10 +142,10 @@ async fn user_view(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let last_voice: Option<i16> = sqlx::query_scalar(
+    let last_voice = sqlx::query_scalar!(
         r#"SELECT risk_score FROM voice_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1"#,
+        id
     )
-    .bind(id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -154,7 +154,7 @@ async fn user_view(
         user_id: user.id,
         role: user.role,
         rolling_score: rolling,
-        last_voice_risk: last_voice,
+        last_voice_risk: last_voice.map(|v| v as i16),
         outstanding_questions: outstanding,
     };
     Ok(Json(payload))
@@ -336,10 +336,10 @@ async fn team_view(
             .next_questions(&state.pool, user.id, 3)
             .await
             .unwrap_or_default();
-        let last_voice: Option<i16> = sqlx::query_scalar(
+        let last_voice = sqlx::query_scalar!(
             r#"SELECT risk_score FROM voice_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1"#,
+            user.id
         )
-        .bind(user.id)
         .fetch_optional(&state.pool)
         .await
         .ok()
@@ -349,7 +349,7 @@ async fn team_view(
             user_id: user.id,
             role: user.role,
             rolling_score: rolling,
-            last_voice_risk: last_voice,
+            last_voice_risk: last_voice.map(|v| v as i16),
             outstanding_questions: outstanding,
         });
     }
