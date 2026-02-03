@@ -122,14 +122,14 @@ async fn anonymous(
         .encrypt_str(&payload.message)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO anonymous_feedback (id, enc_message)
         VALUES ($1, $2)
         "#,
-        Uuid::new_v4(),
-        enc
     )
+    .bind(Uuid::new_v4())
+    .bind(enc)
     .execute(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

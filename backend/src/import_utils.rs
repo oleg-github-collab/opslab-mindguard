@@ -26,16 +26,16 @@ pub struct HistoricalVoiceLog {
 pub async fn import_answers(pool: &PgPool, payload: &[HistoricalAnswer]) -> Result<()> {
     for entry in payload {
         if let Some(created_at) = entry.created_at {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO answers (user_id, question_id, value, created_at)
                 VALUES ($1, $2, $3, $4)
                 "#,
-                entry.user_id,
-                entry.question_id,
-                entry.value,
-                created_at
             )
+            .bind(entry.user_id)
+            .bind(entry.question_id)
+            .bind(entry.value)
+            .bind(created_at)
             .execute(pool)
             .await?;
         } else {
@@ -54,18 +54,18 @@ pub async fn import_voice_logs(
         let enc_transcript = crypto.encrypt_str(&entry.transcript)?;
         let enc_ai = crypto.encrypt_str(&entry.ai_json.to_string())?;
         if let Some(created_at) = entry.created_at {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO voice_logs (user_id, enc_transcript, enc_ai_analysis, risk_score, urgent, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6)
                 "#,
-                entry.user_id,
-                enc_transcript,
-                enc_ai,
-                entry.risk_score,
-                entry.risk_score >= 9,
-                created_at
             )
+            .bind(entry.user_id)
+            .bind(enc_transcript)
+            .bind(enc_ai)
+            .bind(entry.risk_score)
+            .bind(entry.risk_score >= 9)
+            .bind(created_at)
             .execute(pool)
             .await?;
         } else {

@@ -33,7 +33,9 @@ pub async fn set_rls_context(
             // Set PostgreSQL session variables for RLS policies
             let role_str = format!("{:?}", user.role).to_uppercase();
 
-            sqlx::query!("SELECT set_user_context($1, $2)", user_id, role_str)
+            sqlx::query("SELECT set_user_context($1, $2)")
+                .bind(user_id)
+                .bind(role_str.as_str())
                 .execute(&state.pool)
                 .await
                 .map_err(|e| {

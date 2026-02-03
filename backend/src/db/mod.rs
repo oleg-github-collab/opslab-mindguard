@@ -49,6 +49,7 @@ pub struct UserPreferences {
     pub last_plan_nudge_date: Option<NaiveDate>,
     pub onboarding_completed: bool,
     pub onboarding_completed_at: Option<DateTime<Utc>>,
+    pub checkin_frequency: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -221,15 +222,15 @@ pub async fn find_user_by_telegram(pool: &PgPool, telegram_id: i64) -> Result<Op
 }
 
 pub async fn attach_telegram(pool: &PgPool, user_id: Uuid, telegram_id: i64) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $2, updated_at = now()
         WHERE id = $1
         "#,
-        user_id,
-        telegram_id
     )
+    .bind(user_id)
+    .bind(telegram_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -262,16 +263,16 @@ pub async fn insert_answer(
     let normalized_value = ((value as f32 / 3.0) * 9.0 + 1.0).round() as i16;
 
     // Insert into new table
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO checkin_answers (user_id, question_id, question_type, value)
         VALUES ($1, $2, $3, $4)
         "#,
-        user_id,
-        question_id,
-        question_type,
-        normalized_value
     )
+    .bind(user_id)
+    .bind(question_id)
+    .bind(question_type)
+    .bind(normalized_value)
     .execute(pool)
     .await?;
 
@@ -293,18 +294,72 @@ pub async fn insert_voice_log(
         None => None,
     };
     let id = Uuid::new_v4();
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO voice_logs (id, user_id, enc_transcript, enc_ai_analysis, risk_score, urgent)
         VALUES ($1, $2, $3, $4, $5, $6)
         "#,
-        id,
-        user_id,
-        enc_transcript,
-        enc_ai_analysis,
-        risk_score,
-        urgent
     )
+    .bind(id)
+    .bind(user_id)
+    .bind(enc_transcript)
+    .bind(enc_ai_analysis)
+    .bind(risk_score)
+    .bind(urgent)
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
+
+pub async fn insert_checkin_open_response(
+    pool: &PgPool,
+    crypto: &Crypto,
+    user_id: Uuid,
+    checkin_id: &str,
+    question_id: i32,
+    qtype: &str,
+    response_source: &str,
+    response_text: &str,
+    analysis: Option<&serde_json::Value>,
+    risk_score: Option<i16>,
+    urgent: bool,
+    audio_duration_seconds: Option<i32>,
+) -> Result<Uuid> {
+    let enc_response = crypto.encrypt_str(response_text)?;
+    let enc_ai_analysis = match analysis {
+        Some(val) => Some(crypto.encrypt_str(&val.to_string())?),
+        None => None,
+    };
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO checkin_open_responses (
+            id,
+            user_id,
+            checkin_id,
+            question_id,
+            question_type,
+            response_source,
+            enc_response,
+            enc_ai_analysis,
+            risk_score,
+            urgent,
+            audio_duration_seconds
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(checkin_id)
+    .bind(question_id)
+    .bind(qtype)
+    .bind(response_source)
+    .bind(enc_response)
+    .bind(enc_ai_analysis)
+    .bind(risk_score)
+    .bind(urgent)
+    .bind(audio_duration_seconds)
     .execute(pool)
     .await?;
     Ok(id)
@@ -320,16 +375,16 @@ pub async fn insert_checkin_answer(
     qtype: &str,
     value: i16,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO checkin_answers (user_id, question_id, question_type, value)
         VALUES ($1, $2, $3, $4)
         "#,
-        user_id,
-        question_id,
-        qtype,
-        value
     )
+    .bind(user_id)
+    .bind(question_id)
+    .bind(qtype)
+    .bind(value)
     .execute(pool)
     .await?;
     Ok(())
@@ -341,8 +396,7 @@ pub async fn get_recent_checkin_answers(
     user_id: Uuid,
     days: i32,
 ) -> Result<Vec<CheckInAnswer>> {
-    let answers = sqlx::query_as!(
-        CheckInAnswer,
+    let rows = sqlx::query(
         r#"
         SELECT question_id, question_type as qtype, value
         FROM checkin_answers
@@ -350,26 +404,32 @@ pub async fn get_recent_checkin_answers(
           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
         ORDER BY created_at DESC
         "#,
-        user_id,
-        &days.to_string()
     )
+    .bind(user_id)
+    .bind(days.to_string())
     .fetch_all(pool)
     .await?;
+
+    let mut answers = Vec::with_capacity(rows.len());
+    for row in rows {
+        answers.push(CheckInAnswer {
+            question_id: row.try_get("question_id")?,
+            qtype: row.try_get("qtype")?,
+            value: row.try_get("value")?,
+        });
+    }
     Ok(answers)
 }
 
 /// Calculate and return metrics for a user
 pub async fn calculate_user_metrics(pool: &PgPool, user_id: Uuid) -> Result<Option<Metrics>> {
-    let result = sqlx::query!(
-        r#"
-        SELECT calculate_user_metrics($1) as metrics
-        "#,
-        user_id
-    )
-    .fetch_one(pool)
-    .await?;
+    let metrics_json: Option<serde_json::Value> =
+        sqlx::query_scalar("SELECT calculate_user_metrics($1)")
+            .bind(user_id)
+            .fetch_one(pool)
+            .await?;
 
-    match result.metrics {
+    match metrics_json {
         Some(json_value) => {
             let metrics: Metrics = serde_json::from_value(json_value)?;
             Ok(Some(metrics))
@@ -380,19 +440,19 @@ pub async fn calculate_user_metrics(pool: &PgPool, user_id: Uuid) -> Result<Opti
 
 /// Get the count of check-in answers for a user in the last N days
 pub async fn get_checkin_answer_count(pool: &PgPool, user_id: Uuid, days: i32) -> Result<i64> {
-    let result = sqlx::query!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(*) as count
+        SELECT COUNT(*)
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - ($2 || ' days')::INTERVAL
         "#,
-        user_id,
-        &days.to_string()
     )
+    .bind(user_id)
+    .bind(days.to_string())
     .fetch_one(pool)
     .await?;
-    Ok(result.count.unwrap_or(0))
+    Ok(count)
 }
 
 // ========== Telegram PIN Functions ==========
@@ -421,15 +481,6 @@ pub async fn link_telegram_by_email_code(
         return Ok(TelegramLinkOutcome::InvalidCredentials);
     };
 
-    let parsed_hash = PasswordHash::new(&user.hash)
-        .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
-    if Argon2::default()
-        .verify_password(code.as_bytes(), &parsed_hash)
-        .is_err()
-    {
-        return Ok(TelegramLinkOutcome::InvalidCredentials);
-    }
-
     if let Some(existing) = user.telegram_id {
         return Ok(TelegramLinkOutcome::AlreadyLinked {
             user_id: user.id,
@@ -441,15 +492,69 @@ pub async fn link_telegram_by_email_code(
         return Ok(TelegramLinkOutcome::TelegramIdInUse);
     }
 
-    sqlx::query!(
+    let pin_row = sqlx::query(
+        r#"
+        SELECT id
+        FROM telegram_pins
+        WHERE user_id = $1
+          AND pin_code = $2
+          AND used = false
+          AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(user.id)
+    .bind(code)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(pin) = pin_row {
+        let pin_id: Uuid = pin.try_get("id")?;
+        sqlx::query(
+            r#"
+            UPDATE telegram_pins
+            SET used = true, used_at = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .bind(pin_id)
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            UPDATE users
+            SET telegram_id = $1, updated_at = NOW()
+            WHERE id = $2
+            "#,
+        )
+        .bind(telegram_id)
+        .bind(user.id)
+        .execute(pool)
+        .await?;
+
+        return Ok(TelegramLinkOutcome::Linked(user.id));
+    }
+
+    let parsed_hash = PasswordHash::new(&user.hash)
+        .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+    if Argon2::default()
+        .verify_password(code.as_bytes(), &parsed_hash)
+        .is_err()
+    {
+        return Ok(TelegramLinkOutcome::InvalidCredentials);
+    }
+
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $1, updated_at = NOW()
         WHERE id = $2
         "#,
-        telegram_id,
-        user.id
     )
+    .bind(telegram_id)
+    .bind(user.id)
     .execute(pool)
     .await?;
 
@@ -467,26 +572,26 @@ pub async fn generate_telegram_pin(pool: &PgPool, user_id: Uuid) -> Result<Strin
     };
 
     // Mark old PINs as used
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE telegram_pins
         SET used = true
         WHERE user_id = $1 AND used = false
         "#,
-        user_id
     )
+    .bind(user_id)
     .execute(pool)
     .await?;
 
     // Insert new PIN
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO telegram_pins (user_id, pin_code, expires_at)
         VALUES ($1, $2, NOW() + INTERVAL '5 minutes')
         "#,
-        user_id,
-        &pin_code
     )
+    .bind(user_id)
+    .bind(&pin_code)
     .execute(pool)
     .await?;
 
@@ -500,7 +605,7 @@ pub async fn verify_and_link_telegram(
     telegram_id: i64,
 ) -> Result<Option<Uuid>> {
     // Find valid PIN
-    let pin = sqlx::query!(
+    let pin = sqlx::query(
         r#"
         SELECT user_id, expires_at
         FROM telegram_pins
@@ -510,8 +615,8 @@ pub async fn verify_and_link_telegram(
         ORDER BY created_at DESC
         LIMIT 1
         "#,
-        pin_code
     )
+    .bind(pin_code)
     .fetch_optional(pool)
     .await?;
 
@@ -519,37 +624,39 @@ pub async fn verify_and_link_telegram(
         return Ok(None); // Invalid or expired PIN
     };
 
+    let user_id: Uuid = pin.try_get("user_id")?;
+
     // Mark PIN as used
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE telegram_pins
         SET used = true, used_at = NOW()
         WHERE pin_code = $1
         "#,
-        pin_code
     )
+    .bind(pin_code)
     .execute(pool)
     .await?;
 
     // Link Telegram ID to user
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET telegram_id = $1, updated_at = NOW()
         WHERE id = $2
         "#,
-        telegram_id,
-        pin.user_id
     )
+    .bind(telegram_id)
+    .bind(user_id)
     .execute(pool)
     .await?;
 
-    Ok(Some(pin.user_id))
+    Ok(Some(user_id))
 }
 
 /// Get active PIN for user (for display on dashboard)
 pub async fn get_active_pin(pool: &PgPool, user_id: Uuid) -> Result<Option<String>> {
-    let pin = sqlx::query!(
+    let pin = sqlx::query(
         r#"
         SELECT pin_code
         FROM telegram_pins
@@ -559,12 +666,12 @@ pub async fn get_active_pin(pool: &PgPool, user_id: Uuid) -> Result<Option<Strin
         ORDER BY created_at DESC
         LIMIT 1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
-    Ok(pin.map(|p| p.pin_code))
+    Ok(pin.map(|p| p.try_get("pin_code")).transpose()?)
 }
 
 // ========== WOW Features Database Functions ==========
@@ -659,19 +766,41 @@ pub async fn set_user_onboarding_complete(
     Ok(())
 }
 
+pub async fn set_user_checkin_frequency(
+    pool: &PgPool,
+    user_id: Uuid,
+    frequency: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, checkin_frequency)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET checkin_frequency = $2,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(frequency)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get user preferences with defaults
 pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPreferences> {
     let row = sqlx::query(
         r#"
         SELECT
-            COALESCE(reminder_hour, 10) as reminder_hour,
-            COALESCE(reminder_minute, 0) as reminder_minute,
+            COALESCE(reminder_hour, 10)::SMALLINT as reminder_hour,
+            COALESCE(reminder_minute, 0)::SMALLINT as reminder_minute,
             COALESCE(timezone, 'Europe/Kyiv') as timezone,
             COALESCE(notification_enabled, true) as notification_enabled,
             last_reminder_date,
             last_plan_nudge_date,
             COALESCE(onboarding_completed, false) as onboarding_completed,
-            onboarding_completed_at
+            onboarding_completed_at,
+            COALESCE(checkin_frequency, 'daily') as checkin_frequency
         FROM user_preferences
         WHERE user_id = $1
         "#,
@@ -690,6 +819,10 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             last_plan_nudge_date: row.try_get::<Option<NaiveDate>, _>("last_plan_nudge_date")?,
             onboarding_completed: row.try_get::<bool, _>("onboarding_completed")?,
             onboarding_completed_at: row.try_get::<Option<DateTime<Utc>>, _>("onboarding_completed_at")?,
+            checkin_frequency: row
+                .try_get::<String, _>("checkin_frequency")?
+                .trim()
+                .to_string(),
         })
     } else {
         Ok(UserPreferences {
@@ -701,6 +834,7 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
+            checkin_frequency: "daily".to_string(),
         })
     }
 }
@@ -730,6 +864,28 @@ pub async fn mark_reminder_sent(
     Ok(result.rows_affected() > 0)
 }
 
+/// Clear reminder marker for a given local date (used when delivery fails)
+pub async fn clear_reminder_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    local_date: NaiveDate,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        UPDATE user_preferences
+        SET last_reminder_date = NULL,
+            updated_at = NOW()
+        WHERE user_id = $1
+          AND last_reminder_date = $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(local_date)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Get reminder candidates with preferences
 pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandidate>> {
     let rows = sqlx::query(
@@ -737,8 +893,8 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
         SELECT
             u.id as user_id,
             u.telegram_id as telegram_id,
-            COALESCE(p.reminder_hour, 10) as reminder_hour,
-            COALESCE(p.reminder_minute, 0) as reminder_minute,
+            COALESCE(p.reminder_hour, 10)::SMALLINT as reminder_hour,
+            COALESCE(p.reminder_minute, 0)::SMALLINT as reminder_minute,
             COALESCE(p.timezone, 'Europe/Kyiv') as timezone,
             COALESCE(p.notification_enabled, true) as notification_enabled,
             p.last_reminder_date as last_reminder_date,
@@ -747,7 +903,6 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
-          AND u.role != 'ADMIN'
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
         "#,
@@ -825,14 +980,14 @@ pub async fn calculate_best_reminder_time_local(
 
 /// Get user's current streak
 pub async fn get_user_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32> {
-    let streak = sqlx::query_scalar!(
+    let streak: Option<i32> = sqlx::query_scalar(
         r#"
-        SELECT COALESCE(current_streak, 0) as "streak!"
+        SELECT COALESCE(current_streak, 0)
         FROM user_streaks
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await?;
 
@@ -841,15 +996,15 @@ pub async fn get_user_current_streak(pool: &PgPool, user_id: Uuid) -> Result<i32
 
 /// Get check-in count for the last week
 pub async fn get_checkin_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<i32> {
-    let count = sqlx::query_scalar!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(DISTINCT DATE(created_at)) as "count!"
+        SELECT COUNT(DISTINCT DATE(created_at))
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - INTERVAL '7 days'
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -858,14 +1013,14 @@ pub async fn get_checkin_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<
 
 /// Get last check-in date for user
 pub async fn get_last_checkin_date(pool: &PgPool, user_id: Uuid) -> Result<Option<DateTime<Utc>>> {
-    let result = sqlx::query_scalar!(
+    let result: Option<DateTime<Utc>> = sqlx::query_scalar(
         r#"
-        SELECT MAX(created_at) as "last_checkin"
+        SELECT MAX(created_at)
         FROM checkin_answers
         WHERE user_id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -899,6 +1054,7 @@ pub async fn get_team_average_metrics(pool: &PgPool) -> Result<TeamAverage> {
             JOIN users u ON u.id = ca.user_id
             WHERE ca.created_at >= NOW() - INTERVAL '7 days'
               AND u.is_active = true
+              AND u.role != 'ADMIN'
             GROUP BY ca.user_id
         ),
         per_user AS (
@@ -935,7 +1091,6 @@ pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
         WHERE u.telegram_id IS NOT NULL
-          AND u.role != 'ADMIN'
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
           AND COALESCE(p.notification_enabled, true) = true
@@ -954,6 +1109,60 @@ pub async fn get_all_telegram_users(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
     }
 
     Ok(out)
+}
+
+/// Get users who should receive the web check-in rollout announcement
+pub async fn get_web_checkin_announcement_candidates(pool: &PgPool) -> Result<Vec<(Uuid, i64)>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT u.id, u.telegram_id
+        FROM users u
+        LEFT JOIN user_preferences p ON u.id = p.user_id
+        WHERE u.telegram_id IS NOT NULL
+          AND u.is_active = true
+          AND COALESCE(p.onboarding_completed, false) = true
+          AND COALESCE(p.notification_enabled, true) = true
+          AND p.last_web_checkin_announcement_date IS NULL
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        let user_id: Uuid = row.try_get("id")?;
+        let telegram_id: Option<i64> = row.try_get("telegram_id")?;
+        if let Some(telegram_id) = telegram_id {
+            out.push((user_id, telegram_id));
+        }
+    }
+
+    Ok(out)
+}
+
+/// Mark web check-in rollout announcement as sent (idempotent)
+pub async fn mark_web_checkin_announcement_sent(
+    pool: &PgPool,
+    user_id: Uuid,
+    sent_date: NaiveDate,
+) -> Result<bool> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO user_preferences (user_id, last_web_checkin_announcement_date)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE
+        SET last_web_checkin_announcement_date = EXCLUDED.last_web_checkin_announcement_date,
+            updated_at = NOW()
+        WHERE user_preferences.last_web_checkin_announcement_date IS NULL
+           OR user_preferences.last_web_checkin_announcement_date < EXCLUDED.last_web_checkin_announcement_date
+        "#,
+    )
+    .bind(user_id)
+    .bind(sent_date)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
 }
 
 // ---------- Kudos System (#17) ----------
@@ -985,15 +1194,15 @@ pub async fn insert_kudos(
     to_user_id: Uuid,
     message: &str,
 ) -> Result<()> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO kudos (from_user_id, to_user_id, message)
         VALUES ($1, $2, $3)
         "#,
-        from_user_id,
-        to_user_id,
-        message
     )
+    .bind(from_user_id)
+    .bind(to_user_id)
+    .bind(message)
     .execute(pool)
     .await?;
     Ok(())
@@ -1001,15 +1210,15 @@ pub async fn insert_kudos(
 
 /// Get kudos count for the last week
 pub async fn get_kudos_count_for_week(pool: &PgPool, user_id: Uuid) -> Result<i64> {
-    let count = sqlx::query_scalar!(
+    let count: i64 = sqlx::query_scalar(
         r#"
-        SELECT COUNT(*) as "count!"
+        SELECT COUNT(*)
         FROM kudos
         WHERE to_user_id = $1
           AND created_at >= NOW() - INTERVAL '7 days'
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -1022,20 +1231,19 @@ pub async fn get_recent_kudos(
     user_id: Uuid,
     limit: i64,
 ) -> Result<Vec<KudosRecord>> {
-    let records = sqlx::query_as!(
-        KudosRecord,
+    let records = sqlx::query_as::<_, KudosRecord>(
         r#"
         SELECT k.id, k.from_user_id, k.to_user_id, k.message, k.created_at,
-               u.enc_name as "from_user_enc_name!"
+               u.enc_name as from_user_enc_name
         FROM kudos k
         JOIN users u ON k.from_user_id = u.id
         WHERE k.to_user_id = $1
         ORDER BY k.created_at DESC
         LIMIT $2
         "#,
-        user_id,
-        limit
     )
+    .bind(user_id)
+    .bind(limit)
     .fetch_all(pool)
     .await?;
 
@@ -1114,14 +1322,14 @@ pub async fn get_active_users(pool: &PgPool) -> Result<Vec<DbUser>> {
 
 /// Get user role
 pub async fn get_user_role(pool: &PgPool, user_id: Uuid) -> Result<UserRole> {
-    let role = sqlx::query_scalar!(
+    let role: UserRole = sqlx::query_scalar(
         r#"
-        SELECT role as "role: UserRole"
+        SELECT role
         FROM users
         WHERE id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
@@ -1132,23 +1340,26 @@ pub async fn get_user_role(pool: &PgPool, user_id: Uuid) -> Result<UserRole> {
 
 /// Get question type pattern for adaptive logic
 pub async fn get_user_recent_pattern(pool: &PgPool, user_id: Uuid) -> Result<Vec<(String, f64)>> {
-    let patterns: Vec<_> = sqlx::query!(
+    let rows = sqlx::query(
         r#"
-        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as "avg_value: f64"
+        SELECT question_type, CAST(COALESCE(AVG(value), 0.0) AS DOUBLE PRECISION) as avg_value
         FROM checkin_answers
         WHERE user_id = $1
           AND created_at >= NOW() - INTERVAL '3 days'
         GROUP BY question_type
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
 
-    Ok(patterns
-        .into_iter()
-        .map(|p| (p.question_type, p.avg_value.unwrap_or(0.0)))
-        .collect())
+    let mut patterns = Vec::with_capacity(rows.len());
+    for row in rows {
+        let question_type: String = row.try_get("question_type")?;
+        let avg_value: f64 = row.try_get("avg_value")?;
+        patterns.push((question_type, avg_value));
+    }
+    Ok(patterns)
 }
 
 // ---------- Metrics for Period (#6) ----------
@@ -1228,6 +1439,7 @@ pub async fn calculate_user_metrics_for_period(
         gad7_score: gad7,
         mbi_score: mbi,
         sleep_duration,
+        sleep_quality: Some(sleep_duration),
         work_life_balance,
         stress_level,
     }))
@@ -1620,4 +1832,334 @@ pub async fn insert_wall_toxic_signal(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+// ---------- Analytics Storage ----------
+
+#[derive(Debug, Clone, FromRow)]
+pub struct MonthlyMetricRow {
+    pub user_id: Uuid,
+    pub period: NaiveDate,
+    pub who5: f64,
+    pub phq9: f64,
+    pub gad7: f64,
+    pub mbi: f64,
+    pub sleep_duration: f64,
+    pub sleep_quality: f64,
+    pub work_life_balance: f64,
+    pub stress_level: f64,
+    pub source: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MonthlyMetricInput {
+    pub who5: f64,
+    pub phq9: f64,
+    pub gad7: f64,
+    pub mbi: f64,
+    pub sleep_duration: f64,
+    pub sleep_quality: f64,
+    pub work_life_balance: f64,
+    pub stress_level: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalyticsMetadataRow {
+    pub company: String,
+    pub data_collection_period: Option<String>,
+    pub update_frequency: Option<String>,
+    pub next_assessment: Option<NaiveDate>,
+    pub participation_rate: Option<String>,
+    pub assessment_tools: Vec<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct IndustryBenchmarkRow {
+    pub sector: String,
+    pub who5: Option<f64>,
+    pub phq9: Option<f64>,
+    pub gad7: Option<f64>,
+    pub mbi: Option<f64>,
+    pub sleep_duration: Option<f64>,
+    pub work_life_balance: Option<f64>,
+    pub stress_level: Option<f64>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct AnalyticsAlertRow {
+    pub severity: String,
+    pub employee_name: String,
+    pub message: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalyticsRecommendationRow {
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub affected_employees: Vec<String>,
+    pub priority: String,
+}
+
+pub async fn get_monthly_metric_overrides(
+    pool: &PgPool,
+    user_ids: &[Uuid],
+) -> Result<Vec<MonthlyMetricRow>> {
+    if user_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let rows = sqlx::query_as::<_, MonthlyMetricRow>(
+        r#"
+        SELECT
+            user_id,
+            period,
+            COALESCE(who5, 0) as who5,
+            COALESCE(phq9, 0) as phq9,
+            COALESCE(gad7, 0) as gad7,
+            COALESCE(mbi, 0) as mbi,
+            COALESCE(sleep_duration, 0) as sleep_duration,
+            COALESCE(sleep_quality, sleep_duration, 0) as sleep_quality,
+            COALESCE(work_life_balance, 0) as work_life_balance,
+            COALESCE(stress_level, 0) as stress_level,
+            COALESCE(source, 'computed') as source
+        FROM analytics_monthly_metrics
+        WHERE user_id = ANY($1)
+        ORDER BY period ASC
+        "#,
+    )
+    .bind(user_ids)
+    .fetch_all(pool)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_monthly_metrics unavailable ({}); skipping overrides",
+                    err
+                );
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+}
+
+fn is_missing_analytics_schema(err: &sqlx::Error) -> bool {
+    match err {
+        sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+            Some("42P01") => true, // undefined_table
+            Some("42703") => true, // undefined_column
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+pub async fn upsert_monthly_metric(
+    pool: &PgPool,
+    user_id: Uuid,
+    period: NaiveDate,
+    metrics: &MonthlyMetricInput,
+    source: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO analytics_monthly_metrics (
+            user_id,
+            period,
+            who5,
+            phq9,
+            gad7,
+            mbi,
+            sleep_duration,
+            sleep_quality,
+            work_life_balance,
+            stress_level,
+            source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (user_id, period) DO UPDATE
+        SET who5 = EXCLUDED.who5,
+            phq9 = EXCLUDED.phq9,
+            gad7 = EXCLUDED.gad7,
+            mbi = EXCLUDED.mbi,
+            sleep_duration = EXCLUDED.sleep_duration,
+            sleep_quality = EXCLUDED.sleep_quality,
+            work_life_balance = EXCLUDED.work_life_balance,
+            stress_level = EXCLUDED.stress_level,
+            source = EXCLUDED.source,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(user_id)
+    .bind(period)
+    .bind(metrics.who5)
+    .bind(metrics.phq9)
+    .bind(metrics.gad7)
+    .bind(metrics.mbi)
+    .bind(metrics.sleep_duration)
+    .bind(metrics.sleep_quality)
+    .bind(metrics.work_life_balance)
+    .bind(metrics.stress_level)
+    .bind(source)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_analytics_metadata(pool: &PgPool) -> Result<Option<AnalyticsMetadataRow>> {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            company,
+            data_collection_period,
+            update_frequency,
+            next_assessment,
+            participation_rate,
+            assessment_tools,
+            updated_at
+        FROM analytics_metadata
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(pool)
+    .await;
+
+    let row = match row {
+        Ok(row) => row,
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!("analytics_metadata unavailable ({}); using defaults", err);
+                return Ok(None);
+            }
+            return Err(err.into());
+        }
+    };
+
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    let tools_value: Option<serde_json::Value> = row.try_get("assessment_tools")?;
+    let assessment_tools = tools_value
+        .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+        .unwrap_or_default();
+
+    Ok(Some(AnalyticsMetadataRow {
+        company: row.try_get("company")?,
+        data_collection_period: row.try_get("data_collection_period")?,
+        update_frequency: row.try_get("update_frequency")?,
+        next_assessment: row.try_get("next_assessment")?,
+        participation_rate: row.try_get("participation_rate")?,
+        assessment_tools,
+        updated_at: row.try_get("updated_at")?,
+    }))
+}
+
+pub async fn get_industry_benchmarks(pool: &PgPool) -> Result<Vec<IndustryBenchmarkRow>> {
+    let rows = sqlx::query_as::<_, IndustryBenchmarkRow>(
+        r#"
+        SELECT
+            sector,
+            who5,
+            phq9,
+            gad7,
+            mbi,
+            sleep_duration,
+            work_life_balance,
+            stress_level
+        FROM analytics_industry_benchmarks
+        ORDER BY sector ASC
+        "#,
+    )
+    .fetch_all(pool)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_industry_benchmarks unavailable ({}); using defaults",
+                    err
+                );
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+}
+
+pub async fn get_analytics_alerts(pool: &PgPool) -> Result<Vec<AnalyticsAlertRow>> {
+    let rows = sqlx::query_as::<_, AnalyticsAlertRow>(
+        r#"
+        SELECT severity, employee_name, message, timestamp
+        FROM analytics_alerts
+        ORDER BY timestamp DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await;
+
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!("analytics_alerts unavailable ({}); skipping", err);
+                Ok(Vec::new())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+}
+
+pub async fn get_analytics_recommendations(
+    pool: &PgPool,
+) -> Result<Vec<AnalyticsRecommendationRow>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT category, title, description, affected_employees, priority
+        FROM analytics_recommendations
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await;
+
+    let rows = match rows {
+        Ok(rows) => rows,
+        Err(err) => {
+            if is_missing_analytics_schema(&err) {
+                tracing::warn!(
+                    "analytics_recommendations unavailable ({}); skipping",
+                    err
+                );
+                return Ok(Vec::new());
+            }
+            return Err(err.into());
+        }
+    };
+
+    let mut out = Vec::new();
+    for row in rows {
+        let affected: Option<serde_json::Value> = row.try_get("affected_employees")?;
+        let affected_employees = affected
+            .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+            .unwrap_or_default();
+        out.push(AnalyticsRecommendationRow {
+            category: row.try_get("category")?,
+            title: row.try_get("title")?,
+            description: row.try_get("description")?,
+            affected_employees,
+            priority: row.try_get("priority")?,
+        });
+    }
+    Ok(out)
 }

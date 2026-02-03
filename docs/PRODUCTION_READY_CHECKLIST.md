@@ -44,7 +44,7 @@ ENV SQLX_OFFLINE=true
 COPY Cargo.toml Cargo.lock ./
 
 # Copy SQLx metadata (REQUIRED!)
-COPY sqlx-data.json ./
+COPY .sqlx ./.sqlx
 
 # Build without database connection
 RUN cargo build --release
@@ -53,7 +53,7 @@ RUN cargo build --release
 #### 2.2. Script для генерації
 [GENERATE_LOCKFILE.sh](GENERATE_LOCKFILE.sh) виконує:
 ```bash
-cargo sqlx prepare --merged  # Generates sqlx-data.json
+cargo sqlx prepare  # Generates .sqlx
 export SQLX_OFFLINE=true
 cargo check  # Verify offline build works
 ```
@@ -309,7 +309,7 @@ cargo generate-lockfile
 sqlx migrate run
 
 # 3. Generate SQLx metadata
-cargo sqlx prepare --merged
+cargo sqlx prepare
 
 # 4. Verify offline build
 export SQLX_OFFLINE=true
@@ -319,11 +319,11 @@ cargo check
 ### Step 2: Commit Build Artifacts
 
 ```bash
-git add Cargo.lock sqlx-data.json
+git add Cargo.lock .sqlx
 git commit -m "Add build artifacts for production deployment
 
 - Cargo.lock for deterministic dependencies
-- sqlx-data.json for offline SQLx compilation
+- .sqlx for offline SQLx compilation
 - Enables Railway builds without database connection"
 ```
 
@@ -334,7 +334,7 @@ git push origin main
 
 # Railway will:
 # 1. Use Cargo.lock for exact dependencies
-# 2. Use sqlx-data.json for query verification
+# 2. Use .sqlx for query verification
 # 3. Build with SQLX_OFFLINE=true (no DATABASE_URL needed)
 # 4. Deploy deterministically
 ```
@@ -430,8 +430,8 @@ WHERE schemaname='public'
 
 | Item | Status |
 |------|--------|
-| Cargo.lock committed | ⚠️ PENDING (need cargo) |
-| sqlx-data.json generated | ⚠️ PENDING (need DB) |
+| Cargo.lock committed | ✅ DONE |
+| .sqlx generated | ✅ DONE |
 | SQLX_OFFLINE in Dockerfile | ✅ ADDED |
 | /admin/heatmap protected | ✅ DONE (UserSession + role) |
 | /feedback/wall authenticated | ✅ DONE (UserSession) |
@@ -473,7 +473,7 @@ WHERE schemaname='public'
 # Need Rust + PostgreSQL locally
 ./GENERATE_LOCKFILE.sh
 
-git add Cargo.lock sqlx-data.json
+git add Cargo.lock .sqlx
 git commit -m "Production build artifacts"
 git push origin main
 ```
@@ -508,7 +508,7 @@ curl https://app.railway.app/admin/heatmap
 ### Blocking Items: 2
 
 1. ⚠️ **Run `./GENERATE_LOCKFILE.sh`** (need Rust + DB)
-2. ⚠️ **Commit `Cargo.lock` + `sqlx-data.json`**
+2. ⚠️ **Commit `Cargo.lock` + `.sqlx`**
 
 ### After That: 100% PRODUCTION READY 🚀
 

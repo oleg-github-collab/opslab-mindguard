@@ -22,7 +22,7 @@ cp .env.example .env
 Скрипт автоматично:
 - ✅ Згенерує `Cargo.lock`
 - ✅ Запустить міграції
-- ✅ Згенерує `sqlx-data.json`
+- ✅ Згенерує `.sqlx`
 - ✅ Перевірить offline збірку
 
 ### Варіант 2: Ручні команди
@@ -40,7 +40,7 @@ sqlx database create
 sqlx migrate run
 
 # 4. SQLx metadata
-cargo sqlx prepare --merged
+cargo sqlx prepare
 
 # 5. Перевірка
 export SQLX_OFFLINE=true
@@ -51,13 +51,13 @@ cargo check
 
 ```bash
 # Видаліть placeholder файли
-rm Cargo.lock.PLACEHOLDER sqlx-data.json.PLACEHOLDER
+rm -f Cargo.lock.PLACEHOLDER
 
 # Перевірте, що файли створені
-ls -lh Cargo.lock sqlx-data.json
+ls -lh Cargo.lock .sqlx
 
 # Закомітьте
-git add Cargo.lock sqlx-data.json
+git add Cargo.lock .sqlx
 git commit -m "Add production build artifacts"
 git push origin main
 ```
@@ -106,13 +106,13 @@ jobs:
           sqlx database create
           sqlx migrate run
           cargo generate-lockfile
-          cargo sqlx prepare --merged
+          cargo sqlx prepare
 
       - name: Commit artifacts
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add Cargo.lock sqlx-data.json
+          git add Cargo.lock .sqlx
           git commit -m "Auto-generate build artifacts" || exit 0
           git push
 ```
@@ -124,7 +124,7 @@ jobs:
 Railway автоматично:
 1. Виявить `Dockerfile`
 2. Побачить `SQLX_OFFLINE=true`
-3. Використає `Cargo.lock` та `sqlx-data.json`
+3. Використає `Cargo.lock` та `.sqlx`
 4. Зберe без підключення до БД
 5. Задеплоїть на HTTPS
 

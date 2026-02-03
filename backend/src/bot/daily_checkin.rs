@@ -6,6 +6,7 @@ use chrono::{Datelike, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::domain::checkin::CheckinFrequency;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuestionType {
@@ -19,6 +20,13 @@ pub enum QuestionType {
     Wellbeing,
     Reflection,
     Support,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuestionWindow {
+    Daily,
+    Every3Days,
+    Weekly,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,8 +63,10 @@ pub struct Metrics {
     pub gad7_score: f64,
     #[serde(alias = "burnout_percentage")]
     pub mbi_score: f64,
-    #[serde(alias = "sleep_quality")]
+    #[serde(default)]
     pub sleep_duration: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sleep_quality: Option<f64>,
     pub work_life_balance: f64,
     pub stress_level: f64,
 }
@@ -68,7 +78,7 @@ impl Metrics {
     }
 
     pub fn sleep_quality(&self) -> f64 {
-        self.sleep_duration
+        self.sleep_quality.unwrap_or(self.sleep_duration)
     }
 }
 
@@ -77,115 +87,250 @@ pub struct QuestionBank;
 
 impl QuestionBank {
     /// Питання про настрій (WHO-5 базовані)
-    pub fn mood_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Як твій настрій сьогодні?", "😊"),
-            ("Як ти себе почуваєш цього ранку?", "🌅"),
-            ("Оціни свій емоційний стан зараз", "💭"),
-            ("Наскільки позитивно ти відчуваєш себе сьогодні?", "✨"),
-        ]
+    fn mood_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Як твій настрій сьогодні?", "😊"),
+                ("Як ти себе почуваєш цього ранку?", "🌅"),
+                ("Оціни свій емоційний стан зараз", "💭"),
+                ("Наскільки позитивно ти відчуваєш себе сьогодні?", "✨"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Як змінювався твій настрій за останні 3 дні?", "😊"),
+                ("Як ти почувався в середньому останні кілька днів?", "🌅"),
+                ("Наскільки стабільним був твій настрій останніми днями?", "💭"),
+                ("Яким був загальний емоційний фон за останні 3 дні?", "✨"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Як ти оцінюєш свій настрій цього тижня?", "😊"),
+                ("Яким був емоційний фон за останній тиждень?", "🌅"),
+                ("Наскільки позитивним був твій настрій цього тижня?", "💭"),
+                ("Як загалом почувався протягом тижня?", "✨"),
+            ],
+        }
     }
 
     /// Питання про енергію
-    pub fn energy_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Який у тебе рівень енергії?", "⚡"),
-            ("Наскільки ти відчуваєш себе бадьорим?", "🔋"),
-            ("Як твоя витривалість сьогодні?", "💪"),
-            ("Чи є у тебе сили на продуктивний день?", "🚀"),
-        ]
+    fn energy_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Який у тебе рівень енергії?", "⚡"),
+                ("Наскільки ти відчуваєш себе бадьорим?", "🔋"),
+                ("Як твоя витривалість сьогодні?", "💪"),
+                ("Чи є у тебе сили на продуктивний день?", "🚀"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Який рівень енергії був у середньому за останні 3 дні?", "⚡"),
+                ("Наскільки бадьорим ти був останніми днями?", "🔋"),
+                ("Як змінювався твій рівень сил останні кілька днів?", "💪"),
+                ("Чи вистачало енергії на справи останні 3 дні?", "🚀"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Яким був твій рівень енергії цього тижня?", "⚡"),
+                ("Наскільки стабільною була енергія протягом тижня?", "🔋"),
+                ("Чи вистачало сил на завдання цього тижня?", "💪"),
+                ("Як загалом з енергією за тиждень?", "🚀"),
+            ],
+        }
     }
 
     /// Питання про стрес
-    pub fn stress_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Наскільки ти відчуваєш стрес?", "😰"),
-            ("Чи відчуваєш тиск або напругу?", "⚠️"),
-            ("Наскільки спокійно ти себе почуваєш?", "🧘"),
-            ("Чи турбують тебе якісь переживання?", "💭"),
-        ]
+    fn stress_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Наскільки ти відчуваєш стрес?", "😰"),
+                ("Чи відчуваєш тиск або напругу?", "⚠️"),
+                ("Наскільки спокійно ти себе почуваєш?", "🧘"),
+                ("Чи турбують тебе якісь переживання?", "💭"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Наскільки напруженим ти був останні 3 дні?", "😰"),
+                ("Як багато стресу було останніми днями?", "⚠️"),
+                ("Наскільки часто відчував тиск останні 3 дні?", "🧘"),
+                ("Чи було відчуття перевантаження останніми днями?", "💭"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Яким був рівень стресу цього тижня?", "😰"),
+                ("Наскільки напруженим був тиждень?", "⚠️"),
+                ("Чи відчував тиск протягом тижня?", "🧘"),
+                ("Як часто турбували переживання цього тижня?", "💭"),
+            ],
+        }
     }
 
     /// Питання про сон
-    pub fn sleep_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Як ти спав минулої ночі?", "😴"),
-            ("Наскільки якісним був твій сон?", "🌙"),
-            ("Чи відчуваєш себе відпочившим?", "🛌"),
-            ("Скільки годин ти спав?", "⏰"),
-        ]
+    fn sleep_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Як ти спав минулої ночі?", "😴"),
+                ("Наскільки якісним був твій сон?", "🌙"),
+                ("Чи відчуваєш себе відпочившим?", "🛌"),
+                ("Скільки годин ти спав?", "⏰"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Як ти спав останні кілька ночей?", "😴"),
+                ("Наскільки якісним був сон останні 3 дні?", "🌙"),
+                ("Чи відчував себе відпочившим у ці дні?", "🛌"),
+                ("Скільки годин сну було в середньому останні 3 ночі?", "⏰"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Як ти спав цього тижня?", "😴"),
+                ("Наскільки якісним був сон за тиждень?", "🌙"),
+                ("Чи відчував себе відпочившим протягом тижня?", "🛌"),
+                ("Скільки годин сну було в середньому за тиждень?", "⏰"),
+            ],
+        }
     }
 
     /// Питання про робоче навантаження
-    pub fn workload_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Наскільки високе твоє робоче навантаження?", "📊"),
-            ("Чи справляєшся з кількістю задач?", "✅"),
-            ("Як відчуваєш баланс роботи та відпочинку?", "⚖️"),
-            ("Чи вистачає часу на все важливе?", "⏱️"),
-        ]
+    fn workload_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Наскільки високе твоє робоче навантаження?", "📊"),
+                ("Чи справляєшся з кількістю задач?", "✅"),
+                ("Як відчуваєш баланс роботи та відпочинку?", "⚖️"),
+                ("Чи вистачає часу на все важливе?", "⏱️"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Яким було робоче навантаження останні 3 дні?", "📊"),
+                ("Чи справлявся з кількістю задач останніми днями?", "✅"),
+                ("Як відчував баланс роботи та відпочинку останні 3 дні?", "⚖️"),
+                ("Чи вистачало часу на важливе останніми днями?", "⏱️"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Яким було робоче навантаження цього тижня?", "📊"),
+                ("Чи справлявся з кількістю задач цього тижня?", "✅"),
+                ("Як був баланс роботи та відпочинку протягом тижня?", "⚖️"),
+                ("Чи вистачало часу на важливе цього тижня?", "⏱️"),
+            ],
+        }
     }
 
     /// Питання про мотивацію
-    pub fn motivation_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Наскільки ти вмотивований сьогодні?", "🎯"),
-            ("Чи є у тебе натхнення до роботи?", "💡"),
-            ("Як твоя продуктивність сьогодні?", "📈"),
-            ("Чи відчуваєш драйв до досягнень?", "🚀"),
-        ]
+    fn motivation_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Наскільки ти вмотивований сьогодні?", "🎯"),
+                ("Чи є у тебе натхнення до роботи?", "💡"),
+                ("Як твоя продуктивність сьогодні?", "📈"),
+                ("Чи відчуваєш драйв до досягнень?", "🚀"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Наскільки вмотивованим ти був останні 3 дні?", "🎯"),
+                ("Чи було натхнення до роботи останніми днями?", "💡"),
+                ("Як із продуктивністю останні 3 дні?", "📈"),
+                ("Чи відчував драйв до досягнень останніми днями?", "🚀"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Наскільки вмотивованим ти був цього тижня?", "🎯"),
+                ("Чи було натхнення до роботи протягом тижня?", "💡"),
+                ("Як із продуктивністю цього тижня?", "📈"),
+                ("Чи відчував драйв до досягнень протягом тижня?", "🚀"),
+            ],
+        }
     }
 
     /// Питання про фокус
-    pub fn focus_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Наскільки легко тобі зосередитися?", "🎯"),
-            ("Як твоя здатність до концентрації?", "🧠"),
-            ("Чи вдається уникати відволікань?", "🔕"),
-        ]
+    fn focus_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Наскільки легко тобі зосередитися?", "🎯"),
+                ("Як твоя здатність до концентрації?", "🧠"),
+                ("Чи вдається уникати відволікань?", "🔕"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Як було з концентрацією останні 3 дні?", "🎯"),
+                ("Наскільки легко було зосередитися останніми днями?", "🧠"),
+                ("Чи вдавалось уникати відволікань останні 3 дні?", "🔕"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Як було з концентрацією цього тижня?", "🎯"),
+                ("Наскільки легко було зосередитися протягом тижня?", "🧠"),
+                ("Чи вдавалось уникати відволікань цього тижня?", "🔕"),
+            ],
+        }
     }
 
     /// Питання про загальне благополуччя
-    pub fn wellbeing_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Як оцінюєш своє загальне самопочуття?", "🌟"),
-            ("Наскільки ти задоволений життям зараз?", "😊"),
-            ("Чи відчуваєш себе комфортно?", "✨"),
-        ]
+    fn wellbeing_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Як оцінюєш своє загальне самопочуття?", "🌟"),
+                ("Наскільки ти задоволений життям зараз?", "😊"),
+                ("Чи відчуваєш себе комфортно?", "✨"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Як загалом почувався останні кілька днів?", "🌟"),
+                ("Наскільки задоволений самопочуттям за останні 3 дні?", "😊"),
+                ("Чи відчував комфорт останніми днями?", "✨"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Як загалом самопочуття цього тижня?", "🌟"),
+                ("Наскільки задоволений самопочуттям за тиждень?", "😊"),
+                ("Чи було відчуття комфорту цього тижня?", "✨"),
+            ],
+        }
     }
 
     /// Глибокі рефлексивні питання
-    pub fn reflection_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Що сьогодні найбільше забрало енергію?", "🧭"),
-            ("Що було найскладнішим моментом дня?", "🧩"),
-            ("Яка одна річ зараз найбільше турбує?", "🫧"),
-        ]
+    fn reflection_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Що сьогодні найбільше забрало енергію?", "🧭"),
+                ("Що було найскладнішим моментом дня?", "🧩"),
+                ("Яка одна річ зараз найбільше турбує?", "🫧"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Що останніми днями найбільше забирало енергію?", "🧭"),
+                ("Які моменти були найскладнішими останні 3 дні?", "🧩"),
+                ("Що найбільше турбувало останні кілька днів?", "🫧"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Що цього тижня найбільше забирало енергію?", "🧭"),
+                ("Які моменти були найскладнішими цього тижня?", "🧩"),
+                ("Що найбільше турбувало цього тижня?", "🫧"),
+            ],
+        }
     }
 
     /// Підтримуючі питання
-    pub fn support_questions() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("Наскільки ти відчуваєш підтримку навколо?", "🤝"),
-            ("Чи є щось, що могло б полегшити твій день?", "💬"),
-            ("Наскільки ти відчуваєш безпеку говорити про труднощі?", "🛟"),
-        ]
+    fn support_questions(window: QuestionWindow) -> Vec<(&'static str, &'static str)> {
+        match window {
+            QuestionWindow::Daily => vec![
+                ("Що зараз найбільше допомагає відчувати підтримку?", "🤝"),
+                ("Що могло б полегшити твій день?", "💬"),
+                ("Що зробило б розмову про труднощі безпечнішою?", "🛟"),
+            ],
+            QuestionWindow::Every3Days => vec![
+                ("Що останніми днями допомагало відчувати підтримку?", "🤝"),
+                ("Що могло б полегшити ці останні дні?", "💬"),
+                ("Що зробило б розмову про труднощі безпечнішою останніми днями?", "🛟"),
+            ],
+            QuestionWindow::Weekly => vec![
+                ("Що цього тижня допомагало відчувати підтримку?", "🤝"),
+                ("Що могло б полегшити твій тиждень?", "💬"),
+                ("Що зробило б розмову про труднощі безпечнішою цього тижня?", "🛟"),
+            ],
+        }
     }
 
     /// Отримати випадкове питання за типом
-    pub fn get_random_question(qtype: QuestionType) -> (&'static str, &'static str) {
+    fn get_random_question(
+        qtype: QuestionType,
+        window: QuestionWindow,
+    ) -> (&'static str, &'static str) {
         let mut rng = rand::thread_rng();
         let questions = match qtype {
-            QuestionType::Mood => Self::mood_questions(),
-            QuestionType::Energy => Self::energy_questions(),
-            QuestionType::Stress => Self::stress_questions(),
-            QuestionType::Sleep => Self::sleep_questions(),
-            QuestionType::Workload => Self::workload_questions(),
-            QuestionType::Motivation => Self::motivation_questions(),
-            QuestionType::Focus => Self::focus_questions(),
-            QuestionType::Wellbeing => Self::wellbeing_questions(),
-            QuestionType::Reflection => Self::reflection_questions(),
-            QuestionType::Support => Self::support_questions(),
+            QuestionType::Mood => Self::mood_questions(window),
+            QuestionType::Energy => Self::energy_questions(window),
+            QuestionType::Stress => Self::stress_questions(window),
+            QuestionType::Sleep => Self::sleep_questions(window),
+            QuestionType::Workload => Self::workload_questions(window),
+            QuestionType::Motivation => Self::motivation_questions(window),
+            QuestionType::Focus => Self::focus_questions(window),
+            QuestionType::Wellbeing => Self::wellbeing_questions(window),
+            QuestionType::Reflection => Self::reflection_questions(window),
+            QuestionType::Support => Self::support_questions(window),
         };
         let idx = rng.gen_range(0..questions.len());
         questions[idx]
@@ -366,13 +511,13 @@ impl CheckInGenerator {
 
         let mut questions = Vec::new();
         for (idx, qtype) in question_types.iter().enumerate().take(3) {
-            let (text, emoji) = QuestionBank::get_random_question(*qtype);
+            let (text, emoji) = QuestionBank::get_random_question(*qtype, QuestionWindow::Daily);
             questions.push(Question {
                 id: idx as i32 + 1,
                 qtype: Self::qtype_to_string(*qtype),
                 text: text.to_string(),
                 emoji: emoji.to_string(),
-                scale: "1-10".to_string(),
+                scale: Self::scale_for_qtype(*qtype).to_string(),
             });
         }
 
@@ -405,13 +550,13 @@ impl CheckInGenerator {
         let mut questions = Vec::new();
 
         for (idx, qtype) in question_types.iter().enumerate() {
-            let (text, emoji) = QuestionBank::get_random_question(*qtype);
+            let (text, emoji) = QuestionBank::get_random_question(*qtype, QuestionWindow::Daily);
             questions.push(Question {
                 id: idx as i32 + 1,
                 qtype: Self::qtype_to_string(*qtype),
                 text: text.to_string(),
                 emoji: emoji.to_string(),
-                scale: "1-10".to_string(),
+                scale: Self::scale_for_qtype(*qtype).to_string(),
             });
         }
 
@@ -424,6 +569,137 @@ impl CheckInGenerator {
             intro_message: Self::get_intro_message(day_of_week),
             estimated_time: "2-3 хвилини".to_string(),
         }
+    }
+
+    /// Генерує web-чекін залежно від вибраної частоти
+    pub async fn generate_web_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+        frequency: CheckinFrequency,
+    ) -> Result<CheckIn, anyhow::Error> {
+        match frequency {
+            CheckinFrequency::Daily => Self::generate_adaptive_checkin(pool, user_id).await,
+            CheckinFrequency::Every3Days => Self::generate_deep_checkin(pool, user_id).await,
+            CheckinFrequency::Weekly => Self::generate_full_checkin(pool, user_id).await,
+        }
+    }
+
+    async fn generate_deep_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+    ) -> Result<CheckIn, anyhow::Error> {
+        let day_of_week = Utc::now().weekday().num_days_from_monday();
+        let base_types = vec![
+            QuestionType::Mood,
+            QuestionType::Energy,
+            QuestionType::Stress,
+            QuestionType::Sleep,
+            QuestionType::Workload,
+            QuestionType::Motivation,
+            QuestionType::Focus,
+            QuestionType::Wellbeing,
+            QuestionType::Reflection,
+            QuestionType::Support,
+        ];
+
+        let mut prioritized = AdaptiveQuestionEngine::analyze_priority(pool, user_id)
+            .await
+            .unwrap_or_default();
+        prioritized.retain(|t| base_types.contains(t));
+
+        let mut question_types = Vec::new();
+        for qtype in prioritized {
+            if !question_types.contains(&qtype) {
+                question_types.push(qtype);
+            }
+        }
+        for qtype in base_types {
+            if !question_types.contains(&qtype) {
+                question_types.push(qtype);
+            }
+        }
+
+        let questions = Self::build_questions(&question_types, QuestionWindow::Every3Days);
+        Ok(CheckIn {
+            id: format!("web_checkin_{}_every3", Utc::now().format("%Y%m%d")),
+            user_id,
+            date: Utc::now(),
+            day_of_week,
+            questions,
+            intro_message: "Сьогодні глибший чекін (10 питань). Поділись, як ти почуваєшся останні дні."
+                .to_string(),
+            estimated_time: "6-8 хвилин".to_string(),
+        })
+    }
+
+    async fn generate_full_checkin(
+        pool: &sqlx::PgPool,
+        user_id: Uuid,
+    ) -> Result<CheckIn, anyhow::Error> {
+        let day_of_week = Utc::now().weekday().num_days_from_monday();
+        let base_types = vec![
+            QuestionType::Mood,
+            QuestionType::Energy,
+            QuestionType::Stress,
+            QuestionType::Workload,
+            QuestionType::Focus,
+            QuestionType::Motivation,
+            QuestionType::Sleep,
+            QuestionType::Wellbeing,
+            QuestionType::Reflection,
+            QuestionType::Support,
+        ];
+
+        let mut question_types = base_types.clone();
+
+        let mut extras = AdaptiveQuestionEngine::analyze_priority(pool, user_id)
+            .await
+            .unwrap_or_default();
+        extras.retain(|t| base_types.contains(t));
+        extras.dedup();
+
+        for qtype in extras {
+            if question_types.len() >= 12 {
+                break;
+            }
+            question_types.push(qtype);
+        }
+
+        while question_types.len() < 12 {
+            question_types.push(QuestionType::Mood);
+            if question_types.len() < 12 {
+                question_types.push(QuestionType::Stress);
+            }
+        }
+
+        let questions = Self::build_questions(&question_types, QuestionWindow::Weekly);
+        Ok(CheckIn {
+            id: format!("web_checkin_{}_weekly", Utc::now().format("%Y%m%d")),
+            user_id,
+            date: Utc::now(),
+            day_of_week,
+            questions,
+            intro_message: "Повний тижневий тест: більше деталей про стан, енергію та відновлення."
+                .to_string(),
+            estimated_time: "10-12 хвилин".to_string(),
+        })
+    }
+
+    fn build_questions(question_types: &[QuestionType], window: QuestionWindow) -> Vec<Question> {
+        question_types
+            .iter()
+            .enumerate()
+            .map(|(idx, qtype)| {
+                let (text, emoji) = QuestionBank::get_random_question(*qtype, window);
+                Question {
+                    id: idx as i32 + 1,
+                    qtype: Self::qtype_to_string(*qtype),
+                    text: text.to_string(),
+                    emoji: emoji.to_string(),
+                    scale: Self::scale_for_qtype(*qtype).to_string(),
+                }
+            })
+            .collect()
     }
 
     /// Вибір типів питань залежно від дня тижня
@@ -482,6 +758,13 @@ impl CheckInGenerator {
         }
         .to_string()
     }
+
+    fn scale_for_qtype(qtype: QuestionType) -> &'static str {
+        match qtype {
+            QuestionType::Reflection | QuestionType::Support => "open",
+            _ => "1-10",
+        }
+    }
 }
 
 /// Розрахунок метрик на основі відповідей
@@ -526,14 +809,6 @@ impl MetricsCalculator {
             }
         };
 
-        let inv_avg = |vals: &[f64]| -> f64 {
-            if vals.is_empty() {
-                0.0
-            } else {
-                vals.iter().map(|v| 10.0 - v).sum::<f64>() / vals.len() as f64
-            }
-        };
-
         // WHO-5 Well-Being Index (0-100)
         let who5_components: Vec<f64> = mood_values
             .iter()
@@ -572,7 +847,6 @@ impl MetricsCalculator {
 
         // Sleep
         let sleep_duration = avg(&sleep_values);
-        let sleep_quality = avg(&sleep_values);
 
         // Work-Life Balance
         let work_life_balance = 10.0 - avg(&workload_values);
@@ -585,7 +859,8 @@ impl MetricsCalculator {
             phq9_score: phq9 as f64,
             gad7_score: gad7 as f64,
             mbi_score: mbi,
-            sleep_duration: sleep_quality,
+            sleep_duration,
+            sleep_quality: Some(sleep_duration),
             work_life_balance,
             stress_level,
         })

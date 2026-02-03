@@ -1,0 +1,17 @@
+# Build artifacts
+/target
+**/target
+
+# VCS
+/.git
+/.gitignore
+
+# Environment and secrets
+/.env
+/.env.*
+
+# Logs and temp files
+*.log
+/tmp
+/temp
+.DS_Store

@@ -29,7 +29,7 @@ FILES CHANGED:
 - GENERATE_LOCKFILE.sh: automated build artifacts generation
 
 DEPLOYMENT NOTES:
-1. Run ./GENERATE_LOCKFILE.sh locally to generate Cargo.lock + sqlx-data.json
+1. Run ./GENERATE_LOCKFILE.sh locally to generate Cargo.lock + .sqlx
 2. Set environment variables on Railway (see PRODUCTION_DEPLOY.md)
 3. Push to main → Railway auto-deploys
 4. Optional: enable RLS middleware (instructions in PRODUCTION_DEPLOY.md)
