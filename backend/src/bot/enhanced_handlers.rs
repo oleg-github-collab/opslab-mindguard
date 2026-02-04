@@ -10,7 +10,7 @@ use crate::state::SharedState;
 use crate::time_utils;
 use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use serde_json::json;
 use sqlx::{self, Row};
 use std::env;
@@ -670,6 +670,7 @@ async fn handle_private(bot: &teloxide::Bot, state: SharedState, msg: Message) -
             timezone: "Europe/Kyiv".to_string(),
             notification_enabled: true,
             last_reminder_date: None,
+            last_reminder_stage: None,
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
@@ -1141,7 +1142,18 @@ pub async fn start_daily_checkin(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    send_web_checkin_reminder(bot, state, chat_id, user_id).await
+    send_web_checkin_reminder(bot, state, chat_id, user_id, 0).await
+}
+
+/// Надіслати web-чекін нагадування з конкретним етапом (0 = перше, 1+ = фоллоуапи)
+pub async fn send_web_checkin_reminder_stage(
+    bot: &teloxide::Bot,
+    state: &SharedState,
+    chat_id: ChatId,
+    user_id: Uuid,
+    reminder_stage: i16,
+) -> Result<()> {
+    send_web_checkin_reminder(bot, state, chat_id, user_id, reminder_stage).await
 }
 
 /// Відправка питання чекіну
@@ -1748,7 +1760,7 @@ async fn send_web_login_link(
         mdv2(format!(
             "🔐 Ваше персональне посилання для входу:\n\n\
             {}\n\n\
-            ⏱ Посилання дійсне 2 години\n\
+            ⏱ Посилання дійсне до кінця дня\n\
             🔒 Одноразове використання\n\n\
             Просто перейдіть за посиланням - вхід виконається автоматично!",
             login_url
@@ -1765,6 +1777,7 @@ async fn send_web_checkin_reminder(
     state: &SharedState,
     chat_id: ChatId,
     user_id: Uuid,
+    reminder_stage: i16,
 ) -> Result<()> {
     let _user = db::find_user_by_id(&state.pool, user_id)
         .await?
@@ -1797,11 +1810,17 @@ async fn send_web_checkin_reminder(
     let token = create_login_token(state, user_id).await?;
     let login_url = build_login_url(&token, true);
 
+    let header = if reminder_stage <= 0 {
+        "🧭 Нагадування Mindguard".to_string()
+    } else {
+        format!("🔔 Нагадування №{} Mindguard", reminder_stage + 1)
+    };
+
     bot.send_message(
         chat_id,
         mdv2(format!(
-            "🧭 Нагадування Mindguard\n\n{}\n\n⚙️ Частоту чекінів можна обрати у веб-формі (щодня / кожні 3 дні / щотижня).\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне 2 години.",
-            status_line, login_url
+            "{}\n\n{}\n\n⚙️ Частоту чекінів можна обрати у веб-формі (щодня / кожні 3 дні / щотижня).\n\n🔗 Перейти до веб-чекіну:\n{}\n\nПосилання дійсне до кінця дня.",
+            header, status_line, login_url
         )),
     )
     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
@@ -1930,15 +1949,40 @@ pub async fn send_web_checkin_rollout_announcement(state: &SharedState) -> Resul
 }
 
 async fn create_login_token(state: &SharedState, user_id: Uuid) -> Result<String> {
+    if let Some(existing) = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT token
+        FROM telegram_login_tokens
+        WHERE user_id = $1
+          AND used = FALSE
+          AND expires_at > NOW()
+        ORDER BY expires_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    {
+        return Ok(existing);
+    }
+
     let token: String = (0..32)
         .map(|_| format!("{:02x}", rand::random::<u8>()))
         .collect();
 
+    let prefs = db::get_user_preferences(&state.pool, user_id).await?;
+    let mut expires_at = time_utils::end_of_local_day_utc(&prefs.timezone, Utc::now());
+    if expires_at <= Utc::now() {
+        expires_at = expires_at + Duration::days(1);
+    }
+
     sqlx::query(
-        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, now() + INTERVAL '2 hours')"
+        "INSERT INTO telegram_login_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)"
     )
     .bind(user_id)
     .bind(&token)
+    .bind(expires_at)
     .execute(&state.pool)
     .await?;
 
@@ -2328,6 +2372,7 @@ async fn handle_settime_command(
                 timezone: "Europe/Kyiv".to_string(),
                 notification_enabled: true,
                 last_reminder_date: None,
+                last_reminder_stage: None,
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
@@ -2363,6 +2408,7 @@ async fn handle_settime_command(
                 timezone: "Europe/Kyiv".to_string(),
                 notification_enabled: true,
                 last_reminder_date: None,
+                last_reminder_stage: None,
                 last_plan_nudge_date: None,
                 onboarding_completed: false,
                 onboarding_completed_at: None,
@@ -2434,6 +2480,7 @@ async fn handle_settime_command(
             timezone: "Europe/Kyiv".to_string(),
             notification_enabled: true,
             last_reminder_date: None,
+            last_reminder_stage: None,
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
@@ -2575,6 +2622,7 @@ async fn send_wellness_plan(
             timezone: "Europe/Kyiv".to_string(),
             notification_enabled: true,
             last_reminder_date: None,
+            last_reminder_stage: None,
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,

@@ -2799,6 +2799,7 @@
 
           <div class="checkin-actions">
             <button id="checkin-start-btn" class="btn btn-primary" type="button">Почати чекін</button>
+            <button id="checkin-missed-btn" class="btn btn-secondary hidden" type="button">Пройти пропущений</button>
             <button id="checkin-force-btn" class="btn btn-secondary hidden" type="button">Почати поза графіком</button>
             <span id="checkin-start-hint" class="form-hint"></span>
           </div>
@@ -6107,6 +6108,7 @@
       const freqChip = document.getElementById('checkin-frequency-chip');
       const nextChip = document.getElementById('checkin-next-chip');
       const startBtn = document.getElementById('checkin-start-btn');
+      const missedBtn = document.getElementById('checkin-missed-btn');
       const forceBtn = document.getElementById('checkin-force-btn');
       const startHint = document.getElementById('checkin-start-hint');
       const frequencyGrid = document.getElementById('checkin-frequency-grid');
@@ -6115,14 +6117,20 @@
 
       const nextDays = Math.max(0, status.days_until);
       const lastText = status.last_checkin_date ? `Останній чекін: ${status.last_checkin_date}. ` : '';
+      const reminderText = status.reminder_time ? `Нагадування о ${status.reminder_time}. ` : '';
+      const missedAvailable = !!status.missed_available;
 
       if (titleEl) {
         titleEl.textContent = status.due_today ? 'Сьогодні час чекіну' : 'Чекін вже виконано';
       }
       if (detailEl) {
-        detailEl.textContent = status.due_today
-          ? `Очікується ${status.question_count_label} питань, приблизно ${status.estimated_time}.`
-          : `${lastText}Наступний чекін: ${status.next_due_date}.`;
+        if (status.due_today && missedAvailable) {
+          detailEl.textContent = `Пропущено час чекіну. ${reminderText}Можна пройти до кінця дня.`;
+        } else {
+          detailEl.textContent = status.due_today
+            ? `${reminderText}Очікується ${status.question_count_label} питань, приблизно ${status.estimated_time}.`
+            : `${lastText}Наступний чекін: ${status.next_due_date}.`;
+        }
       }
       if (freqChip) {
         freqChip.textContent = `${status.frequency_label} · ${status.question_count_label} питань`;
@@ -6138,6 +6146,12 @@
           startBtn.disabled = !status.due_today;
           startBtn.textContent = status.due_today ? 'Почати чекін' : 'Чекін недоступний';
         }
+        startBtn.classList.toggle('hidden', missedAvailable && !checkinSession);
+      }
+      if (missedBtn) {
+        const showMissed = missedAvailable && !checkinSession;
+        missedBtn.classList.toggle('hidden', !showMissed);
+        missedBtn.disabled = !showMissed;
       }
       if (forceBtn) {
         const showForce = !status.due_today && canForceCheckin() && !checkinSession;
@@ -6145,7 +6159,9 @@
         forceBtn.disabled = !showForce;
       }
       if (startHint && !checkinSession) {
-        if (status.due_today) {
+        if (status.due_today && missedAvailable) {
+          startHint.textContent = 'Натисніть "Пройти пропущений" щоб завершити чекін сьогодні.';
+        } else if (status.due_today) {
           startHint.textContent = '';
         } else if (canForceCheckin()) {
           startHint.textContent = `Наступний чекін ${status.next_due_date}. Можна почати поза графіком.`;
@@ -6974,6 +6990,13 @@
     const checkinStartBtn = document.getElementById('checkin-start-btn');
     if (checkinStartBtn) {
       checkinStartBtn.addEventListener('click', () => {
+        startCheckin();
+      });
+    }
+
+    const checkinMissedBtn = document.getElementById('checkin-missed-btn');
+    if (checkinMissedBtn) {
+      checkinMissedBtn.addEventListener('click', () => {
         startCheckin();
       });
     }

@@ -46,6 +46,7 @@ pub struct UserPreferences {
     pub timezone: String,
     pub notification_enabled: bool,
     pub last_reminder_date: Option<NaiveDate>,
+    pub last_reminder_stage: Option<i16>,
     pub last_plan_nudge_date: Option<NaiveDate>,
     pub onboarding_completed: bool,
     pub onboarding_completed_at: Option<DateTime<Utc>>,
@@ -61,8 +62,11 @@ pub struct ReminderCandidate {
     pub timezone: String,
     pub notification_enabled: bool,
     pub last_reminder_date: Option<NaiveDate>,
+    pub last_reminder_stage: Option<i16>,
     pub last_plan_nudge_date: Option<NaiveDate>,
     pub onboarding_completed: bool,
+    pub checkin_frequency: String,
+    pub last_checkin_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -693,6 +697,7 @@ pub async fn set_user_reminder_time(
         SET reminder_hour = $2,
             reminder_minute = $3,
             last_reminder_date = NULL,
+            last_reminder_stage = NULL,
             updated_at = NOW()
         "#,
     )
@@ -797,6 +802,7 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             COALESCE(timezone, 'Europe/Kyiv') as timezone,
             COALESCE(notification_enabled, true) as notification_enabled,
             last_reminder_date,
+            last_reminder_stage,
             last_plan_nudge_date,
             COALESCE(onboarding_completed, false) as onboarding_completed,
             onboarding_completed_at,
@@ -816,6 +822,7 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             timezone: row.try_get::<String, _>("timezone")?,
             notification_enabled: row.try_get::<bool, _>("notification_enabled")?,
             last_reminder_date: row.try_get::<Option<NaiveDate>, _>("last_reminder_date")?,
+            last_reminder_stage: row.try_get::<Option<i16>, _>("last_reminder_stage")?,
             last_plan_nudge_date: row.try_get::<Option<NaiveDate>, _>("last_plan_nudge_date")?,
             onboarding_completed: row.try_get::<bool, _>("onboarding_completed")?,
             onboarding_completed_at: row.try_get::<Option<DateTime<Utc>>, _>("onboarding_completed_at")?,
@@ -831,6 +838,7 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
             timezone: "Europe/Kyiv".to_string(),
             notification_enabled: true,
             last_reminder_date: None,
+            last_reminder_stage: None,
             last_plan_nudge_date: None,
             onboarding_completed: false,
             onboarding_completed_at: None,
@@ -839,48 +847,61 @@ pub async fn get_user_preferences(pool: &PgPool, user_id: Uuid) -> Result<UserPr
     }
 }
 
-/// Mark reminder as sent for a local date (idempotent)
-pub async fn mark_reminder_sent(
+/// Mark reminder as sent for a local date and stage (idempotent)
+pub async fn mark_reminder_sent_stage(
     pool: &PgPool,
     user_id: Uuid,
     local_date: NaiveDate,
+    stage: i16,
 ) -> Result<bool> {
     let result = sqlx::query(
         r#"
-        INSERT INTO user_preferences (user_id, last_reminder_date)
-        VALUES ($1, $2)
+        INSERT INTO user_preferences (user_id, last_reminder_date, last_reminder_stage)
+        VALUES ($1, $2, $3)
         ON CONFLICT (user_id) DO UPDATE
         SET last_reminder_date = EXCLUDED.last_reminder_date,
+            last_reminder_stage = EXCLUDED.last_reminder_stage,
             updated_at = NOW()
         WHERE user_preferences.last_reminder_date IS NULL
            OR user_preferences.last_reminder_date < EXCLUDED.last_reminder_date
+           OR (
+               user_preferences.last_reminder_date = EXCLUDED.last_reminder_date
+               AND COALESCE(user_preferences.last_reminder_stage, -1) < EXCLUDED.last_reminder_stage
+           )
         "#,
     )
     .bind(user_id)
     .bind(local_date)
+    .bind(stage)
     .execute(pool)
     .await?;
 
     Ok(result.rows_affected() > 0)
 }
 
-/// Clear reminder marker for a given local date (used when delivery fails)
-pub async fn clear_reminder_sent(
+/// Roll back reminder marker when delivery fails
+pub async fn rollback_reminder_stage(
     pool: &PgPool,
     user_id: Uuid,
     local_date: NaiveDate,
+    previous_stage: i16,
+    failed_stage: i16,
 ) -> Result<()> {
     sqlx::query(
         r#"
         UPDATE user_preferences
-        SET last_reminder_date = NULL,
+        SET last_reminder_date = CASE WHEN $3 < 0 THEN NULL ELSE last_reminder_date END,
+            last_reminder_stage = CASE WHEN $3 < 0 THEN NULL ELSE $3 END,
             updated_at = NOW()
         WHERE user_id = $1
           AND last_reminder_date = $2
+          AND COALESCE(last_reminder_stage, -1) = $4
         "#,
     )
     .bind(user_id)
     .bind(local_date)
+    .bind(previous_stage)
+    .bind(failed_stage)
     .execute(pool)
     .await?;
     Ok(())
@@ -898,10 +919,18 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
             COALESCE(p.timezone, 'Europe/Kyiv') as timezone,
             COALESCE(p.notification_enabled, true) as notification_enabled,
             p.last_reminder_date as last_reminder_date,
+            p.last_reminder_stage as last_reminder_stage,
             p.last_plan_nudge_date as last_plan_nudge_date,
-            COALESCE(p.onboarding_completed, false) as onboarding_completed
+            COALESCE(p.onboarding_completed, false) as onboarding_completed,
+            COALESCE(p.checkin_frequency, 'daily') as checkin_frequency,
+            lc.last_checkin_at as last_checkin_at
         FROM users u
         LEFT JOIN user_preferences p ON u.id = p.user_id
+        LEFT JOIN LATERAL (
+            SELECT MAX(created_at) as last_checkin_at
+            FROM checkin_answers ca
+            WHERE ca.user_id = u.id
+        ) lc ON true
         WHERE u.telegram_id IS NOT NULL
           AND u.is_active = true
           AND COALESCE(p.onboarding_completed, false) = true
@@ -924,8 +953,11 @@ pub async fn get_reminder_candidates(pool: &PgPool) -> Result<Vec<ReminderCandid
             timezone: row.try_get("timezone")?,
             notification_enabled: row.try_get("notification_enabled")?,
             last_reminder_date: row.try_get("last_reminder_date")?,
+            last_reminder_stage: row.try_get("last_reminder_stage")?,
             last_plan_nudge_date: row.try_get("last_plan_nudge_date")?,
             onboarding_completed: row.try_get("onboarding_completed")?,
+            checkin_frequency: row.try_get::<String, _>("checkin_frequency")?,
+            last_checkin_at: row.try_get("last_checkin_at")?,
         });
     }
 

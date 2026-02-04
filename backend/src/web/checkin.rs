@@ -38,6 +38,8 @@ struct CheckinStatusResponse {
     days_until: i64,
     question_count_label: String,
     estimated_time: String,
+    reminder_time: String,
+    missed_available: bool,
 }
 
 #[derive(Serialize)]
@@ -120,10 +122,17 @@ async fn status(
     UserSession(user_id): UserSession,
     State(state): State<SharedState>,
 ) -> Result<Json<CheckinStatusResponse>, StatusCode> {
-    let (_user, schedule, frequency) = load_schedule(&state, user_id).await?;
+    let (_user, prefs, schedule, frequency) = load_schedule(&state, user_id).await?;
 
     let (frequency_label, question_count_label, estimated_time) =
         frequency_metadata(frequency);
+
+    let reminder_time = format!("{:02}:{:02}", prefs.reminder_hour, prefs.reminder_minute);
+    let (local_date, local_hour, local_minute) =
+        time_utils::local_components(&prefs.timezone, Utc::now());
+    let now_minutes = (local_hour as i32) * 60 + (local_minute as i32);
+    let reminder_minutes = (prefs.reminder_hour as i32) * 60 + (prefs.reminder_minute as i32);
+    let missed_available = schedule.due && local_date == schedule.next_due_date && now_minutes > reminder_minutes;
 
     Ok(Json(CheckinStatusResponse {
         enabled: true,
@@ -135,6 +144,8 @@ async fn status(
         days_until: schedule.days_until,
         question_count_label,
         estimated_time,
+        reminder_time,
+        missed_available,
     }))
 }
 
@@ -160,7 +171,7 @@ async fn start(
     State(state): State<SharedState>,
     Query(params): Query<CheckinStartParams>,
 ) -> Result<Json<CheckinStartResponse>, (StatusCode, Json<CheckinErrorResponse>)> {
-    let (user, schedule, frequency) = load_schedule(&state, user_id).await.map_err(|status| {
+    let (user, prefs, schedule, frequency) = load_schedule(&state, user_id).await.map_err(|status| {
             (
                 status,
                 Json(CheckinErrorResponse {
@@ -209,7 +220,10 @@ async fn start(
         .map(question_payload)
         .collect::<Vec<_>>();
 
-    let expires_at = Utc::now() + Duration::hours(2);
+    let mut expires_at = time_utils::end_of_local_day_utc(&prefs.timezone, Utc::now());
+    if expires_at <= Utc::now() {
+        expires_at = expires_at + Duration::days(1);
+    }
     {
         let mut sessions = state.web_checkin_sessions.write().await;
         sessions.insert(
@@ -464,7 +478,7 @@ fn question_payload(question: &Question) -> CheckinQuestionPayload {
 async fn load_schedule(
     state: &SharedState,
     user_id: Uuid,
-) -> Result<(db::DbUser, CheckinSchedule, CheckinFrequency), StatusCode> {
+) -> Result<(db::DbUser, db::UserPreferences, CheckinSchedule, CheckinFrequency), StatusCode> {
     let user = db::find_user_by_id(&state.pool, user_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -486,7 +500,7 @@ async fn load_schedule(
         .map(|dt| time_utils::local_components(&prefs.timezone, dt).0);
 
     let schedule = schedule_for(frequency, last_local, today);
-    Ok((user, schedule, frequency))
+    Ok((user, prefs, schedule, frequency))
 }
 
 fn frequency_metadata(

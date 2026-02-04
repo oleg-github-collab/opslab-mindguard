@@ -12,6 +12,7 @@ mod time_utils;
 
 use crate::db::seed;
 use crate::state::SharedState;
+use crate::domain::checkin::{schedule_for, CheckinFrequency};
 use axum::{
     body::Body,
     http::{header, Request, Response},
@@ -189,30 +190,53 @@ async fn run() -> anyhow::Result<()> {
                     let (local_date, local_hour, local_minute) =
                         time_utils::local_components(&candidate.timezone, now);
 
-                    let is_due_time = local_hour > candidate.reminder_hour
-                        || (local_hour == candidate.reminder_hour
-                            && local_minute >= candidate.reminder_minute);
+                    let Some(stage) = reminder_stage_for_time(
+                        candidate.reminder_hour,
+                        candidate.reminder_minute,
+                        local_hour,
+                        local_minute,
+                    ) else {
+                        continue;
+                    };
 
-                    if is_due_time
+                    let frequency = CheckinFrequency::try_from(candidate.checkin_frequency.as_str())
+                        .unwrap_or(CheckinFrequency::Daily);
+                    let last_local = candidate
+                        .last_checkin_at
+                        .map(|dt| time_utils::local_components(&candidate.timezone, dt).0);
+                    let schedule = schedule_for(frequency, last_local, local_date);
+                    if !schedule.due {
+                        continue;
+                    }
+
+                    let previous_stage = if candidate.last_reminder_date == Some(local_date) {
+                        candidate.last_reminder_stage.unwrap_or(-1)
+                    } else {
+                        -1
+                    };
+                    if stage <= previous_stage {
+                        continue;
+                    }
+
+                    match db::mark_reminder_sent_stage(&state.pool, candidate.user_id, local_date, stage)
+                        .await
                     {
-                        match db::mark_reminder_sent(&state.pool, candidate.user_id, local_date)
-                            .await
-                        {
-                            Ok(true) => {
-                                due_users.push(DueReminder {
-                                    user_id: candidate.user_id,
-                                    telegram_id: candidate.telegram_id,
-                                    local_date,
-                                });
-                            }
-                            Ok(false) => {}
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to mark reminder sent for {}: {}",
-                                    candidate.user_id,
-                                    e
-                                );
-                            }
+                        Ok(true) => {
+                            due_users.push(DueReminder {
+                                user_id: candidate.user_id,
+                                telegram_id: candidate.telegram_id,
+                                local_date,
+                                stage,
+                                previous_stage,
+                            });
+                        }
+                        Ok(false) => {}
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to mark reminder sent for {}: {}",
+                                candidate.user_id,
+                                e
+                            );
                         }
                     }
                 }
@@ -552,6 +576,35 @@ struct DueReminder {
     user_id: Uuid,
     telegram_id: i64,
     local_date: NaiveDate,
+    stage: i16,
+    previous_stage: i16,
+}
+
+const REMINDER_STAGE_OFFSETS_HOURS: [i16; 3] = [0, 3, 6];
+
+fn reminder_stage_for_time(
+    reminder_hour: i16,
+    reminder_minute: i16,
+    local_hour: i16,
+    local_minute: i16,
+) -> Option<i16> {
+    let base_minutes = reminder_hour as i32 * 60 + reminder_minute as i32;
+    let now_minutes = local_hour as i32 * 60 + local_minute as i32;
+    if now_minutes < base_minutes {
+        return None;
+    }
+
+    let mut stage = None;
+    for (idx, offset) in REMINDER_STAGE_OFFSETS_HOURS.iter().enumerate() {
+        let target = base_minutes + (*offset as i32) * 60;
+        if target >= 24 * 60 {
+            continue;
+        }
+        if now_minutes >= target {
+            stage = Some(idx as i16);
+        }
+    }
+    stage
 }
 
 async fn send_smart_reminders(state: &SharedState, users: Vec<DueReminder>) -> anyhow::Result<()> {
@@ -564,11 +617,20 @@ async fn send_smart_reminders(state: &SharedState, users: Vec<DueReminder>) -> a
     for due in users {
         let chat_id = teloxide::types::ChatId(due.telegram_id);
 
-        match bot::enhanced_handlers::start_daily_checkin(&bot, state, chat_id, due.user_id).await {
+        match bot::enhanced_handlers::send_web_checkin_reminder_stage(
+            &bot,
+            state,
+            chat_id,
+            due.user_id,
+            due.stage,
+        )
+        .await
+        {
             Ok(_) => {
                 success_count += 1;
                 tracing::debug!(
-                    "Sent smart reminder to user {} (telegram: {})",
+                    "Sent smart reminder stage {} to user {} (telegram: {})",
+                    due.stage + 1,
                     due.user_id,
                     due.telegram_id
                 );
@@ -576,13 +638,21 @@ async fn send_smart_reminders(state: &SharedState, users: Vec<DueReminder>) -> a
             Err(e) => {
                 error_count += 1;
                 tracing::error!(
-                    "Failed to send smart reminder to user {} (telegram: {}): {}",
+                    "Failed to send smart reminder stage {} to user {} (telegram: {}): {}",
+                    due.stage + 1,
                     due.user_id,
                     due.telegram_id,
                     e
                 );
                 if let Err(clear_err) =
-                    db::clear_reminder_sent(&state.pool, due.user_id, due.local_date).await
+                    db::rollback_reminder_stage(
+                        &state.pool,
+                        due.user_id,
+                        due.local_date,
+                        due.previous_stage,
+                        due.stage,
+                    )
+                    .await
                 {
                     tracing::warn!(
                         "Failed to clear reminder marker for {}: {}",

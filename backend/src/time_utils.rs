@@ -1,4 +1,6 @@
 use chrono::{DateTime, FixedOffset, NaiveDate, Timelike, Utc};
+use chrono::TimeZone;
+use chrono::LocalResult;
 use chrono_tz::Tz;
 
 #[derive(Clone, Copy)]
@@ -124,4 +126,25 @@ pub fn local_components(raw_tz: &str, utc_dt: DateTime<Utc>) -> (NaiveDate, i16,
 pub fn format_local_time(raw_tz: &str, utc_dt: DateTime<Utc>) -> String {
     let (date, hour, minute) = local_components(raw_tz, utc_dt);
     format!("{} {:02}:{:02}", date, hour, minute)
+}
+
+pub fn end_of_local_day_utc(raw_tz: &str, utc_dt: DateTime<Utc>) -> DateTime<Utc> {
+    let (local_date, _, _) = local_components(raw_tz, utc_dt);
+    let naive = local_date
+        .and_hms_opt(23, 59, 59)
+        .unwrap_or_else(|| local_date.and_hms_opt(0, 0, 0).unwrap());
+
+    match parse_timezone(raw_tz) {
+        Some(ParsedTimezone::Named(tz)) => match tz.from_local_datetime(&naive) {
+            LocalResult::Single(dt) => dt.with_timezone(&Utc),
+            LocalResult::Ambiguous(_, latest) => latest.with_timezone(&Utc),
+            LocalResult::None => naive.and_utc(),
+        },
+        Some(ParsedTimezone::Fixed(offset)) => match offset.from_local_datetime(&naive) {
+            LocalResult::Single(dt) => dt.with_timezone(&Utc),
+            LocalResult::Ambiguous(_, latest) => latest.with_timezone(&Utc),
+            LocalResult::None => naive.and_utc(),
+        },
+        None => naive.and_utc(),
+    }
 }
