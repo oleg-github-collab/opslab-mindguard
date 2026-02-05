@@ -1475,18 +1475,18 @@ async fn process_open_response(
 
         if should_send_alert {
             if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
-                bot.send_message(
-                    ChatId(admin_id),
-                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
-                )
-                .await?;
-            }
-            if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
-                bot.send_message(
-                    ChatId(jane_id),
-                    format!("⚠️ URGENT | User {user_id} open response flagged risk_score={}", outcome.risk_score),
-                )
-                .await?;
+                let alert_msg = format!(
+                    "🚨 *КРИТИЧНИЙ АЛЕРТ \\- Відкрита відповідь*\n\n\
+                    👤 *Користувач:* `{}`\n\
+                    ⚠️ *Рівень ризику:* {}/10\n\n\
+                    _Виявлено високий рівень ризику в текстовій відповіді\\._\n\
+                    _Рекомендується перегляд та консультація\\._",
+                    user_id.to_string().replace("-", "\\-"),
+                    outcome.risk_score
+                );
+                bot.send_message(ChatId(admin_id), alert_msg)
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .await?;
             }
         }
     }
@@ -2005,9 +2005,8 @@ pub async fn send_open_response_alert(
     risk_score: i16,
 ) -> Result<()> {
     let admin_id = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]);
-    let jane_id = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]);
 
-    if admin_id.is_none() && jane_id.is_none() {
+    if admin_id.is_none() {
         return Ok(());
     }
 
@@ -2015,14 +2014,20 @@ pub async fn send_open_response_alert(
         .map_err(|_| anyhow::anyhow!("TELEGRAM_BOT_TOKEN missing"))?;
     let bot = teloxide::Bot::new(token);
     let message = format!(
-        "⚠️ URGENT | User {user_id} open response flagged risk_score={risk_score}"
+        "🚨 *КРИТИЧНИЙ АЛЕРТ \\- Відкрита відповідь*\n\n\
+        👤 *Користувач:* `{}`\n\
+        ⚠️ *Рівень ризику:* {}/10\n\n\
+        _Виявлено високий рівень ризику в текстовій відповіді\\._\n\
+        _Рекомендується перегляд та консультація\\._",
+        user_id.to_string().replace("-", "\\-"),
+        risk_score
     );
 
     if let Some(admin) = admin_id {
-        bot.send_message(ChatId(admin), message.clone()).await.ok();
-    }
-    if let Some(jane) = jane_id {
-        bot.send_message(ChatId(jane), message.clone()).await.ok();
+        bot.send_message(ChatId(admin), message)
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .await
+            .ok();
     }
 
     Ok(())
@@ -2036,7 +2041,6 @@ async fn send_critical_alert(
     metrics: &Metrics,
 ) -> Result<()> {
     let admin_id = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]);
-    let jane_id = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]);
 
     let alert_message = mdv2(format!(
         "🚨 КРИТИЧНИЙ АЛЕРТ!\n\n\
@@ -2063,14 +2067,6 @@ async fn send_critical_alert(
     // Відправка Олегу (admin)
     if let Some(admin) = admin_id {
         bot.send_message(ChatId(admin), alert_message.clone())
-            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-            .await
-            .ok();
-    }
-
-    // Відправка Джейн (manager)
-    if let Some(jane) = jane_id {
-        bot.send_message(ChatId(jane), alert_message.clone())
             .parse_mode(teloxide::types::ParseMode::MarkdownV2)
             .await
             .ok();
@@ -2213,18 +2209,17 @@ async fn handle_voice(
         )
         .await?;
         if let Some(admin_id) = env_chat_id(&["ADMIN_TELEGRAM_ID", "TELEGRAM_ADMIN_CHAT_ID"]) {
-            bot.send_message(
-                ChatId(admin_id),
-                format!("⚠️ URGENT | User {user_id} flagged risk_score=10"),
-            )
-            .await?;
-        }
-        if let Some(jane_id) = env_chat_id(&["JANE_TELEGRAM_ID", "TELEGRAM_JANE_CHAT_ID"]) {
-            bot.send_message(
-                ChatId(jane_id),
-                format!("⚠️ URGENT | User {user_id} flagged risk_score=10"),
-            )
-            .await?;
+            let alert_msg = format!(
+                "🚨 *КРИТИЧНИЙ АЛЕРТ \\- Голосове повідомлення*\n\n\
+                👤 *Користувач:* `{}`\n\
+                ⚠️ *Рівень ризику:* 10/10\n\n\
+                _Виявлено високий рівень ризику в голосовому повідомленні\\._\n\
+                _Рекомендується перегляд та консультація\\._",
+                user_id.to_string().replace("-", "\\-")
+            );
+            bot.send_message(ChatId(admin_id), alert_msg)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
         }
     }
 
