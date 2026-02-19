@@ -6,7 +6,7 @@ use crate::state::{SharedState, WebCheckInSession};
 use crate::time_utils;
 use crate::web::session::UserSession;
 use axum::{
-    extract::{Query, State},
+    extract::{DefaultBodyLimit, Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
@@ -24,6 +24,8 @@ pub fn router(state: SharedState) -> Router {
         .route("/frequency", post(update_frequency))
         .route("/start", post(start))
         .route("/submit", post(submit))
+        // Audio base64 payloads can reach 6-8MB; default 2MB limit blocks them
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .with_state(state)
 }
 
@@ -364,7 +366,13 @@ async fn submit(
                 .ai
                 .transcribe_audio(bytes, mime, filename)
                 .await
-                .map_err(|_| StatusCode::BAD_REQUEST)?;
+                .map_err(|e| {
+                    tracing::error!(
+                        "Audio transcription failed for question {} (mime={}, duration={:?}): {}",
+                        question.id, mime, answer.audio_duration_seconds, e
+                    );
+                    StatusCode::UNPROCESSABLE_ENTITY
+                })?;
             (
                 transcript,
                 "voice",
