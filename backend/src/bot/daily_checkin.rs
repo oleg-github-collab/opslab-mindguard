@@ -2,9 +2,11 @@
 ///! - Короткі опитування (2-4 питання, до 3 хвилин)
 ///! - Різні варіанти питань для підтримки інтересу
 ///! - Повна картина за 7-10 днів
+///! - Data maturity system: hide criticality until sufficient representative data
 use chrono::{Datelike, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use uuid::Uuid;
 use crate::domain::checkin::CheckinFrequency;
 
@@ -56,6 +58,128 @@ pub struct CheckInAnswer {
     pub value: i16,
 }
 
+/// Data maturity assessment - determines if user has enough representative data
+/// for reliable metrics calculation and risk level display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataMaturity {
+    /// Total answers collected
+    pub total_answers: usize,
+    /// Number of unique days with check-ins
+    pub unique_days: usize,
+    /// Which core question types have data (mood, energy, stress, sleep, workload, motivation, focus, wellbeing)
+    pub covered_types: Vec<String>,
+    /// Number of core types with data out of 8
+    pub type_coverage: usize,
+    /// Overall confidence 0.0-1.0 (requires >= 0.6 to show risk level)
+    pub confidence: f64,
+    /// Whether we have enough data to reliably show risk/criticality level
+    pub sufficient_for_risk: bool,
+    /// Human-readable maturity level
+    pub level: String,
+    /// Required answers to reach next maturity level
+    pub answers_to_next_level: usize,
+}
+
+impl DataMaturity {
+    /// Core question types required for reliable metrics
+    const CORE_TYPES: &'static [&'static str] = &[
+        "mood", "energy", "stress", "sleep", "workload", "motivation", "focus", "wellbeing",
+    ];
+
+    /// Minimum unique days for risk level display
+    const MIN_DAYS_FOR_RISK: usize = 5;
+    /// Minimum different question types covered for risk level
+    const MIN_TYPES_FOR_RISK: usize = 5;
+    /// Minimum total answers for risk level
+    const MIN_ANSWERS_FOR_RISK: usize = 21;
+    /// Minimum confidence threshold for showing risk level
+    const MIN_CONFIDENCE_FOR_RISK: f64 = 0.6;
+
+    pub fn assess(answers: &[CheckInAnswer]) -> Self {
+        let total_answers = answers.len();
+        let mut types_seen: HashSet<String> = HashSet::new();
+
+        for answer in answers {
+            types_seen.insert(answer.qtype.clone());
+        }
+
+        // Estimate unique days from answer count / average questions per day (3)
+        let unique_days = (total_answers / 3).max(1).min(total_answers);
+
+        let covered_types: Vec<String> = Self::CORE_TYPES
+            .iter()
+            .filter(|t| types_seen.contains(**t))
+            .map(|t| t.to_string())
+            .collect();
+        let type_coverage = covered_types.len();
+
+        // Calculate confidence based on multiple factors
+        let day_factor = (unique_days as f64 / Self::MIN_DAYS_FOR_RISK as f64).min(1.0);
+        let type_factor = (type_coverage as f64 / Self::MIN_TYPES_FOR_RISK as f64).min(1.0);
+        let answer_factor = (total_answers as f64 / Self::MIN_ANSWERS_FOR_RISK as f64).min(1.0);
+
+        // Weighted confidence: types matter most, then days, then raw count
+        let confidence = (type_factor * 0.4 + day_factor * 0.35 + answer_factor * 0.25).min(1.0);
+
+        let sufficient_for_risk = unique_days >= Self::MIN_DAYS_FOR_RISK
+            && type_coverage >= Self::MIN_TYPES_FOR_RISK
+            && total_answers >= Self::MIN_ANSWERS_FOR_RISK
+            && confidence >= Self::MIN_CONFIDENCE_FOR_RISK;
+
+        let (level, answers_to_next) = if sufficient_for_risk && confidence >= 0.9 {
+            ("reliable".to_string(), 0)
+        } else if sufficient_for_risk {
+            ("sufficient".to_string(), ((0.9 - confidence) * Self::MIN_ANSWERS_FOR_RISK as f64).ceil() as usize)
+        } else if total_answers >= 10 {
+            ("building".to_string(), Self::MIN_ANSWERS_FOR_RISK.saturating_sub(total_answers))
+        } else {
+            ("early".to_string(), Self::MIN_ANSWERS_FOR_RISK.saturating_sub(total_answers))
+        };
+
+        Self {
+            total_answers,
+            unique_days,
+            covered_types,
+            type_coverage,
+            confidence,
+            sufficient_for_risk,
+            level,
+            answers_to_next_level: answers_to_next,
+        }
+    }
+
+    /// Assess maturity from enriched data with actual unique day count
+    pub fn assess_with_days(answers: &[CheckInAnswer], unique_days: usize) -> Self {
+        let mut base = Self::assess(answers);
+        base.unique_days = unique_days;
+
+        // Recalculate confidence with actual days
+        let day_factor = (unique_days as f64 / Self::MIN_DAYS_FOR_RISK as f64).min(1.0);
+        let type_factor = (base.type_coverage as f64 / Self::MIN_TYPES_FOR_RISK as f64).min(1.0);
+        let answer_factor = (base.total_answers as f64 / Self::MIN_ANSWERS_FOR_RISK as f64).min(1.0);
+        base.confidence = (type_factor * 0.4 + day_factor * 0.35 + answer_factor * 0.25).min(1.0);
+
+        base.sufficient_for_risk = unique_days >= Self::MIN_DAYS_FOR_RISK
+            && base.type_coverage >= Self::MIN_TYPES_FOR_RISK
+            && base.total_answers >= Self::MIN_ANSWERS_FOR_RISK
+            && base.confidence >= Self::MIN_CONFIDENCE_FOR_RISK;
+
+        let (level, answers_to_next) = if base.sufficient_for_risk && base.confidence >= 0.9 {
+            ("reliable".to_string(), 0)
+        } else if base.sufficient_for_risk {
+            ("sufficient".to_string(), ((0.9 - base.confidence) * Self::MIN_ANSWERS_FOR_RISK as f64).ceil() as usize)
+        } else if base.total_answers >= 10 {
+            ("building".to_string(), Self::MIN_ANSWERS_FOR_RISK.saturating_sub(base.total_answers))
+        } else {
+            ("early".to_string(), Self::MIN_ANSWERS_FOR_RISK.saturating_sub(base.total_answers))
+        };
+        base.level = level;
+        base.answers_to_next_level = answers_to_next;
+
+        base
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metrics {
     pub who5_score: f64,
@@ -80,6 +204,18 @@ impl Metrics {
     pub fn sleep_quality(&self) -> f64 {
         self.sleep_quality.unwrap_or(self.sleep_duration)
     }
+}
+
+/// Extended metrics response that includes data maturity information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricsWithMaturity {
+    #[serde(flatten)]
+    pub metrics: Metrics,
+    pub data_maturity: DataMaturity,
+    /// Risk level (only populated when data is sufficient)
+    pub risk_level: Option<String>,
+    /// Whether this user's metrics are reliable enough for clinical-grade assessment
+    pub risk_reliable: bool,
 }
 
 /// Банк варіативних питань (укр)
@@ -772,9 +908,20 @@ pub struct MetricsCalculator;
 
 impl MetricsCalculator {
     /// Розраховує метрики за 7-10 днів відповідей
+    /// Returns None only if there are literally no answers.
+    /// Use calculate_metrics_with_maturity for data sufficiency checks.
     pub fn calculate_metrics(answers: &[CheckInAnswer]) -> Option<Metrics> {
         if answers.len() < 21 {
             // Мінімум 7 днів * 3 питання = 21 відповідь
+            return None;
+        }
+
+        Self::compute_raw_metrics(answers)
+    }
+
+    /// Internal: compute metrics from any number of answers (no minimum check)
+    fn compute_raw_metrics(answers: &[CheckInAnswer]) -> Option<Metrics> {
+        if answers.is_empty() {
             return None;
         }
 
@@ -788,6 +935,9 @@ impl MetricsCalculator {
         let mut wellbeing_values = Vec::new();
 
         for answer in answers {
+            if answer.value < 1 || answer.value > 10 {
+                continue; // Skip invalid values
+            }
             match answer.qtype.as_str() {
                 "mood" => mood_values.push(answer.value as f64),
                 "energy" => energy_values.push(answer.value as f64),
@@ -803,7 +953,7 @@ impl MetricsCalculator {
 
         let avg = |vals: &[f64]| -> f64 {
             if vals.is_empty() {
-                0.0
+                5.0 // Neutral default when no data for this type
             } else {
                 vals.iter().sum::<f64>() / vals.len() as f64
             }
@@ -816,7 +966,12 @@ impl MetricsCalculator {
             .chain(wellbeing_values.iter())
             .copied()
             .collect();
-        let who5 = (avg(&who5_components) * 10.0).min(100.0).max(0.0) as i32;
+        let who5 = if who5_components.is_empty() {
+            50.0 // Neutral when no relevant data
+        } else {
+            (avg(&who5_components) * 10.0).clamp(0.0, 100.0)
+        };
+        let who5 = who5 as i32;
 
         // PHQ-9 Depression (0-27) - інверсія позитивних показників
         let phq9_inv: Vec<f64> = mood_values
@@ -825,7 +980,11 @@ impl MetricsCalculator {
             .chain(motivation_values.iter())
             .map(|v| 10.0 - v)
             .collect();
-        let phq9 = (avg(&phq9_inv) * 2.7).min(27.0).max(0.0) as i32;
+        let phq9 = if phq9_inv.is_empty() {
+            0
+        } else {
+            (avg(&phq9_inv) * 2.7).clamp(0.0, 27.0) as i32
+        };
 
         // GAD-7 Anxiety (0-21)
         let gad7_components: Vec<f64> = stress_values
@@ -833,7 +992,11 @@ impl MetricsCalculator {
             .copied()
             .chain(focus_values.iter().map(|v| 10.0 - v))
             .collect();
-        let gad7 = (avg(&gad7_components) * 2.1).min(21.0).max(0.0) as i32;
+        let gad7 = if gad7_components.is_empty() {
+            0
+        } else {
+            (avg(&gad7_components) * 2.1).clamp(0.0, 21.0) as i32
+        };
 
         // MBI Burnout (0-100%)
         let mbi_components: Vec<f64> = stress_values
@@ -843,7 +1006,11 @@ impl MetricsCalculator {
             .chain(energy_values.iter().map(|v| 10.0 - v))
             .chain(motivation_values.iter().map(|v| 10.0 - v))
             .collect();
-        let mbi = (avg(&mbi_components) * 10.0).min(100.0).max(0.0);
+        let mbi = if mbi_components.is_empty() {
+            0.0
+        } else {
+            (avg(&mbi_components) * 10.0).clamp(0.0, 100.0)
+        };
 
         // Sleep
         let sleep_duration = avg(&sleep_values);
@@ -866,12 +1033,45 @@ impl MetricsCalculator {
         })
     }
 
+    /// Calculate metrics along with data maturity assessment.
+    /// This is the preferred method - it always returns metrics if there's any data,
+    /// but only shows risk level when data is sufficient.
+    pub fn calculate_metrics_with_maturity(answers: &[CheckInAnswer]) -> Option<MetricsWithMaturity> {
+        if answers.is_empty() {
+            return None;
+        }
+
+        let maturity = DataMaturity::assess(answers);
+        let metrics = Self::compute_raw_metrics(answers)?;
+        let risk_level = if maturity.sufficient_for_risk {
+            Some(Self::risk_level(&metrics).to_string())
+        } else {
+            None
+        };
+        let risk_reliable = maturity.sufficient_for_risk;
+
+        Some(MetricsWithMaturity {
+            metrics,
+            data_maturity: maturity,
+            risk_level,
+            risk_reliable,
+        })
+    }
+
     /// Перевірка чи показники критичні
     pub fn is_critical(metrics: &Metrics) -> bool {
         metrics.who5_score < 50.0
             || metrics.phq9_score >= 15.0
             || metrics.gad7_score >= 15.0
             || metrics.mbi_score >= 70.0
+    }
+
+    /// Check if critical, but only if data maturity is sufficient
+    pub fn is_critical_reliable(metrics: &Metrics, maturity: &DataMaturity) -> bool {
+        if !maturity.sufficient_for_risk {
+            return false;
+        }
+        Self::is_critical(metrics)
     }
 
     /// Визначення рівня ризику
@@ -892,6 +1092,15 @@ impl MetricsCalculator {
             "medium"
         } else {
             "low"
+        }
+    }
+
+    /// Risk level only when data is sufficient, otherwise "collecting_data"
+    pub fn risk_level_safe(metrics: &Metrics, maturity: &DataMaturity) -> &'static str {
+        if !maturity.sufficient_for_risk {
+            "collecting_data"
+        } else {
+            Self::risk_level(metrics)
         }
     }
 }
@@ -932,7 +1141,7 @@ mod tests {
             },
         ];
 
-        // Недостатньо даних для розрахунку
+        // Недостатньо даних для розрахунку (old API)
         let result = MetricsCalculator::calculate_metrics(&answers);
         assert!(result.is_none());
 
@@ -946,7 +1155,82 @@ mod tests {
         assert!(metrics.is_some());
 
         let m = metrics.unwrap();
-        assert!(m.who5_score > 0 && m.who5_score <= 100);
-        assert!(m.phq9_score >= 0 && m.phq9_score <= 27);
+        assert!(m.who5_score > 0.0 && m.who5_score <= 100.0);
+        assert!(m.phq9_score >= 0.0 && m.phq9_score <= 27.0);
+    }
+
+    #[test]
+    fn test_data_maturity_early() {
+        let answers = vec![
+            CheckInAnswer { question_id: 1, qtype: "mood".to_string(), value: 7 },
+            CheckInAnswer { question_id: 2, qtype: "energy".to_string(), value: 6 },
+            CheckInAnswer { question_id: 3, qtype: "stress".to_string(), value: 5 },
+        ];
+
+        let maturity = DataMaturity::assess(&answers);
+        assert_eq!(maturity.level, "early");
+        assert!(!maturity.sufficient_for_risk);
+        assert!(maturity.confidence < 0.6);
+    }
+
+    #[test]
+    fn test_data_maturity_sufficient() {
+        let types = ["mood", "energy", "stress", "sleep", "workload", "motivation", "focus", "wellbeing"];
+        let mut answers = Vec::new();
+        for (i, t) in types.iter().enumerate() {
+            for _ in 0..4 {
+                answers.push(CheckInAnswer {
+                    question_id: i as i32 + 1,
+                    qtype: t.to_string(),
+                    value: 5,
+                });
+            }
+        }
+        // 32 answers, 8 types covered
+        let maturity = DataMaturity::assess_with_days(&answers, 8);
+        assert!(maturity.sufficient_for_risk, "Should be sufficient: {:?}", maturity);
+        assert!(maturity.confidence >= 0.6);
+    }
+
+    #[test]
+    fn test_metrics_with_maturity_no_risk_early() {
+        let answers = vec![
+            CheckInAnswer { question_id: 1, qtype: "mood".to_string(), value: 2 },
+            CheckInAnswer { question_id: 2, qtype: "energy".to_string(), value: 1 },
+            CheckInAnswer { question_id: 3, qtype: "stress".to_string(), value: 9 },
+        ];
+        // Even with terrible values, risk should NOT be shown with too little data
+        let result = MetricsCalculator::calculate_metrics_with_maturity(&answers);
+        assert!(result.is_some());
+        let mwm = result.unwrap();
+        assert!(!mwm.risk_reliable);
+        assert!(mwm.risk_level.is_none());
+    }
+
+    #[test]
+    fn test_risk_level_safe_collecting() {
+        let answers = vec![
+            CheckInAnswer { question_id: 1, qtype: "mood".to_string(), value: 2 },
+        ];
+        let maturity = DataMaturity::assess(&answers);
+        let metrics = Metrics {
+            who5_score: 20.0, phq9_score: 20.0, gad7_score: 18.0,
+            mbi_score: 80.0, sleep_duration: 3.0, sleep_quality: Some(3.0),
+            work_life_balance: 2.0, stress_level: 35.0,
+        };
+        let level = MetricsCalculator::risk_level_safe(&metrics, &maturity);
+        assert_eq!(level, "collecting_data");
+    }
+
+    #[test]
+    fn test_invalid_values_skipped() {
+        let answers = vec![
+            CheckInAnswer { question_id: 1, qtype: "mood".to_string(), value: 0 },
+            CheckInAnswer { question_id: 2, qtype: "mood".to_string(), value: 11 },
+            CheckInAnswer { question_id: 3, qtype: "mood".to_string(), value: 7 },
+        ];
+        // Only value=7 should be counted, 0 and 11 should be skipped
+        let result = MetricsCalculator::calculate_metrics_with_maturity(&answers);
+        assert!(result.is_some());
     }
 }

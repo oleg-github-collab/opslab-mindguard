@@ -289,12 +289,26 @@ async fn submit(
 
     for question in &session.checkin.questions {
         let Some(answer) = answer_map.get(&question.id) else {
+            tracing::warn!(
+                "Missing answer for question {} (type={}) in checkin {}",
+                question.id, question.qtype, session.checkin.id
+            );
             return Err(StatusCode::BAD_REQUEST);
         };
 
         if question.scale == "1-10" {
-            let value = answer.value.ok_or(StatusCode::BAD_REQUEST)?;
+            let value = answer.value.ok_or_else(|| {
+                tracing::warn!(
+                    "Missing value for scale question {} (type={}) in checkin {}",
+                    question.id, question.qtype, session.checkin.id
+                );
+                StatusCode::BAD_REQUEST
+            })?;
             if !(1..=10).contains(&value) {
+                tracing::warn!(
+                    "Invalid value {} for question {} (type={}) in checkin {}",
+                    value, question.id, question.qtype, session.checkin.id
+                );
                 return Err(StatusCode::BAD_REQUEST);
             }
             prepared_scales.push(PreparedScaleAnswer {
@@ -378,6 +392,14 @@ async fn submit(
         });
     }
 
+    tracing::info!(
+        "Saving checkin {}: {} scale answers, {} open responses for user {}",
+        session.checkin.id,
+        prepared_scales.len(),
+        prepared_open.len(),
+        user_id
+    );
+
     for answer in prepared_scales {
         db::insert_checkin_answer(
             &state.pool,
@@ -387,7 +409,13 @@ async fn submit(
             answer.value,
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to save checkin answer q={} type={} value={}: {}",
+                answer.question_id, answer.qtype, answer.value, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
         saved_answers += 1;
     }
 
@@ -407,7 +435,13 @@ async fn submit(
             response.duration,
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to save open response q={} type={} source={}: {}",
+                response.question_id, response.qtype, response.source, e
+            );
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
         if response.source == "voice" {
             if let Err(err) = db::insert_voice_log(
@@ -456,6 +490,11 @@ async fn submit(
     if let Err(err) = crate::bot::enhanced_handlers::send_web_checkin_followups(&state, user_id).await {
         tracing::warn!("Failed to send web check-in followups: {}", err);
     }
+
+    tracing::info!(
+        "Checkin {} completed for user {}: {} scale + {} open answers saved, urgent={}",
+        payload.checkin_id, user_id, saved_answers, saved_open, urgent
+    );
 
     Ok(Json(CheckinSubmitResponse {
         saved_answers,

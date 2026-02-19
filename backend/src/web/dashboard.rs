@@ -10,7 +10,7 @@ use axum::{
 };
 use serde::Serialize;
 use uuid::Uuid;
-use crate::bot::daily_checkin::Metrics;
+use crate::bot::daily_checkin::{DataMaturity, Metrics, MetricsCalculator};
 
 #[derive(Serialize)]
 pub struct CurrentUser {
@@ -48,6 +48,12 @@ pub struct UserMetricsResponse {
     pub metrics: Option<Metrics>,
     pub checkins_last_week: i32,
     pub streak: i32,
+    /// Data maturity assessment - tells the frontend whether to show risk levels
+    pub data_maturity: Option<DataMaturity>,
+    /// Risk level - only present when data is sufficient for reliable assessment
+    pub risk_level: Option<String>,
+    /// Whether data is reliable enough for clinical-grade risk assessment
+    pub risk_reliable: bool,
 }
 
 pub fn router(state: SharedState) -> Router {
@@ -80,10 +86,34 @@ async fn get_user_metrics(
         .await
         .unwrap_or(0);
 
+    // Compute data maturity for reliable risk level display
+    let answers = db::get_recent_checkin_answers(&state.pool, claims.user_id, 14)
+        .await
+        .unwrap_or_default();
+    let unique_days = db::get_unique_checkin_days(&state.pool, claims.user_id, 14)
+        .await
+        .unwrap_or(0) as usize;
+
+    let maturity = if !answers.is_empty() {
+        Some(DataMaturity::assess_with_days(&answers, unique_days))
+    } else {
+        None
+    };
+
+    let (risk_level, risk_reliable) = match (&metrics, &maturity) {
+        (Some(m), Some(mat)) if mat.sufficient_for_risk => {
+            (Some(MetricsCalculator::risk_level(m).to_string()), true)
+        }
+        _ => (None, false),
+    };
+
     Ok(Json(UserMetricsResponse {
         metrics,
         checkins_last_week,
         streak,
+        data_maturity: maturity,
+        risk_level,
+        risk_reliable,
     }))
 }
 

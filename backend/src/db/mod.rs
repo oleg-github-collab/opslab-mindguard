@@ -459,6 +459,40 @@ pub async fn get_checkin_answer_count(pool: &PgPool, user_id: Uuid, days: i32) -
     Ok(count)
 }
 
+/// Get the number of unique days with check-in data in the last N days
+pub async fn get_unique_checkin_days(pool: &PgPool, user_id: Uuid, days: i32) -> Result<i64> {
+    let count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(DISTINCT DATE(created_at))
+        FROM checkin_answers
+        WHERE user_id = $1
+          AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+        "#,
+    )
+    .bind(user_id)
+    .bind(days.to_string())
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+/// Get the unique question types a user has answered in the last N days
+pub async fn get_covered_question_types(pool: &PgPool, user_id: Uuid, days: i32) -> Result<Vec<String>> {
+    let types: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT question_type
+        FROM checkin_answers
+        WHERE user_id = $1
+          AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+        "#,
+    )
+    .bind(user_id)
+    .bind(days.to_string())
+    .fetch_all(pool)
+    .await?;
+    Ok(types)
+}
+
 // ========== Telegram PIN Functions ==========
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

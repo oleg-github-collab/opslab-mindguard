@@ -78,6 +78,8 @@ struct EmployeeProfile {
     risk_level: String,
     notes: String,
     has_data: bool,
+    /// Whether risk level is based on sufficient data
+    risk_reliable: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -241,10 +243,15 @@ async fn employee_data(
         let metrics = latest_user_metrics(&history, &analytics.month_keys)
             .unwrap_or_else(MetricBlock::zero);
         let has_data = !history.is_empty();
-        let risk_level = if has_data {
+        // Determine how many months of data this user has
+        let months_with_data = history.len();
+        let risk_reliable = has_data && months_with_data >= 1;
+        let risk_level = if has_data && risk_reliable {
             calculate_employee_risk(&metrics)
+        } else if has_data {
+            "collecting_data"
         } else {
-            "low"
+            "no_data"
         };
 
         let notes = build_notes(&metrics, &history, &analytics.month_keys, risk_level);
@@ -258,6 +265,7 @@ async fn employee_data(
             risk_level: risk_level.to_string(),
             notes,
             has_data,
+            risk_reliable,
         });
     }
 

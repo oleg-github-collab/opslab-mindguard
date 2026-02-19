@@ -1318,8 +1318,16 @@ async fn complete_checkin(
         tracing::warn!("Failed to send plan nudge: {}", e);
     }
 
-    let count = db::get_checkin_answer_count(&state.pool, user_id, 10).await?;
-    if count >= 21 {
+    // Only check critical alerts when data maturity is sufficient
+    let answers = db::get_recent_checkin_answers(&state.pool, user_id, 14)
+        .await
+        .unwrap_or_default();
+    let unique_days = db::get_unique_checkin_days(&state.pool, user_id, 14)
+        .await
+        .unwrap_or(0) as usize;
+    let maturity = crate::bot::daily_checkin::DataMaturity::assess_with_days(&answers, unique_days);
+
+    if maturity.sufficient_for_risk {
         if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
             if MetricsCalculator::is_critical(&metrics) {
                 send_critical_alert(bot, state, user_id, &metrics).await?;
@@ -1649,8 +1657,8 @@ async fn send_user_status(
     chat_id: ChatId,
     user_id: Uuid,
 ) -> Result<()> {
-    // Отримати відповіді з БД за останні 10 днів
-    let answers = db::get_recent_checkin_answers(&state.pool, user_id, 10).await?;
+    // Отримати відповіді з БД за останні 14 днів
+    let answers = db::get_recent_checkin_answers(&state.pool, user_id, 14).await?;
     let answer_count = answers.len();
 
     if answers.is_empty() {
@@ -1663,36 +1671,56 @@ async fn send_user_status(
         return Ok(());
     }
 
+    // Assess data maturity
+    let unique_days = db::get_unique_checkin_days(&state.pool, user_id, 14)
+        .await
+        .unwrap_or(0) as usize;
+    let maturity = crate::bot::daily_checkin::DataMaturity::assess_with_days(&answers, unique_days);
+
     // Спробувати розрахувати метрики через БД функцію
     let metrics = db::calculate_user_metrics(&state.pool, user_id).await?;
 
     let Some(metrics) = metrics else {
-        bot.send_message(
-            chat_id,
-            mdv2(format!(
+        let progress_msg = if maturity.type_coverage < 5 {
+            format!(
                 "📊 Твій статус\n\n\
-                Чекінів пройдено: {}\n\
-                Потрібно мінімум 7 днів (21 відповідь) для повної картини.\n\n\
+                Відповідей: {} (потрібно мінімум 21)\n\
+                Унікальних днів: {} (потрібно мінімум 5)\n\
+                Типів питань: {}/8\n\n\
+                Для повної картини потрібно ще {} відповідей.\n\
+                Продовжуй проходити чекіни — збираємо дані! 📈",
+                answer_count,
+                unique_days,
+                maturity.type_coverage,
+                maturity.answers_to_next_level
+            )
+        } else {
+            format!(
+                "📊 Твій статус\n\n\
+                Відповідей: {}\n\
+                Ще потрібно {} відповідей для повної картини.\n\n\
                 Продовжуй проходити щоденні чекіни! 💪",
-                answer_count
-            )),
-        )
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
+                answer_count,
+                maturity.answers_to_next_level
+            )
+        };
+        bot.send_message(chat_id, mdv2(progress_msg))
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+            .await?;
         return Ok(());
     };
 
-    let risk = MetricsCalculator::risk_level(&metrics);
-    let risk_emoji = match risk {
-        "critical" => "🔴",
-        "high" => "🟡",
-        "medium" => "🟠",
-        _ => "🟢",
-    };
-
-    bot.send_message(
-        chat_id,
-        mdv2(format!(
+    // Build status message based on data maturity
+    let status_msg = if maturity.sufficient_for_risk {
+        // Full status with risk level
+        let risk = MetricsCalculator::risk_level(&metrics);
+        let risk_emoji = match risk {
+            "critical" => "🔴",
+            "high" => "🟡",
+            "medium" => "🟠",
+            _ => "🟢",
+        };
+        format!(
             "📊 Твій статус за останній тиждень\n\n\
             {} Рівень ризику: {}\n\n\
             🌟 Благополуччя (WHO-5): {}/100\n\
@@ -1702,7 +1730,8 @@ async fn send_user_status(
             😴 Сон: {:.1}h (якість {:.1}/10)\n\
             ⚖️ Work-Life Balance: {:.1}/10\n\
             ⚠️ Рівень стресу: {:.1}/40\n\n\
-            Дані за {} відповідей",
+            📈 Надійність: {:.0}% ({})\n\
+            Дані за {} відповідей, {} днів",
             risk_emoji,
             risk,
             metrics.who5_score,
@@ -1713,14 +1742,42 @@ async fn send_user_status(
             metrics.sleep_quality(),
             metrics.work_life_balance,
             metrics.stress_level,
-            answer_count
-        )),
-    )
-    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-    .await?;
+            maturity.confidence * 100.0,
+            maturity.level,
+            answer_count,
+            unique_days
+        )
+    } else {
+        // Metrics without risk level (insufficient data)
+        format!(
+            "📊 Твій статус (попередній)\n\n\
+            ⏳ Рівень ризику: збір даних ({:.0}%)\n\n\
+            🌟 Благополуччя (WHO-5): {}/100\n\
+            😴 Сон: {:.1}h\n\
+            ⚖️ Work-Life Balance: {:.1}/10\n\
+            ⚠️ Рівень стресу: {:.1}/40\n\n\
+            📈 Прогрес: {} відповідей, {} днів\n\
+            Типів питань: {}/8\n\
+            Потрібно ще {} відповідей для повної оцінки ризику.\n\n\
+            Продовжуй чекіни для точної аналітики! 💪",
+            maturity.confidence * 100.0,
+            metrics.who5_score,
+            metrics.sleep_duration,
+            metrics.work_life_balance,
+            metrics.stress_level,
+            answer_count,
+            unique_days,
+            maturity.type_coverage,
+            maturity.answers_to_next_level
+        )
+    };
 
-    // Якщо критичні показники - надіслати алерт
-    if MetricsCalculator::is_critical(&metrics) {
+    bot.send_message(chat_id, mdv2(status_msg))
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .await?;
+
+    // Only send critical alert if data is reliable
+    if maturity.sufficient_for_risk && MetricsCalculator::is_critical(&metrics) {
         send_critical_alert(bot, state, user_id, &metrics).await?;
     }
 
@@ -1865,8 +1922,16 @@ pub async fn send_web_checkin_followups(
         tracing::warn!("Failed to send plan nudge for web checkin: {}", e);
     }
 
-    let count = db::get_checkin_answer_count(&state.pool, user_id, 10).await?;
-    if count >= 21 {
+    // Only check critical alerts when data maturity is sufficient
+    let answers = db::get_recent_checkin_answers(&state.pool, user_id, 14)
+        .await
+        .unwrap_or_default();
+    let unique_days = db::get_unique_checkin_days(&state.pool, user_id, 14)
+        .await
+        .unwrap_or(0) as usize;
+    let maturity = crate::bot::daily_checkin::DataMaturity::assess_with_days(&answers, unique_days);
+
+    if maturity.sufficient_for_risk {
         if let Ok(Some(metrics)) = db::calculate_user_metrics(&state.pool, user_id).await {
             if MetricsCalculator::is_critical(&metrics) {
                 send_critical_alert(&bot, state, user_id, &metrics).await.ok();
