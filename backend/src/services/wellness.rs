@@ -47,6 +47,21 @@ pub fn generate_daily_plan(metrics: Option<&Metrics>, goals: &GoalSettings) -> V
         // ===== COMBINED MULTI-METRIC PATTERNS =====
         add_combined_patterns(&mut candidates, m, goals);
 
+        // ===== SLEEP QUALITY (separate from duration) =====
+        add_sleep_quality_items(&mut candidates, m);
+
+        // ===== MORNING ACTIVATION =====
+        add_morning_routine(&mut candidates, m, goals);
+
+        // ===== NUTRITION =====
+        add_nutrition_items(&mut candidates, m);
+
+        // ===== BODY CARE =====
+        add_body_care_items(&mut candidates, m);
+
+        // ===== SELF-COMPASSION =====
+        add_self_compassion_items(&mut candidates, m);
+
         // ===== POSITIVE REINFORCEMENT =====
         add_positive_reinforcement(&mut candidates, m);
     }
@@ -59,9 +74,11 @@ pub fn generate_daily_plan(metrics: Option<&Metrics>, goals: &GoalSettings) -> V
 
     // Determine max items based on severity
     let max_items = match metrics {
+        Some(m) if m.mbi_score >= 80.0 || m.stress_level >= 32.0
+            || (m.phq9_score >= 15.0 && m.gad7_score >= 10.0) => 7,
         Some(m) if m.mbi_score >= 70.0 || m.stress_level >= 28.0 || m.phq9_score >= 15.0 => 6,
         Some(m) if m.mbi_score >= 50.0 || m.stress_level >= 20.0 || m.phq9_score >= 10.0 => 5,
-        Some(m) if m.who5_score < 50.0 || m.gad7_score >= 10.0 => 4,
+        Some(m) if m.who5_score < 50.0 || m.gad7_score >= 10.0 => 5,
         _ => 4,
     };
 
@@ -317,6 +334,59 @@ fn add_anxiety_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
             duration_minutes: Some(5),
         }));
     }
+
+    // Progressive Muscle Relaxation when anxiety + physical tension
+    if m.gad7_score >= 8.0 && m.stress_level >= 16.0 {
+        c.push((81, PlanItem {
+            id: "pmr_anxiety".into(),
+            title: "Прогресивна м'язова релаксація".into(),
+            description: format!(
+                "Тривога ({:.0}/21) + стрес ({:.0}/40) = тіло затиснуте. \
+                Прогресивна м'язова релаксація (Джекобсон): \
+                напружуй групу м'язів на 5 сек → розслаб на 15 сек. \
+                Послідовність: кулаки → передпліччя → плечі → чоло → щелепа → шия → живіт → ноги. \
+                Весь цикл 10-15 хв. Це знижує кортизол і м'язову напругу одночасно.",
+                m.gad7_score, m.stress_level
+            ),
+            category: "anxiety".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+
+    // Cognitive defusion for moderate+ anxiety
+    if m.gad7_score >= 10.0 && m.phq9_score < 15.0 {
+        c.push((77, PlanItem {
+            id: "cognitive_defusion".into(),
+            title: "Когнітивна дефузія".into(),
+            description: format!(
+                "Тривога ({:.0}/21) часто тримається на \"клейких\" думках. \
+                Техніка дефузії: коли з'являється тривожна думка, \
+                додай перед нею \"я помічаю, що думаю...\". \
+                Напр.: не \"все піде погано\", а \"я помічаю думку що все піде погано\". \
+                Це створює дистанцію між тобою і думкою. Спробуй з 3 думками зараз.",
+                m.gad7_score
+            ),
+            category: "anxiety".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Butterfly hug for acute anxiety
+    if m.gad7_score >= 12.0 {
+        c.push((84, PlanItem {
+            id: "butterfly_hug".into(),
+            title: "Техніка \"метелик\"".into(),
+            description:
+                "Швидка техніка зниження тривоги (EMDR-based): \
+                схрести руки на грудях, кінчики пальців на плечах. \
+                По черзі постукуй лівою і правою рукою (як крила метелика) \
+                протягом 2-3 хв, дихаючи повільно. \
+                Білатеральна стимуляція знижує активацію мигдалини за 60-90 сек."
+                    .into(),
+            category: "anxiety".into(),
+            duration_minutes: Some(5),
+        }));
+    }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -366,6 +436,78 @@ fn add_depression_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
             ),
             category: "mood".into(),
             duration_minutes: Some(10),
+        }));
+    }
+
+    // Self-compassion break for depression + burnout
+    if m.phq9_score >= 10.0 && m.mbi_score >= 40.0 {
+        c.push((86, PlanItem {
+            id: "self_compassion_break".into(),
+            title: "Пауза самоспівчуття".into(),
+            description: format!(
+                "PHQ-9 ({:.0}) + вигорання ({:.0}%) — ти надто суворий до себе. \
+                Вправа Крістін Нефф (3 кроки, 2 хв): \
+                1) \"Мені зараз важко\" (визнай страждання), \
+                2) \"Інші люди теж переживають подібне\" (спільність), \
+                3) \"Нехай я буду добрим до себе\" (самодоброта). \
+                Поклади руку на серце. Скажи це вголос або подумки.",
+                m.phq9_score, m.mbi_score
+            ),
+            category: "mood".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Behavioral scheduling: mastery + pleasure
+    if m.phq9_score >= 8.0 {
+        c.push((73, PlanItem {
+            id: "mastery_pleasure".into(),
+            title: "Задоволення + майстерність".into(),
+            description: format!(
+                "При зниженому настрої ({:.0}/27) мозок \"забуває\" що приносить радість. \
+                Заплануй на сьогодні: 1 дію задоволення (Pleasure) — \
+                щось приємне без мети (кава, музика, прогулянка), \
+                і 1 дію майстерності (Mastery) — маленьке досягнення \
+                (прибрати стіл, закрити 1 задачу, приготувати їжу). \
+                Комбінація P+M — основа поведінкової активації в КПТ.",
+                m.phq9_score
+            ),
+            category: "mood".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+
+    // Anti-rumination walk for moderate depression
+    if m.phq9_score >= 10.0 && m.who5_score < 55.0 {
+        c.push((79, PlanItem {
+            id: "anti_rumination_walk".into(),
+            title: "Антируминаційна прогулянка".into(),
+            description:
+                "Руминація (прокручування негативних думок) — головний підтримувач депресії. \
+                Техніка: вийди на 15-хв прогулянку і СВІДОМО фокусуйся на зовнішньому: \
+                рахуй червоні машини, помічай форми хмар, слухай звуки. \
+                Кожного разу коли думки повертаються всередину — м'яко \
+                перенаправляй увагу назовні. Це розриває цикл руминації."
+                    .into(),
+            category: "mood".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+
+    // Accomplishment journaling
+    if m.phq9_score >= 7.0 && m.phq9_score < 15.0 {
+        c.push((60, PlanItem {
+            id: "accomplishment_journal".into(),
+            title: "Журнал досягнень".into(),
+            description:
+                "При зниженому настрої мозок ігнорує позитивне. Щовечора запиши: \
+                1) Що я зробив сьогодні (навіть дрібниці: встав, поїв, відповів на лист), \
+                2) Що було складно але я впорався, \
+                3) Що хочу зробити завтра (1 маленька річ). \
+                Через тиждень перечитай — побачиш прогрес якого не помічав."
+                    .into(),
+            category: "mood".into(),
+            duration_minutes: Some(5),
         }));
     }
 }
@@ -429,6 +571,43 @@ fn add_balance_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
             ),
             category: "balance".into(),
             duration_minutes: Some(5),
+        }));
+    }
+
+    // Boundary communication script
+    if m.work_life_balance < 3.5 && m.stress_level >= 16.0 {
+        c.push((85, PlanItem {
+            id: "boundary_script".into(),
+            title: "Скрипт кордонів".into(),
+            description: format!(
+                "Баланс ({:.1}/10) при стресі ({:.0}/40) = тобі потрібно сказати \"ні\". \
+                Готові фрази: \
+                \"Я зараз не зможу взяти це — у мене [X] в пріоритеті\", \
+                \"Давай повернемось до цього наступного тижня?\", \
+                \"Мені потрібно перевірити своє навантаження перед тим як відповісти\". \
+                Обери 1 задачу сьогодні і встанови кордон. \"Ні\" — це повне речення.",
+                m.work_life_balance, m.stress_level
+            ),
+            category: "balance".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Values alignment check
+    if m.work_life_balance < 5.0 && m.mbi_score >= 45.0 {
+        c.push((70, PlanItem {
+            id: "values_check".into(),
+            title: "Перевірка цінностей".into(),
+            description: format!(
+                "Дисбаланс ({:.1}/10) + вигорання ({:.0}%) часто означає: \
+                ти живеш за чужими пріоритетами. \
+                Запитай себе: \"Якби я мав лише 3 робочі години на день — \
+                що б я зробив?\" Відповідь покаже твої справжні пріоритети. \
+                Якщо реальний день не схожий на цю відповідь — час щось змінити.",
+                m.work_life_balance, m.mbi_score
+            ),
+            category: "balance".into(),
+            duration_minutes: Some(10),
         }));
     }
 }
@@ -730,6 +909,82 @@ fn add_combined_patterns(c: &mut Vec<(i32, PlanItem)>, m: &Metrics, goals: &Goal
         }));
     }
 
+    // Sleep + anxiety = racing thoughts at night
+    if m.sleep_duration < 6.5 && m.gad7_score >= 8.0 {
+        c.push((88, PlanItem {
+            id: "racing_thoughts_sleep".into(),
+            title: "Нічні нав'язливі думки".into(),
+            description: format!(
+                "Тривога ({:.0}/21) + дефіцит сну ({:.1}h) = думки не дають заснути. \
+                Техніка \"відкладених тривог\": за 2 год до сну запиши всі тривоги \
+                на аркуш + для кожної: \"розберуся завтра о [конкретний час]\". \
+                Поклади аркуш далеко від ліжка. Якщо думка повертається — \
+                скажи собі: \"це вже записано, мозок може відпочити\".",
+                m.gad7_score, m.sleep_duration
+            ),
+            category: "sleep".into(),
+            duration_minutes: Some(10),
+        }));
+    }
+
+    // Depression + poor balance = work-driven emptiness
+    if m.phq9_score >= 8.0 && m.work_life_balance < 4.0 && m.mbi_score >= 40.0 {
+        c.push((87, PlanItem {
+            id: "work_driven_emptiness".into(),
+            title: "Робота без сенсу".into(),
+            description: format!(
+                "Знижений настрій ({:.0}/27) + дисбаланс ({:.1}/10) + вигорання ({:.0}%) = \
+                робота поглинає, але не наповнює. \
+                Сьогодні: 1) Згадай момент коли робота приносила задоволення — що тоді було інакше? \
+                2) Визнач 1 задачу яка відповідає твоїм цінностям і зроби її ПЕРШОЮ. \
+                3) Після роботи — 30 хв на щось поза роботою що має для тебе значення.",
+                m.phq9_score, m.work_life_balance, m.mbi_score
+            ),
+            category: "recovery".into(),
+            duration_minutes: Some(30),
+        }));
+    }
+
+    // Good metrics = optimization mode
+    if m.who5_score >= 65.0 && m.stress_level < 16.0 && m.sleep_duration >= 7.0
+        && m.gad7_score < 7.0 && m.phq9_score < 5.0
+    {
+        c.push((45, PlanItem {
+            id: "optimization_mode".into(),
+            title: "Режим оптимізації".into(),
+            description: format!(
+                "Сон ({:.1}h), настрій ({:.0}), стрес ({:.0}) — все в нормі! \
+                Рідкісний день для зростання. Спробуй щось нове: \
+                холодний душ 30 сек (вагусна стимуляція), \
+                нову фізичну активність (йога, біг, плавання), \
+                або 15 хв медитації. В хороші дні формуються звички \
+                які тримають в погані.",
+                m.sleep_duration, m.who5_score, m.stress_level
+            ),
+            category: "energy".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+
+    // Stress + depression (без тривоги) = анестезований стрес
+    if m.stress_level >= 20.0 && m.phq9_score >= 10.0 && m.gad7_score < 8.0 {
+        c.push((88, PlanItem {
+            id: "numbed_stress".into(),
+            title: "Стрес без тривоги".into(),
+            description: format!(
+                "Стрес ({:.0}/40) + знижений настрій ({:.0}/27) без вираженої тривоги — \
+                це може бути \"анестезована\" реакція: тіло під навантаженням, \
+                але емоції пригнічені. Це небезпечніше ніж тривога, бо непомітне. \
+                Сьогодні: 1) Перевір тілесні сигнали (головний біль? напруга в спині? \
+                стиснуті щелепи?), 2) 10 хв легкої розтяжки з увагою до відчуттів, \
+                3) Запиши \"як я НАСПРАВДІ себе почуваю?\"",
+                m.stress_level, m.phq9_score
+            ),
+            category: "recovery".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+
     // All metrics bad = crisis
     if m.who5_score < 40.0 && m.stress_level >= 24.0 && m.sleep_duration < 5.5 {
         c.push((100, PlanItem {
@@ -801,15 +1056,14 @@ fn add_positive_reinforcement(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
 }
 
 fn weakest_area_tip(m: &Metrics) -> &'static str {
-    // Find which area needs most attention
     let mut worst = ("sleep", 0.0f64);
-    // Normalize all to 0-1 where 1 is worst
     let sleep_bad = if m.sleep_duration < 8.0 { (8.0 - m.sleep_duration) / 8.0 } else { 0.0 };
     let stress_bad = m.stress_level / 40.0;
     let mood_bad = (100.0 - m.who5_score) / 100.0;
     let anxiety_bad = m.gad7_score / 21.0;
     let burnout_bad = m.mbi_score / 100.0;
     let balance_bad = (10.0 - m.work_life_balance) / 10.0;
+    let depression_bad = m.phq9_score / 27.0;
 
     if sleep_bad > worst.1 { worst = ("sleep", sleep_bad); }
     if stress_bad > worst.1 { worst = ("stress", stress_bad); }
@@ -817,14 +1071,16 @@ fn weakest_area_tip(m: &Metrics) -> &'static str {
     if anxiety_bad > worst.1 { worst = ("anxiety", anxiety_bad); }
     if burnout_bad > worst.1 { worst = ("burnout", burnout_bad); }
     if balance_bad > worst.1 { worst = ("balance", balance_bad); }
+    if depression_bad > worst.1 { worst = ("depression", depression_bad); }
 
     match worst.0 {
-        "sleep" => "сон — ляг на 30 хв раніше сьогодні",
-        "stress" => "стрес — зроби 5-хвилинну дихальну вправу",
-        "mood" => "настрій — зроби 1 приємну дію для себе",
-        "anxiety" => "тривога — спробуй техніку заземлення 5-4-3-2-1",
-        "burnout" => "вигорання — делегуй або відклади 1 задачу",
-        "balance" => "баланс — визнач стоп-тайм роботи сьогодні",
+        "sleep" => "сон — ляг на 30 хв раніше і вимкни екрани за годину до сну",
+        "stress" => "стрес — 5 хв box breathing (4-4-4-4) і скасуй 1 необов'язкову справу",
+        "mood" => "настрій — вийди на 15 хв прогулянку і зроби 1 приємну дію для себе",
+        "anxiety" => "тривога — техніка заземлення 5-4-3-2-1 і запиши тривоги на папір",
+        "burnout" => "вигорання — делегуй 1 задачу і захисти 30 хв лише для себе",
+        "balance" => "баланс — визнач стоп-тайм роботи і вимкни робочі нотифікації після нього",
+        "depression" => "настрій — зроби 1 маленьку приємну річ і поговори з близькою людиною",
         _ => "подбай про себе — ти цього вартий",
     }
 }
@@ -870,6 +1126,58 @@ fn add_universal_items(
         category: "movement".into(),
         duration_minutes: Some(goals.move_target),
     }));
+
+    // Specific exercise type based on state
+    match metrics {
+        Some(m) if m.gad7_score >= 10.0 && m.stress_level >= 16.0 => {
+            c.push((69, PlanItem {
+                id: "exercise_type".into(),
+                title: "Ритмічний рух".into(),
+                description: format!(
+                    "При тривозі ({:.0}/21) + стресі ({:.0}/40) найкраще працює \
+                    РИТМІЧНА активність: швидка ходьба, біг, плавання, велосипед. \
+                    Ритмічний рух синхронізує півкулі мозку і знижує кортизол \
+                    ефективніше ніж хаотичний рух. 20-30 хв помірної інтенсивності \
+                    (можеш говорити, але з зусиллям).",
+                    m.gad7_score, m.stress_level
+                ),
+                category: "movement".into(),
+                duration_minutes: Some(25),
+            }));
+        }
+        Some(m) if m.phq9_score >= 8.0 && m.who5_score < 55.0 => {
+            c.push((66, PlanItem {
+                id: "exercise_type".into(),
+                title: "Силова активність".into(),
+                description:
+                    "При зниженому настрої силові вправи ефективніші за кардіо. \
+                    Навіть без обладнання: присідання, віджимання, планка. \
+                    3 підходи по 10 повторень = 10 хв. \
+                    Силове навантаження підвищує тестостерон і BDNF (фактор росту нейронів), \
+                    що покращує настрій і самооцінку. Бонус: відчуття контролю над тілом."
+                        .into(),
+                category: "movement".into(),
+                duration_minutes: Some(15),
+            }));
+        }
+        Some(m) if m.sleep_duration < 6.0 || m.mbi_score >= 60.0 => {
+            c.push((58, PlanItem {
+                id: "exercise_type".into(),
+                title: "М'яка розтяжка".into(),
+                description:
+                    "При виснаженні інтенсивне тренування зашкодить. \
+                    Сьогодні: 15 хв м'якої розтяжки або йоги. \
+                    Фокус на: розтяжка стегон (поза голуба), \
+                    розкриття грудної клітки (руки за спиною), \
+                    нахил вперед (розтяжка задньої поверхні ніг). \
+                    Повільне дихання під час розтяжки = подвійний ефект розслаблення."
+                        .into(),
+                category: "movement".into(),
+                duration_minutes: Some(15),
+            }));
+        }
+        _ => {}
+    }
 
     // Hydration
     c.push((48, PlanItem {
@@ -946,7 +1254,38 @@ fn add_universal_items(
                 duration_minutes: Some(30),
             }));
         }
-        _ => {} // Tue/Thu — no special day item
+        1 => {
+            // Tuesday — energy management
+            c.push((46, PlanItem {
+                id: "tuesday_energy".into(),
+                title: "Вівторок: енергоменеджмент".into(),
+                description:
+                    "Вівторок — зазвичай найпродуктивніший день тижня. \
+                    Використай це: постав найскладнішу задачу на першу половину дня. \
+                    Після обіду — рутинні справи. Захисти свою пікову енергію \
+                    від непотрібних мітингів і дрібних задач."
+                        .into(),
+                category: "focus".into(),
+                duration_minutes: Some(5),
+            }));
+        }
+        3 => {
+            // Thursday — social + reflection
+            c.push((46, PlanItem {
+                id: "thursday_connect".into(),
+                title: "Четвер: зв'язки".into(),
+                description:
+                    "Четвер — гарний день для соціальних зв'язків. \
+                    Напиши колезі подяку за щось конкретне, \
+                    або запропонуй спільний обід. Соціальна підтримка \
+                    на роботі знижує ризик вигорання на 40%. \
+                    Також: рефлексія — чого ти навчився цього тижня?"
+                        .into(),
+                category: "social".into(),
+                duration_minutes: Some(10),
+            }));
+        }
+        _ => {}
     }
 
     // Gratitude — personalized based on state
@@ -1028,6 +1367,58 @@ fn add_universal_items(
         duration_minutes: Some(5),
     }));
 
+    // Nature prescription — calibrated to mood
+    let nature_priority = match metrics {
+        Some(m) if m.who5_score < 45.0 => 74,
+        Some(m) if m.stress_level >= 20.0 => 70,
+        _ => 42,
+    };
+    let nature_desc = match metrics {
+        Some(m) if m.who5_score < 45.0 => format!(
+            "\"Зелена рецептура\": при низькому настрої ({:.0}/100) \
+            20 хв серед зелені знижують кортизол на 20% і покращують настрій на 3 год. \
+            Не потрібен ліс — парк, двір з деревами, навіть балкон з рослинами. \
+            Ключ: без телефону, з увагою до природи (запахи, звуки, кольори).",
+            m.who5_score
+        ),
+        Some(m) if m.stress_level >= 20.0 => format!(
+            "Природа знижує стрес ({:.0}/40) ефективніше ніж медитація в приміщенні. \
+            \"Синрін-йоку\" (лісове купання): 15-20 хв серед дерев, повільна ходьба, \
+            глибоке дихання. Навіть міський парк працює. Без навушників.",
+            m.stress_level
+        ),
+        _ =>
+            "Вийди на 15 хв на свіже повітря сьогодні. Дослідження: 120 хв на природі \
+            на тиждень (17 хв/день) оптимальні для здоров'я і благополуччя. \
+            Без телефону — просто будь присутнім."
+                .to_string(),
+    };
+    c.push((nature_priority, PlanItem {
+        id: "nature_rx".into(),
+        title: "Природа як ліки".into(),
+        description: nature_desc,
+        category: "movement".into(),
+        duration_minutes: Some(20),
+    }));
+
+    // Micro-habits — tiny stackable habits
+    if metrics.map(|m| m.mbi_score >= 40.0 || m.phq9_score >= 8.0).unwrap_or(false) {
+        c.push((52, PlanItem {
+            id: "micro_habits".into(),
+            title: "Мікро-звички".into(),
+            description:
+                "Коли енергії мало, великі зміни не працюють. Стратегія мікро-звичок: \
+                прив'яжи нову дію до існуючої. Приклади: \
+                \"Після того як налью каву → 3 глибоких вдихи\", \
+                \"Після того як сяду за комп'ютер → запишу 1 пріоритет\", \
+                \"Після того як вимию руки → розтяжка шиї 10 сек\". \
+                Обери 1 мікро-звичку на сьогодні. Через 21 день це стане автоматичним."
+                    .into(),
+            category: "motivation".into(),
+            duration_minutes: Some(2),
+        }));
+    }
+
     // Evening wind-down
     if metrics.map(|m| m.sleep_duration < 7.0 || m.stress_level >= 16.0).unwrap_or(false) {
         c.push((62, PlanItem {
@@ -1042,6 +1433,344 @@ fn add_universal_items(
                     .into(),
             category: "sleep".into(),
             duration_minutes: Some(15),
+        }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// SLEEP QUALITY (separate from duration)
+// ─────────────────────────────────────────────────────────
+fn add_sleep_quality_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
+    let sq = m.sleep_quality();
+    // sleep_quality falls back to duration, so only add specific items when we have real quality data
+    // or when there's a notable discrepancy between duration and quality
+    if m.sleep_quality.is_some() {
+        let quality = m.sleep_quality.unwrap();
+        if quality < 4.0 && m.sleep_duration >= 6.0 {
+            // Long sleep but poor quality
+            c.push((85, PlanItem {
+                id: "sleep_quality_poor".into(),
+                title: "Якість сну: увага".into(),
+                description: format!(
+                    "Ти спиш достатньо ({:.1}h), але якість сну низька ({:.1}/10). \
+                    Можливі причини: часті пробудження, апное, стрес. \
+                    Перевір: 1) Температура спальні 18-20°C? \
+                    2) Чи не п'єш алкоголь перед сном (руйнує REM-фазу)? \
+                    3) Чи є шум/світло? (беруші + маска для сну можуть змінити все). \
+                    4) Якщо хропеш — зверніся до лікаря щодо апное.",
+                    m.sleep_duration, quality
+                ),
+                category: "sleep".into(),
+                duration_minutes: Some(10),
+            }));
+        } else if quality < 5.5 {
+            c.push((68, PlanItem {
+                id: "sleep_quality_mediocre".into(),
+                title: "Покращення якості сну".into(),
+                description: format!(
+                    "Якість сну ({:.1}/10) можна покращити. \
+                    Три ключі до глибокого сну: \
+                    1) Регулярність — лягай і вставай в один час (±30 хв), \
+                    2) Прохолода — зниж температуру в спальні, \
+                    3) Темрява — жодного світла (навіть LED індикаторів). \
+                    Найважливіше: стоп-екрани за 60 хв до сну (синє світло \
+                    блокує мелатонін на 90 хв).",
+                    quality
+                ),
+                category: "sleep".into(),
+                duration_minutes: Some(10),
+            }));
+        } else if quality >= 8.0 {
+            c.push((20, PlanItem {
+                id: "sleep_quality_great".into(),
+                title: "Якість сну: відмінно".into(),
+                description: format!(
+                    "Якість сну {:.1}/10 — ти робиш все правильно! \
+                    Твій організм якісно відновлюється. \
+                    Запиши свій вечірній ритуал — це твій рецепт.",
+                    quality
+                ),
+                category: "sleep".into(),
+                duration_minutes: Some(3),
+            }));
+        }
+    }
+
+    // Morning sunlight when sleep is suboptimal
+    if sq < 6.0 || m.sleep_duration < 6.5 {
+        c.push((65, PlanItem {
+            id: "morning_sunlight".into(),
+            title: "Ранкове сонце".into(),
+            description:
+                "Перших 30 хв після пробудження вийди на сонячне світло (або яскраве штучне). \
+                10-15 хв сонця вранці: 1) зсувають циркадний ритм для кращого засинання ввечері, \
+                2) підвищують кортизол вранці (що нормально і корисно), \
+                3) збільшують вироблення серотоніну вдень і мелатоніну вночі. \
+                Це найпотужніший безкоштовний інструмент покращення сну."
+                    .into(),
+            category: "sleep".into(),
+            duration_minutes: Some(15),
+        }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// MORNING ACTIVATION ROUTINE
+// ─────────────────────────────────────────────────────────
+fn add_morning_routine(c: &mut Vec<(i32, PlanItem)>, m: &Metrics, goals: &GoalSettings) {
+    let poor_recovery = m.sleep_duration < 6.0 || m.who5_score < 45.0;
+    let moderate_state = m.sleep_duration >= 6.0 && m.who5_score >= 45.0 && m.stress_level < 24.0;
+
+    if poor_recovery {
+        c.push((76, PlanItem {
+            id: "morning_gentle".into(),
+            title: "М'який ранковий старт".into(),
+            description: format!(
+                "Після поганого сну ({:.1}h) або при низькому настрої ({:.0}/100) \
+                не кидайся одразу в роботу. Ранковий протокол відновлення (15 хв): \
+                1) Склянка теплої води з лимоном, \
+                2) 3 хв повільного дихання (вдих 4 — видих 6), \
+                3) 5 хв легкої розтяжки (шия, плечі, спина), \
+                4) Запиши 1 намір на день (не задачу, а намір: \"бути терплячим\", \"берегти енергію\"). \
+                Повільний старт = стабільніший день.",
+                m.sleep_duration, m.who5_score
+            ),
+            category: "energy".into(),
+            duration_minutes: Some(15),
+        }));
+    } else if moderate_state {
+        c.push((50, PlanItem {
+            id: "morning_activate".into(),
+            title: "Ранкова активація".into(),
+            description: format!(
+                "Стан у нормі — використай ранок для заряду. Протокол (10 хв): \
+                1) Холодне вмивання обличчя (активація вагусного нерва), \
+                2) {} присідань або віджимань (запуск кровообігу), \
+                3) Склянка води, \
+                4) 2 хв візуалізації: уяви що сьогоднішній день пройшов ідеально — \
+                що ти зробив? Як почувався? Це програмує мозок на успіх.",
+                goals.move_target.min(15)
+            ),
+            category: "energy".into(),
+            duration_minutes: Some(10),
+        }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// NUTRITION
+// ─────────────────────────────────────────────────────────
+fn add_nutrition_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
+    // Stress-specific nutrition
+    if m.stress_level >= 20.0 {
+        c.push((66, PlanItem {
+            id: "nutrition_stress".into(),
+            title: "Їжа проти стресу".into(),
+            description: format!(
+                "При стресі ({:.0}/40) організм витрачає більше магнію і вітаміну B. \
+                Антистрес-їжа сьогодні: \
+                темний шоколад (70%+, 1-2 квадратики — магній + ендорфіни), \
+                банан (триптофан → серотонін), горіхи (омега-3, магній), \
+                зелений чай (L-теанін = спокій без сонливості). \
+                Уникай: цукор, фастфуд, надмір кофеїну (макс 2 чашки до 14:00).",
+                m.stress_level
+            ),
+            category: "nutrition".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Depression-specific nutrition
+    if m.phq9_score >= 8.0 {
+        c.push((63, PlanItem {
+            id: "nutrition_mood".into(),
+            title: "Їжа для настрою".into(),
+            description:
+                "Серотонін на 95% виробляється в кишечнику. Для його підтримки: \
+                жирна риба (лосось, скумбрія — омега-3 знижує запалення мозку), \
+                ферментовані продукти (кефір, квашена капуста — мікробіом), \
+                яйця (холін + вітамін D), листова зелень (фолат). \
+                Дослідження SMILES: середземноморська дієта за 12 тижнів \
+                зменшила симптоми депресії у 32% учасників."
+                    .into(),
+            category: "nutrition".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Low energy nutrition
+    if m.who5_score < 50.0 && m.sleep_duration < 7.0 {
+        c.push((60, PlanItem {
+            id: "nutrition_energy".into(),
+            title: "Їжа для енергії".into(),
+            description: format!(
+                "При втомі ({:.0}/100 WHO-5) уникай \"швидких фіксів\" (цукор, енергетики). \
+                Стабільна енергія: вівсянка/каша (повільні вуглеводи), \
+                білок на сніданок (яйця, сир — тримає рівень цукру), \
+                горіхи на перекус (не чіпси/печиво). \
+                Маленькі прийоми їжі кожні 3-4 год замість 2 великих. \
+                Зневоднення імітує втому — мінімум 8 склянок води.",
+                m.who5_score
+            ),
+            category: "nutrition".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Anxiety-specific nutrition
+    if m.gad7_score >= 10.0 {
+        c.push((58, PlanItem {
+            id: "nutrition_anxiety".into(),
+            title: "Їжа проти тривоги".into(),
+            description: format!(
+                "Тривога ({:.0}/21) реагує на харчування. \
+                Зниж: кофеїн (макс 1 чашка вранці), цукор, алкоголь, ультраперероблену їжу. \
+                Додай: магній (гарбузове насіння, мигдаль, шпинат), \
+                L-теанін (зелений чай), пробіотики (кефір, йогурт). \
+                Кишечник-мозок зв'язок: 70% імунної системи і більшість \
+                нейромедіаторів спокою виробляються в кишечнику.",
+                m.gad7_score
+            ),
+            category: "nutrition".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// BODY CARE
+// ─────────────────────────────────────────────────────────
+fn add_body_care_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
+    // Posture + tension when stressed
+    if m.stress_level >= 16.0 {
+        c.push((59, PlanItem {
+            id: "posture_check".into(),
+            title: "Постура і затиски".into(),
+            description: format!(
+                "При стресі ({:.0}/40) тіло затискається непомітно. \
+                Скан тіла прямо зараз (60 сек): \
+                Чоло нахмурене? → розслаб. \
+                Щелепи стиснуті? → відкрий рот на 2 см, подихай. \
+                Плечі підняті? → опусти, зроби 3 кругових рухи. \
+                Живіт затиснутий? → поклади руку, подихай животом. \
+                Повторюй цей скан кожні 2 години — це запобігає головним болям і болю в спині.",
+                m.stress_level
+            ),
+            category: "body".into(),
+            duration_minutes: Some(3),
+        }));
+    }
+
+    // Eye care for screen workers
+    if m.work_life_balance < 6.0 || m.stress_level >= 12.0 {
+        c.push((44, PlanItem {
+            id: "eye_care_2020".into(),
+            title: "Правило 20-20-20".into(),
+            description:
+                "Кожні 20 хв роботи за екраном: дивись 20 секунд \
+                на об'єкт на відстані 20 футів (6 метрів). \
+                Додатково: 1) кожну годину закривай очі на 30 сек, \
+                2) свідомо моргай (при екрані ми моргаємо в 3 рази рідше), \
+                3) ввечері увімкни нічний режим (тепле світло) на всіх пристроях."
+                    .into(),
+            category: "body".into(),
+            duration_minutes: Some(2),
+        }));
+    }
+
+    // Neck and shoulder routine when burnout indicators present
+    if m.mbi_score >= 45.0 || (m.stress_level >= 20.0 && m.sleep_duration < 7.0) {
+        c.push((62, PlanItem {
+            id: "neck_shoulders".into(),
+            title: "Розтяжка шиї і плечей".into(),
+            description:
+                "Стрес накопичується в шиї і плечах. Мікрорутина (3 хв): \
+                1) Нахили голови вліво-вправо (затримка 15 сек кожний), \
+                2) Підборіддя до грудей, потім потилицю назад (5 разів), \
+                3) Кругові рухи плечима вперед і назад (по 10), \
+                4) Зведи лопатки разом, затримай 5 сек (5 разів). \
+                Роби цю рутину після кожної години сидячої роботи."
+                    .into(),
+            category: "body".into(),
+            duration_minutes: Some(3),
+        }));
+    }
+
+    // Cold exposure for vagal tone
+    if m.gad7_score >= 8.0 || (m.stress_level >= 20.0 && m.who5_score < 60.0) {
+        c.push((56, PlanItem {
+            id: "cold_exposure".into(),
+            title: "Холодна стимуляція".into(),
+            description: format!(
+                "Вагусна стимуляція холодом — швидкий спосіб знизити тривогу \
+                і стрес. Обери 1 варіант: \
+                1) Умий обличчя холодною водою (30 сек — \"dive reflex\"), \
+                2) Холодний компрес на задню частину шиї (2 хв), \
+                3) Холодний душ останні 30 сек (просунутий рівень). \
+                Холод активує парасимпатику і знижує пульс за 60 сек. \
+                Протипоказання: серцево-судинні захворювання."
+            ),
+            category: "body".into(),
+            duration_minutes: Some(3),
+        }));
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// SELF-COMPASSION (for depression + burnout overlap)
+// ─────────────────────────────────────────────────────────
+fn add_self_compassion_items(c: &mut Vec<(i32, PlanItem)>, m: &Metrics) {
+    // Perfectionism trap: high burnout but moderate other metrics
+    if m.mbi_score >= 55.0 && m.stress_level < 24.0 && m.gad7_score < 12.0 {
+        c.push((72, PlanItem {
+            id: "perfectionism_release".into(),
+            title: "Відпусти перфекціонізм".into(),
+            description: format!(
+                "Вигорання ({:.0}%) без екстремального стресу — часто ознака перфекціонізму. \
+                Вправа \"достатньо добре\": для 3 задач сьогодні свідомо обери рівень \"80%\" \
+                замість \"ідеально\". Запитай: \"Чи зміниться щось суттєве від різниці \
+                між 80% і 100%?\" Зазвичай ні. Звільнена енергія = твоє відновлення.",
+                m.mbi_score
+            ),
+            category: "recovery".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Inner critic when depression + self-criticism pattern
+    if m.phq9_score >= 10.0 && m.who5_score < 50.0 {
+        c.push((80, PlanItem {
+            id: "inner_critic".into(),
+            title: "Внутрішній критик".into(),
+            description:
+                "Коли настрій низький, внутрішній критик стає голоснішим. \
+                Вправа \"друг\": коли ловиш себе на самокритиці — запитай: \
+                \"Чи сказав би я це близькому другу в такій ситуації?\" \
+                Якщо ні — перефразуй. Замість \"я нікчема\" → \
+                \"мені зараз важко, і це нормально\". \
+                Самоспівчуття — не слабкість, а навичка яка тренується."
+                    .into(),
+            category: "mood".into(),
+            duration_minutes: Some(5),
+        }));
+    }
+
+    // Body scan for combined stress + sleep issues
+    if m.stress_level >= 16.0 && m.sleep_duration < 7.0 {
+        c.push((67, PlanItem {
+            id: "body_scan".into(),
+            title: "Сканування тіла".into(),
+            description:
+                "Повільний body scan перед сном (10 хв): \
+                ляж зручно, закрий очі. Подумки пройди від макушки до пальців ніг, \
+                затримуючись на кожній частині тіла на 3-5 вдихів: \
+                голова → чоло → очі → щелепа → шия → плечі → руки → \
+                груди → живіт → стегна → коліна → стопи. \
+                На кожному видиху уяви як напруга витікає з цієї частини. \
+                Це одна з найефективніших технік засинання (Jon Kabat-Zinn)."
+                    .into(),
+            category: "sleep".into(),
+            duration_minutes: Some(10),
         }));
     }
 }
